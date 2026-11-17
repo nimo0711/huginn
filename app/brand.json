@@ -1,0 +1,10 @@
+{
+  "name": "Moa",
+  "canvas": 64,
+  "background": "#4c6df1",
+  "foreground": "#eeeeee",
+  "inset": 6,
+  "radius": 12,
+  "stroke": 7,
+  "points": [[18, 44], [18, 20], [32, 32], [46, 20], [46, 44]]
+}

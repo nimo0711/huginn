@@ -1,6 +1,6 @@
-# 작업 보드 · Work Board
+# Moa · 모아
 
-여러 Claude·Codex 세션을 한 화면에서 확인하는 개인용 macOS 앱입니다. 작업 제목, 진행 단계, 응답이 필요한 세션, 변경 내용, 실행 결과를 모아 봅니다.
+여러 Claude·Codex 세션의 작업을 한곳에 모아 보는 개인용 macOS 앱입니다. 작업 제목, 진행 단계, 응답이 필요한 세션, 변경 내용, 실행 결과를 확인합니다.
 
 앱은 **Swift/AppKit + WKWebView**로 만든 macOS 창과 **Python 로컬 서비스**로 구성됩니다. 브라우저에서도 같은 화면을 열 수 있습니다. 앱 창을 닫아도 별도로 실행한 로컬 서비스는 계속 동작합니다.
 
@@ -38,7 +38,7 @@ python3 server.py
 
 ```sh
 bash scripts/build_app.sh
-open 'build/작업 보드.app'
+open 'build/Moa.app'
 ```
 
 빌드 결과는 현재 Mac 아키텍처용 앱입니다. 생성한 앱은 로컬 실행용 서명을 사용하며, Apple 공증을 받은 배포본은 아닙니다. 앱을 `~/Applications`로 옮겨 사용할 수 있습니다. 이 앱은 기본 포트 `8790`의 서비스를 열며 Python 서비스를 자체 실행하지 않습니다.

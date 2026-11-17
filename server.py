@@ -17,6 +17,7 @@ import sprint
 import usage
 import local_runtime
 import board_actions
+import branding
 
 HOME = Path(__file__).resolve().parent
 DB_PATH = Path(os.environ.get("WORK_BOARD_DB", HOME / "board.db"))
@@ -294,6 +295,8 @@ class Handler(BaseHTTPRequestHandler):
             return
         if url.path == "/":
             self._send(200, (HOME / "index.html").read_bytes(), "text/html; charset=utf-8")
+        elif url.path == "/assets/brand.svg":
+            self._send(200, branding.icon_svg().encode(), "image/svg+xml; charset=utf-8")
         elif url.path == "/api/state":
             try:
                 q = parse_qs(url.query, keep_blank_values=True, max_num_fields=100)
