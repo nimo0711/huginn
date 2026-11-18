@@ -6,7 +6,7 @@ import tempfile
 import unittest
 
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'scripts'))
-from release_tools import write_checksums, sha256
+from release_tools import config, write_checksums, sha256
 from verify_release import verify
 from publish_draft import prepare_assets
 
@@ -15,9 +15,10 @@ class ReleaseEvidenceTests(unittest.TestCase):
     def setUp(self):
         self.temp=tempfile.TemporaryDirectory();self.addCleanup(self.temp.cleanup)
         self.root=Path(self.temp.name)
-        names=['Forkrail-1.2.0-rc.1-macos-arm64.pkg','Forkrail-1.2.0-rc.1-macos-arm64.zip']
+        self.version=config(Path(__file__).resolve().parents[1])['version']
+        names=[f'Forkrail-{self.version}-macos-arm64{suffix}' for suffix in ['.pkg','.zip']]
         for name in names:(self.root/name).write_bytes(b'fixture package')
-        self.manifest={'name':'Forkrail','version':'1.2.0-rc.1','target':'macos-arm64','signed':False,'artifacts':names}
+        self.manifest={'name':'Forkrail','version':self.version,'target':'macos-arm64','signed':False,'artifacts':names}
         (self.root/'release-manifest.json').write_text(json.dumps(self.manifest))
         write_checksums(self.root,[*(self.root/n for n in names),self.root/'release-manifest.json'])
 
@@ -26,10 +27,10 @@ class ReleaseEvidenceTests(unittest.TestCase):
 
     def test_release_requires_real_service_and_ui_evidence(self):
         with self.assertRaises(ValueError):verify(self.root,require_smoke=True)
-        evidence={'target':'macos-arm64','version':'1.2.0-rc.1','user_data_preserved':True,
+        evidence={'target':'macos-arm64','version':self.version,'user_data_preserved':True,
                   'installer':'installed on disposable runner','app':{
-                      'service':{'ok':True,'mode':'service','version':'1.2.0-rc.1'},
-                      'ui':{'ok':False,'mode':'ui','version':'1.2.0-rc.1'}}}
+                      'service':{'ok':True,'mode':'service','version':self.version},
+                      'ui':{'ok':False,'mode':'ui','version':self.version}}}
         (self.root/'smoke-result.json').write_text(json.dumps(evidence))
         with self.assertRaises(ValueError):verify(self.root,require_smoke=True)
         evidence['app']['ui']['ok']=True

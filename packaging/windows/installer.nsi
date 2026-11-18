@@ -27,9 +27,14 @@ Var Stage
 Var Backup
 Var InstallParent
 Var ServiceBusy
+Var CloseAttempts
 
 !macro CHECK_CLOSED Prefix
 Function ${Prefix}CheckClosed
+  ; An in-app update opens this installer before gracefully exiting. Allow
+  ; that shutdown to finish without killing the app or any separate service.
+  StrCpy $CloseAttempts 40
+  retry_check:
   ; OPEN_EXISTING with no sharing checks the running image without modifying it.
   IfFileExists "$INSTDIR\Forkrail.exe" 0 service_check
   System::Call 'kernel32::CreateFileW(w "$INSTDIR\Forkrail.exe", i 0x40000000, i 0, p 0, i 3, i 0, p 0) p .r0'
@@ -42,6 +47,12 @@ Function ${Prefix}CheckClosed
   System::Call 'kernel32::CloseHandle(p r0)'
   Goto closed
   in_use:
+    IntOp $CloseAttempts $CloseAttempts - 1
+    IntCmp $CloseAttempts 0 give_up give_up retry_wait
+  retry_wait:
+    Sleep 250
+    Goto retry_check
+  give_up:
     IfSilent +2
     MessageBox MB_ICONSTOP "Close Forkrail and its service, then try again."
     SetErrorLevel 3
@@ -180,6 +191,7 @@ Section "Forkrail" SEC_MAIN
   ; Clean only application-owned paths; leave unrelated files in the backup.
   Delete "$Backup\Forkrail.exe"
   Delete "$Backup\Forkrail.ico"
+  Delete "$Backup\release.json"
   Delete "$Backup\Uninstall.exe"
   RMDir /r "$Backup\service"
   RMDir "$Backup"
@@ -242,6 +254,7 @@ Section "Uninstall"
   ClearErrors
   Delete "$Stage\Forkrail.exe"
   Delete "$Stage\Forkrail.ico"
+  Delete "$Stage\release.json"
   Delete "$Stage\Uninstall.exe"
   RMDir /r "$Stage\service"
   StrCpy $1 ""

@@ -9,6 +9,8 @@ import shutil
 import socket
 import subprocess
 import tempfile
+import threading
+import time
 import uuid
 import zipfile
 from contextlib import contextmanager
@@ -161,6 +163,25 @@ def smoke_windows_installer(installer, installed, env, folder, marker, version):
                 raise ValueError('Failed update changed the existing installation')
         require_preserved_markers(marker, default_marker)
 
+        # Model the desktop opening the installer, then finishing its graceful
+        # shutdown. A temporary image lock must be retried without forcing exit.
+        acquired = threading.Event()
+        def closing_app():
+            with windows_file_in_use(installed / 'Forkrail.exe'):
+                acquired.set()
+                time.sleep(1.5)
+        shutdown = threading.Thread(target=closing_app, daemon=True)
+        shutdown.start()
+        if not acquired.wait(5):
+            raise ValueError('Could not exercise graceful update shutdown')
+        try:
+            run_nsis(installer, env)
+        finally:
+            shutdown.join(timeout=5)
+        if shutdown.is_alive() or windows_uninstall_entry() != registration:
+            raise ValueError('Update did not wait for the closing app')
+        require_preserved_markers(marker, default_marker)
+
         stale = installed / 'service/old-release-only.txt'
         stale.write_text('old', encoding='utf-8')
         run_nsis(installer, env)
@@ -232,7 +253,7 @@ def main():
                     installer, installed, env, folder, marker, release['version'],
                 )
                 result['installer'] = (
-                    'installed, locked upgrade refused, upgraded, locked uninstall refused, '
+                    'installed, locked upgrade refused, closing app upgrade retried, upgraded, locked uninstall refused, '
                     'and uninstalled on disposable runner'
                 )
             else:result['installer']='not installed on developer machine'

@@ -17,6 +17,7 @@ class ReleasePackagingTests(unittest.TestCase):
         self.root = Path(self.temp.name)
         self.config = {'name':'Forkrail', 'version':'1.2.0-rc.1',
                        'package_version':'1.2.0', 'bundle_id':'app.forkrail.desktop',
+                       'repository':'nimo0711/forkrail',
                        'platforms':['macos-arm64','macos-x86_64','windows-x64']}
 
     def test_tag_must_match_the_version_being_built(self):
@@ -30,6 +31,11 @@ class ReleasePackagingTests(unittest.TestCase):
                              ('name','../../Other'),('bundle_id','app/forkrail')]:
             with self.subTest(field=field), self.assertRaises(ValueError):
                 release_tools.validate_config({**self.config,field:value})
+
+    def test_repository_must_be_an_exact_github_owner_and_name(self):
+        for repository in ['', '../forkrail', 'owner/repo/releases', 'https://evil.example/repo', 'owner/repo?token=x', None]:
+            with self.subTest(repository=repository), self.assertRaises(ValueError):
+                release_tools.validate_config({**self.config,'repository':repository})
 
     def test_stage_contains_only_distribution_code_and_brand_resources(self):
         for name in release_tools.SOURCE_FILES:

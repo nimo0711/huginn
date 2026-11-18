@@ -90,6 +90,7 @@ def package_mac(release,target,work,service,built,signed,output):
     app=work/'package/Applications/Forkrail.app';app.parent.mkdir(parents=True)
     shutil.copytree(built,app,symlinks=True)
     shutil.copytree(service,app/'Contents/Resources/service',symlinks=True)
+    shutil.copy2(ROOT/'release.json',app/'Contents/Resources/release.json')
     shutil.copy2(ROOT/'desktop/build/Forkrail.icns',app/'Contents/Resources/AppIcon.icns')
     # Wails' XML plist begins with DOCTYPE, without an XML declaration.
     info=app/'Contents/Info.plist';data=plistlib.loads(info.read_bytes(),fmt=plistlib.FMT_XML)
@@ -149,6 +150,7 @@ def sign_windows(path):
 def package_windows(release,target,work,service,built,signed,output):
     folder=work/'Forkrail';folder.mkdir()
     shutil.copy2(built,folder/'Forkrail.exe');shutil.copytree(service,folder/'service')
+    shutil.copy2(ROOT/'release.json',folder/'release.json')
     shutil.copy2(ROOT/'desktop/build/Forkrail.ico',folder/'Forkrail.ico')
     if signed:
         sign_windows(folder/'Forkrail.exe');sign_windows(folder/'service/forkrail-service.exe')
