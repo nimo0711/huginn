@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import calendar
+import copy
 import glob
 import json
 import os
@@ -881,15 +882,43 @@ def _codex_turn(hist: sqlite3.Connection, tid: str, turn_id: str, status: str, s
 
 
 _codex_past = {}
+_codex_recent = {}
 
 
-def _codex_tasks(hist, tid, turns, branch):
+def _recent_codex_tasks(hist, tid, turns, identity):
+    columns = {row[1] for row in hist.execute('PRAGMA table_info(thread_items)')}
+    if 'updated_at_ordinal' not in columns:
+        # Older databases cannot prove that an item was not edited in place.
+        _codex_recent.pop(identity, None)
+        return [_codex_turn(hist, tid, turn, status, float(started or 0), float(completed or 0))
+                for turn, status, started, completed, _ in reversed(turns)]
+    previous = _codex_recent.get(identity, {})
+    current = {}
+    recent = []
+    for turn, status, started, completed, ordinal in reversed(turns):
+        revision = hist.execute(
+            'SELECT count(*), max(rollout_ordinal), max(updated_at_ordinal) FROM thread_items '
+            'WHERE thread_id=? AND turn_id=?', (tid, turn)).fetchone()
+        signature = (status, started, completed, ordinal, revision)
+        saved = previous.get(turn)
+        if saved is None or saved[0] != signature:
+            task = _codex_turn(hist, tid, turn, status, float(started or 0), float(completed or 0))
+            saved = (signature, task)
+        current[turn] = saved
+        # Response decoration and consumers must never change the cached source.
+        recent.append(copy.deepcopy(saved[1]))
+    _codex_recent[identity] = current
+    return recent
+
+
+def _codex_tasks(hist, tid, turns, branch, database_identity):
     """Parse recent turn bodies; aggregate older turns once per database lifetime."""
     oldest = turns[-1][4]
-    identity = (os.path.realpath(CODEX_HISTORY), os.stat(CODEX_HISTORY).st_ino, tid, branch)
-    for old_identity in list(_codex_past):
-        if old_identity[2] == tid and old_identity != identity:
-            _codex_past.pop(old_identity, None)
+    identity = (*database_identity, tid, branch)
+    for cache in (_codex_past, _codex_recent):
+        for old_identity in list(cache):
+            if old_identity[2] == tid and old_identity != identity:
+                cache.pop(old_identity, None)
     saved = _codex_past.get(identity)
     old_count = hist.execute('SELECT count(*) FROM thread_turns WHERE thread_id=? AND rollout_ordinal<?',
                              (tid, oldest)).fetchone()[0]
@@ -906,28 +935,37 @@ def _codex_tasks(hist, tid, turns, branch):
         saved['through'] = ordinal
         saved['count'] += 1
         saved['unfinished'] |= status == 'inProgress'
-    recent = [_codex_turn(hist, tid, t, status, float(started or 0), float(completed or 0))
-              for t, status, started, completed, _ in reversed(turns)]
+    recent = _recent_codex_tasks(hist, tid, turns, identity)
     return sorted(saved['history'], key=lambda t: t['last_ts']) + recent
 
 
 def codex_sessions(now: float) -> list[dict]:
     if not os.path.exists(CODEX_STATE):
         return []
+    st = hist = None
     try:
+        database_identity = (os.path.realpath(CODEX_HISTORY), os.stat(CODEX_HISTORY).st_ino)
         st = sqlite3.connect(Path(CODEX_STATE).as_uri() + '?mode=ro', uri=True, timeout=1)
         hist = sqlite3.connect(Path(CODEX_HISTORY).as_uri() + '?mode=ro', uri=True, timeout=1)
+        if database_identity != (os.path.realpath(CODEX_HISTORY), os.stat(CODEX_HISTORY).st_ino):
+            raise sqlite3.OperationalError('History database replaced while opening')
+        # The open handle retains this identity even if its path is replaced later.
         rows = st.execute(
             "SELECT id, updated_at, cwd, title, git_branch, source, created_at FROM threads "
             "WHERE archived = 0 AND updated_at > ? ORDER BY updated_at DESC LIMIT 40",
             (int(now - WINDOW_SEC),),
         ).fetchall()
-    except sqlite3.Error:
+    except (OSError, sqlite3.Error):
+        if hist is not None:
+            hist.close()
+        if st is not None:
+            st.close()
         return []
     live_ids = {row[0] for row in rows}
-    for identity in list(_codex_past):
-        if identity[2] not in live_ids:
-            _codex_past.pop(identity, None)
+    for cache in (_codex_past, _codex_recent):
+        for identity in list(cache):
+            if identity[2] not in live_ids:
+                cache.pop(identity, None)
     out = []
     for tid, updated, cwd, title, branch, source, created in rows:
         if "subagent" in str(source or ""):
@@ -938,7 +976,13 @@ def codex_sessions(now: float) -> list[dict]:
                 "ORDER BY rollout_ordinal DESC LIMIT ?",
                 (tid, TASKS_KEPT),
             ).fetchall()
-            tasks = _codex_tasks(hist, tid, turns, branch or '') if turns else []
+            if not turns:
+                for cache in (_codex_past, _codex_recent):
+                    for identity in list(cache):
+                        if identity[2] == tid:
+                            cache.pop(identity, None)
+                continue
+            tasks = _codex_tasks(hist, tid, turns, branch or '', database_identity)
         except sqlite3.Error:
             continue
         tasks = [t for t in tasks if t.get('history') or t["prompt"] or t["notes"] or t["n_steps"] or t["n_checks"]]
