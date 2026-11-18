@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/sha256"
+	"encoding/binary"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -323,7 +324,7 @@ func (u *AppUpdates) Check() UpdateState {
 	})
 }
 func installerName(version, target string) string {
-	suffix := ".pkg"
+	suffix := ".dmg"
 	if target == "windows-x64" {
 		suffix = "-Setup.exe"
 	}
@@ -483,6 +484,9 @@ func (u *AppUpdates) Download() UpdateState {
 	return u.change(func(s *UpdateState) {
 		s.Status = "ready"
 		s.Message = "파일 검증을 마쳤습니다. 설치 버튼을 누르면 OS 설치창을 엽니다."
+		if s.OS == "macos" {
+			s.Message = "파일 검증을 마쳤습니다. DMG를 열고 앱을 Applications로 끌어다 놓으면 업데이트할 수 있습니다."
+		}
 	})
 }
 
@@ -535,16 +539,15 @@ func (u *AppUpdates) validateInstaller() error {
 	if err != nil || !os.SameFile(info, opened) {
 		return errUpdateInvalid
 	}
-	var magic [4]byte
-	if _, err := io.ReadFull(f, magic[:]); err != nil {
-		return errUpdateInvalid
-	}
 	if u.config.target == "windows-x64" {
-		if string(magic[:2]) != "MZ" {
+		var magic [4]byte
+		if _, err := io.ReadFull(f, magic[:]); err != nil || string(magic[:2]) != "MZ" {
 			return errUpdateInvalid
 		}
-	} else if string(magic[:]) != "xar!" {
-		return errUpdateInvalid
+	} else {
+		if err := validateDMGEnvelope(f, u.installerSize); err != nil {
+			return err
+		}
 	}
 	if _, err := f.Seek(0, io.SeekStart); err != nil {
 		return err
@@ -556,6 +559,37 @@ func (u *AppUpdates) validateInstaller() error {
 	}
 	return nil
 }
+
+func validateDMGEnvelope(f *os.File, size int64) error {
+	// The compressed UDIF images we distribute end in a 512-byte, big-endian
+	// trailer. A filename or a leading magic value cannot identify these images.
+	const trailerSize = 512
+	if size <= trailerSize {
+		return errUpdateInvalid
+	}
+	var trailer [trailerSize]byte
+	if _, err := f.ReadAt(trailer[:], size-trailerSize); err != nil {
+		return errUpdateInvalid
+	}
+	if string(trailer[:4]) != "koly" || binary.BigEndian.Uint32(trailer[4:8]) != 4 || binary.BigEndian.Uint32(trailer[8:12]) != trailerSize {
+		return errUpdateInvalid
+	}
+	// Segmented disk images are not standalone update installers.
+	if binary.BigEndian.Uint32(trailer[56:60]) != 1 || binary.BigEndian.Uint32(trailer[60:64]) != 1 {
+		return errUpdateInvalid
+	}
+	limit := uint64(size - trailerSize)
+	for _, field := range []int{24, 40, 216} { // data fork, resource fork, XML plist
+		offset := binary.BigEndian.Uint64(trailer[field : field+8])
+		length := binary.BigEndian.Uint64(trailer[field+8 : field+16])
+		// Subtraction keeps malicious offsets/lengths from wrapping on addition.
+		if offset > limit || length > limit-offset || (field != 40 && length == 0) {
+			return errUpdateInvalid
+		}
+	}
+	return nil
+}
+
 func (u *AppUpdates) Install() UpdateState {
 	if !u.begin() {
 		return u.Info()
@@ -606,12 +640,18 @@ func (u *AppUpdates) Install() UpdateState {
 		return u.change(func(s *UpdateState) {
 			s.Status = "ready"
 			s.Message = "OS 설치창을 열지 못했거나 실행을 취소했습니다. 다시 시도해 주세요."
+			if s.OS == "macos" {
+				s.Message = "DMG를 열지 못했거나 실행을 취소했습니다. 다시 시도해 주세요."
+			}
 		})
 	}
 	u.launched = true
 	state := u.change(func(s *UpdateState) {
 		s.Status = "installing"
 		s.Message = "OS 설치창을 열었습니다. 설치 후 다시 실행하면 적용된 버전을 확인할 수 있습니다."
+		if s.OS == "macos" {
+			s.Message = "DMG를 열었습니다. 이 앱이 종료되면 Forkrail을 Applications로 끌어다 놓고 기존 앱을 교체해 주세요."
+		}
 	})
 	if u.afterLaunch != nil {
 		go u.afterLaunch()

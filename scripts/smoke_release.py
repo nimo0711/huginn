@@ -65,11 +65,32 @@ def smoke_mac_app(app, bundle_id, env, folder):
     return smoke(executable, env, folder)
 
 
-def expanded_mac_app(expanded):
-    apps = list(expanded.glob('*.pkg/Payload/Applications/Forkrail.app'))
-    if len(apps) != 1 or not apps[0].is_dir() or apps[0].is_symlink():
-        raise ValueError('The expanded PKG must contain exactly one Forkrail.app in a component payload')
-    return apps[0]
+@contextmanager
+def mounted_disk_image(image, folder):
+    mount=folder/'mounted-dmg';mount.mkdir()
+    run(['/usr/bin/hdiutil','verify',image])
+    run(['/usr/bin/hdiutil','attach','-readonly','-nobrowse','-mountpoint',mount,image])
+    try:
+        yield mount
+    finally:
+        run(['/usr/bin/hdiutil','detach',mount])
+
+
+def smoke_mac_disk_image(image, bundle_id, env, folder):
+    from create_dmg import verify_layout
+    installed=folder/'Applications/Forkrail.app'
+    installed.parent.mkdir()
+    with mounted_disk_image(image,folder) as mount:
+        layout=verify_layout(mount)
+        source=mount/'Forkrail.app'
+        if source.is_symlink() or not source.is_dir():
+            raise ValueError('DMG must contain the actual Forkrail.app')
+        # Finder drag installation copies the whole app bundle. Use the same
+        # metadata-preserving copy without touching the developer's Applications.
+        run(['/usr/bin/ditto',source,installed])
+    run(['/usr/bin/codesign','--verify','--deep','--strict',installed])
+    results=smoke_mac_app(installed,bundle_id,env,folder)
+    return results,{'layout_verified':True,'copied':True,'layout':layout}
 
 
 def nsis_command(executable, path_option=None, directory=None):
@@ -231,17 +252,10 @@ def main():
             run(['/usr/bin/ditto', '-x', '-k', archive, portable])
             result['portable'] = smoke_mac_app(portable / 'Forkrail.app', release['bundle_id'], env, folder)
 
-            pkg = output / (name + '.pkg')
-            if ci:
-                run(['sudo', '/usr/sbin/installer', '-pkg', pkg, '-target', '/'])
-                app = Path('/Applications/Forkrail.app')
-                result['installer'] = 'installed on disposable runner'
-            else:
-                expanded = folder / 'expanded'
-                run(['/usr/sbin/pkgutil', '--expand-full', pkg, expanded])
-                app = expanded_mac_app(expanded)
-                result['installer'] = 'payload expanded; local Applications unchanged'
-            result['app'] = smoke_mac_app(app, release['bundle_id'], env, folder)
+            image=output/(name+'.dmg')
+            result['app'],result['disk_image']=smoke_mac_disk_image(image,release['bundle_id'],env,folder)
+            result['installer']=('DMG mounted, app copied and launched on disposable runner' if ci
+                                 else 'DMG copied to temporary Applications; local Applications unchanged')
         else:
             with zipfile.ZipFile(archive) as release_zip:
                 release_zip.extractall(portable)

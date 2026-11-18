@@ -260,14 +260,21 @@ func (app *desktopApp) confirmUpdateInstall(state UpdateState) (bool, error) {
 	if state.Signed {
 		signature = "운영체제에서 설치 파일의 서명을 확인했습니다."
 	}
+	button := "설치창 열기"
+	message := "Forkrail " + state.LatestVersion + " 설치창을 여시겠습니까?\n\n" + signature +
+		"\n\n설치창을 열면 이 앱을 종료합니다. 별도로 실행한 서비스는 종료하지 않습니다. 설치 후 앱을 다시 실행해 주세요."
+	if state.OS == "macos" {
+		button = "DMG 열기"
+		message = "Forkrail " + state.LatestVersion + " DMG를 여시겠습니까?\n\n" + signature +
+			"\n\nDMG를 열면 이 앱을 종료합니다. 종료된 뒤 Forkrail을 Applications로 끌어다 놓고 기존 앱을 교체해 주세요. Applications에서 Forkrail을 다시 실행하면 업데이트가 적용됩니다. 별도로 실행한 서비스는 종료하지 않습니다."
+	}
 	answer, err := wailsruntime.MessageDialog(ctx, wailsruntime.MessageDialogOptions{
-		Type:  wailsruntime.QuestionDialog,
-		Title: "Forkrail 업데이트 설치",
-		Message: "Forkrail " + state.LatestVersion + " 설치창을 여시겠습니까?\n\n" + signature +
-			"\n\n설치창을 열면 이 앱을 종료합니다. 별도로 실행한 서비스는 종료하지 않습니다. 설치 후 앱을 다시 실행해 주세요.",
-		Buttons: []string{"설치창 열기", "취소"}, DefaultButton: "취소", CancelButton: "취소",
+		Type:    wailsruntime.QuestionDialog,
+		Title:   "Forkrail 업데이트 설치",
+		Message: message,
+		Buttons: []string{button, "취소"}, DefaultButton: "취소", CancelButton: "취소",
 	})
-	return answer == "설치창 열기", err
+	return answer == button, err
 }
 
 func (app *desktopApp) setRuntimeContext(ctx context.Context) {

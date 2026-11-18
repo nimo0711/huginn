@@ -24,20 +24,17 @@ def setup(folder):
     values={}
     if sys.platform=='darwin':
         app=certificate('APPLE_CERTIFICATE_BASE64','app.p12')
-        installer=certificate('APPLE_INSTALLER_CERTIFICATE_BASE64','installer.p12')
         password=secrets.token_hex(24);keychain=folder/'signing.keychain-db'
         run(['security','create-keychain','-p',password,keychain])
         run(['security','set-keychain-settings','-lut','21600',keychain])
         run(['security','unlock-keychain','-p',password,keychain])
-        for path,key in [(app,'APPLE_CERTIFICATE_PASSWORD'),(installer,'APPLE_INSTALLER_CERTIFICATE_PASSWORD')]:
-            run(['security','import',path,'-k',keychain,'-P',required(key),'-T','/usr/bin/codesign','-T','/usr/bin/productsign','-T','/usr/bin/pkgbuild'])
+        run(['security','import',app,'-k',keychain,'-P',required('APPLE_CERTIFICATE_PASSWORD'),'-T','/usr/bin/codesign'])
         run(['security','set-key-partition-list','-S','apple-tool:,apple:,codesign:','-s','-k',password,keychain])
         # This changes only the disposable runner's search list, never a user's Mac.
         run(['security','list-keychains','-d','user','-s',keychain])
         run(['xcrun','notarytool','store-credentials','forkrail-ci','--keychain',keychain,
              '--apple-id',required('APPLE_ID'),'--team-id',required('APPLE_TEAM_ID'),'--password',required('APPLE_APP_PASSWORD')])
         values={'FORKRAIL_APPLE_APP_IDENTITY':required('APPLE_APP_IDENTITY'),
-                'FORKRAIL_APPLE_INSTALLER_IDENTITY':required('APPLE_INSTALLER_IDENTITY'),
                 'FORKRAIL_NOTARY_PROFILE':'forkrail-ci','FORKRAIL_NOTARY_KEYCHAIN':str(keychain)}
     elif sys.platform=='win32':
         cert=certificate('WINDOWS_CERTIFICATE_BASE64','windows.pfx')
