@@ -447,7 +447,7 @@ def _feed(info: dict, line: str) -> None:
             if b.get('name')=='Bash' and local_runtime.launch_command(inp.get('command','')):
                 info.setdefault('pending_servers',{})[b.get('id') or '']=(current,ts)
             if b.get("name") in ("Write", "Edit") or b.get("name") == "Bash" and change:
-                info.setdefault("pending_plans", {})[b.get("id") or ""] = (current, [inp.get("file_path")] + _cmd_paths(inp.get("command") or ""))
+                info.setdefault("pending_plans", {})[b.get("id") or ""] = (current, [inp.get("file_path")] + _doc_paths(inp.get("command") or ""))
             _touch(current, [inp.get("file_path"), inp.get("notebook_path"), inp.get("path")] + _cmd_paths(inp.get("command") or ""), 3 if change else 1)
             if b.get("name") == "Write":
                 _touch(current, _cmd_paths(inp.get("content") or ""), 3)
@@ -510,7 +510,18 @@ def _doc(task: dict, path: str, ts: float, created: bool) -> None:
 
 
 def _doc_paths(text: str) -> list:
-    return [p for p in _cmd_paths(text) if os.path.splitext(p)[1].lower() in DOC_EXT and connections.STORE.document_location(p)]
+    root=connections.STORE.document_root()
+    if not root:return []
+    # Document locations follow the registered folder, independently of the
+    # home-based paths used to infer work areas. Quotes may contain spaces.
+    candidates=_cmd_paths(text)
+    candidates.extend(match[1] for match in re.findall(r"""(['"])((?:[A-Za-z]:[\\/]|/|~[\\/])[^\r\n]*?)\1""",text or ''))
+    prefix=re.escape(root.replace(os.sep,'/')).replace('/',_PATH_SEPARATOR)
+    pattern=r"(?:^|[\s'\"=(])("+prefix+_PATH_SEPARATOR+r"[^\s'\"`;|&)<>]+)"
+    candidates.extend(re.findall(pattern,text or '',re.IGNORECASE if os.name=='nt' else 0))
+    return list(dict.fromkeys(location[0] for path in candidates
+                             if os.path.splitext(path)[1].lower() in DOC_EXT
+                             and (location:=connections.STORE.document_location(path))))
 
 
 def _confirm_docs(pend: tuple, end: float) -> None:
@@ -879,7 +890,11 @@ def _codex_turn(hist: sqlite3.Connection, tid: str, turn_id: str, status: str, s
             _record(task, ts, change, _describe_cmd(cmd), False)
             _touch(task, _cmd_paths(cmd, d.get("cwd") or ""), 3 if change else 1)
             if change and d.get("exitCode") == 0:
-                _plan_reference(task, _cmd_paths(cmd, d.get("cwd") or ""))
+                paths=_doc_paths(cmd)
+                _plan_reference(task,paths)
+                start=command_start/1000 if command_start else ts
+                end=command_end/1000 if command_end else ts
+                _confirm_docs((task,paths,start),end)
         elif kind == "fileChange":
             for c in d.get("changes") or []:
                 if isinstance(c, dict):
