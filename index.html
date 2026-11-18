@@ -894,6 +894,7 @@ h1,h2,h3,p { margin-top:0; }
 .settings-page .section-heading > div { min-width:0; }
 .settings-page .section-heading > button { flex:none; }
 .settings-primary { font-weight:600; border-color:var(--primary) !important; }
+.settings-secondary { border-color:var(--dim) !important; }
 .settings-form-section { display:grid; grid-template-columns:minmax(140px,1fr) minmax(0,2.6fr); gap:32px; padding:20px 0; border-top:1px solid var(--line); }
 .settings-form-section:first-child { border-top:0; padding-top:0; }
 .settings-form-section h3 { margin:0; font-size:14px; font-weight:600; }
@@ -2274,10 +2275,10 @@ function updatesView() {
   ${status==='downloading'?`<progress class="update-progress" aria-label="업데이트 다운로드 진행률" max="100"${known?` value="${percent}"`:''}></progress><p class="quiet">${known?`${percent}%`:'다운로드 크기 확인 중'}</p>`:''}
   ${status==='ready'?`<p class="quiet">${state.signed?'배포 정보에 서명된 파일로 표시돼 있습니다. 설치 시 운영체제에서 확인합니다.':'서명되지 않은 배포 파일입니다. 설치 시 운영체제의 보안 확인이 필요할 수 있습니다.'}</p>`:''}</div></div>
   <div class="settings-form-footer"><div class="action-buttons">
-  ${available?`<button class="soft-button" data-update-action="Check"${disabled}>${checkLabel}</button>`:''}
+  ${available?`<button class="soft-button ${['available','ready'].includes(status)?'settings-secondary':'settings-primary'}" data-update-action="Check"${disabled}>${checkLabel}</button>`:''}
   ${available && status==='available'?`<button class="soft-button settings-primary" data-update-action="Download"${disabled}>업데이트 다운로드</button>`:''}
   ${available && status==='ready'?`<button class="soft-button settings-primary" data-update-action="Install"${disabled}>업데이트 설치</button>`:''}
-  <a class="soft-button" href="${esc(releaseURL)}" target="_blank" rel="noopener noreferrer">배포 페이지 ${ARROW}</a></div></div></section>`;
+  <a class="soft-button settings-secondary" href="${esc(releaseURL)}" target="_blank" rel="noopener noreferrer">배포 페이지 ${ARROW}</a></div></div></section>`;
 }
 function environmentValues(form,trim=false) {
   const result={};
