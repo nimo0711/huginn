@@ -3,6 +3,8 @@ import os
 from pathlib import Path
 import re
 
+from platform_support import IS_WINDOWS
+
 
 THREAD = re.compile(r'^\[codex\] Thread ready \(([0-9a-f-]{36})\)\.', re.M)
 _cache = {}
@@ -13,7 +15,7 @@ def _thread(path):
         stamp = (path.stat().st_mtime_ns, path.stat().st_size)
         if path in _cache and _cache[path][0] == stamp:
             return _cache[path][1]
-        with path.open() as f:
+        with path.open(encoding="utf-8") as f:
             head = f.read(4096)
         match = THREAD.search(head) if head.startswith('[codex] Starting Codex task thread.') else None
         child = match.group(1) if match else None
@@ -24,9 +26,17 @@ def _thread(path):
 
 
 def attach(sessions, output_root=None):
-    root = Path(output_root) if output_root else Path('/tmp').resolve() / ('claude-' + str(os.getuid()))
     parents = {s['id']: s for s in sessions if s['agent'] == 'claude'}
     children = {s['id']: s for s in sessions if s['agent'] == 'codex'}
+    if not parents or not children:
+        return
+    if output_root:
+        root = Path(output_root)
+    elif IS_WINDOWS:
+        # The default Claude scratch location is specific to POSIX sessions.
+        return
+    else:
+        root = Path('/tmp').resolve() / ('claude-' + str(os.getuid()))
     candidates = {}
     for parent_id in parents:
         for path in root.glob('*/' + parent_id + '/tasks/*.output'):

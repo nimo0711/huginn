@@ -32,7 +32,7 @@ class PackagingTests(unittest.TestCase):
     def test_generated_service_keeps_paths_with_spaces_as_separate_arguments(self):
         repo=Path('/test user/My Board');python=Path('/test user/Python/bin/python3')
         value=configuration(repo,python)
-        self.assertEqual(value['ProgramArguments'],[str(python),str(repo/'server.py')])
+        self.assertEqual(value['ProgramArguments'],[str(python.resolve()),str(repo/'server.py')])
         self.assertEqual(value['WorkingDirectory'],str(repo))
 
     def test_scanner_uses_current_home_and_supports_home_alias(self):

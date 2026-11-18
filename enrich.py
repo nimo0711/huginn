@@ -10,9 +10,10 @@ import time
 from pathlib import Path
 from urllib.parse import quote
 import connections
+from runtime_paths import DATA_DIR
+from platform_support import replace_file, run_hidden
 
-HERE = os.path.dirname(os.path.abspath(__file__))
-CACHE = os.path.join(HERE, "story_cache.json")
+CACHE = os.path.join(DATA_DIR, "story_cache.json")
 TTL = 180
 TAG_RE = re.compile(r"^(\s*\[[^\]]*\])+\s*")
 
@@ -24,7 +25,7 @@ _configuration = None
 
 def _load() -> None:
     try:
-        with open(CACHE) as f:
+        with open(CACHE, encoding="utf-8") as f:
             _data.update(json.load(f))
     except (OSError, ValueError):
         pass
@@ -32,16 +33,17 @@ def _load() -> None:
 
 def _save() -> None:
     try:
-        with open(CACHE + ".tmp", "w") as f:
+        os.makedirs(os.path.dirname(CACHE), exist_ok=True)
+        with open(CACHE + ".tmp", "w", encoding="utf-8") as f:
             json.dump(_data, f, ensure_ascii=False)
-        os.replace(CACHE + ".tmp", CACHE)
+        replace_file(CACHE + ".tmp", CACHE)
     except OSError:
         pass
 
 
 def _run(args: list, cwd: str | None = None) -> str:
     try:
-        return subprocess.run(args, capture_output=True, text=True, cwd=cwd, timeout=25).stdout
+        return run_hidden(args, capture_output=True, encoding="utf-8", errors="replace", cwd=cwd, timeout=25).stdout
     except (OSError, subprocess.SubprocessError):
         return ""
 
@@ -118,7 +120,7 @@ def _commits(key: str) -> list:
     seen, out = set(), []
     for d in sorted(dirs):
         repo = re.sub(r"-.*", "", os.path.basename(d))
-        log = _run(["git", "-C", d, "log", "--all", f"--grep={key}", "--format=%ct|%s", "-n", "40"])
+        log = _run([connections.cli("git") if connections.IS_WINDOWS else "git", "-C", d, "log", "--all", f"--grep={key}", "--format=%ct|%s", "-n", "40"])
         for line in log.splitlines():
             ts, _, subj = line.partition("|")
             body = TAG_RE.sub("", subj).strip()

@@ -1,6 +1,7 @@
 """Detached server identity comes from its current output, never a reused port."""
 import os
 import unittest
+import sys
 from unittest.mock import patch
 import local_runtime as runtime
 
@@ -8,6 +9,7 @@ A = '00000000-0000-0000-0000-000000000001'
 B = '00000000-0000-0000-0000-000000000002'
 
 
+@unittest.skipIf(sys.platform == 'win32', 'requires macOS lsof output descriptors and user IDs')
 class DetachedServers(unittest.TestCase):
     def output(self, sid=A, pid=11, fd=1, access='w', uid=None, path=None):
         uid = os.getuid() if uid is None else uid

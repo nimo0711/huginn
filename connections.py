@@ -1,14 +1,14 @@
 """One configuration contract for the settings screen, CLI and data readers."""
 from __future__ import annotations
 import copy
-import fcntl
 import hashlib
 import json
 import os
 from pathlib import Path
+from platform_support import cli_path, file_lock, replace_file, IS_WINDOWS, windows_agent_command, run_hidden
+from runtime_paths import DATA_DIR
 import re
 import shlex
-import shutil
 import subprocess
 import threading
 import time
@@ -20,12 +20,12 @@ SCHEMA = {
     'jira': {'label':'Jira','description':'작업 제목·스토리·상태·스프린트', 'defaults':{'enabled':False,'site':'','project':''},
              'fields':[{'key':'site','label':'사이트 주소','type':'url','hint':'현재 acli에 로그인한 사이트의 주소'},
                        {'key':'project','label':'프로젝트 키','type':'text','hint':'스프린트에서 조회할 프로젝트 키'}],
-             'help':'주소와 프로젝트를 저장한 뒤 로그인 버튼을 누르세요. 터미널과 브라우저에서 본인 계정으로 로그인하고, 보드로 돌아와 연결 확인을 누릅니다. 이미 로그인했다면 연결 확인부터 사용할 수 있습니다. 인증은 이 Mac의 acli가 관리합니다.'},
+             'help':'주소와 프로젝트를 저장한 뒤 로그인 버튼을 누르세요. 터미널과 브라우저에서 본인 계정으로 로그인하고, 보드로 돌아와 연결 확인을 누릅니다. 이미 로그인했다면 연결 확인부터 사용할 수 있습니다. 인증은 이 컴퓨터의 acli가 관리합니다.'},
     'gitlab': {'label':'GitLab','description':'그룹의 MR·머지 상태', 'defaults':{'enabled':False,'host':'','group':'','cwd':''},
                'fields':[{'key':'host','label':'호스트','type':'text','hint':'프로토콜을 제외한 호스트와 필요한 포트'},
                          {'key':'group','label':'그룹 경로','type':'text','hint':'하위 그룹은 /로 구분'},
                          {'key':'cwd','label':'작업 폴더','type':'path','hint':'GitLab CLI가 사용할 기존 로컬 폴더'}],
-               'help':'호스트·그룹·작업 폴더를 저장한 뒤 로그인 버튼을 누르세요. 터미널의 GitLab 로그인 안내를 마치고 연결 확인을 누릅니다. 이미 로그인했다면 연결 확인부터 사용할 수 있습니다. 인증은 이 Mac의 glab이 관리합니다.'},
+               'help':'호스트·그룹·작업 폴더를 저장한 뒤 로그인 버튼을 누르세요. 터미널의 GitLab 로그인 안내를 마치고 연결 확인을 누릅니다. 이미 로그인했다면 연결 확인부터 사용할 수 있습니다. 인증은 이 컴퓨터의 glab이 관리합니다.'},
     'git': {'label':'로컬 Git','description':'등록한 폴더의 저장소·커밋 기록', 'defaults':{'enabled':False,'roots':[]},
             'fields':[{'key':'roots','label':'조회할 폴더','type':'paths','hint':'한 줄에 한 폴더. 폴더 자체와 두 단계 아래의 저장소를 읽습니다.'}],
             'help':'기존 로컬 폴더를 등록합니다. clone·fetch·checkout은 실행하지 않습니다.'},
@@ -40,13 +40,12 @@ SCHEMA = {
 
 
 def cli(name):
-    return next((str(p) for p in [Path.home()/'.local/bin'/name,Path('/opt/homebrew/bin')/name,
-                  Path('/usr/local/bin')/name] if p.is_file() and os.access(p,os.X_OK)),shutil.which(name) or name)
+    return cli_path(name) or (str(Path.home() / '.local/bin' / (name + '.exe')) if IS_WINDOWS else name)
 
 
 def run(args, cwd=None, env=None):
     try:
-        p=subprocess.run(args,cwd=cwd or None,env=env,capture_output=True,text=True,timeout=15)
+        p=run_hidden(args,cwd=cwd or None,env=env,capture_output=True,encoding='utf-8',errors='replace',timeout=15)
         return p.returncode,p.stdout
     except (OSError,subprocess.SubprocessError):return -1,''
 
@@ -68,7 +67,7 @@ def jira_account_matches(site):
 
 def probe(args,cwd=None,env=None):
     try:
-        p=subprocess.run(args,cwd=cwd or None,env=env,capture_output=True,text=True,timeout=15)
+        p=run_hidden(args,cwd=cwd or None,env=env,capture_output=True,encoding='utf-8',errors='replace',timeout=15)
     except FileNotFoundError:return {'status':'cli_missing'}
     except subprocess.TimeoutExpired:return {'status':'timeout'}
     except (OSError,subprocess.SubprocessError):return {'status':'check_failed'}
@@ -94,7 +93,7 @@ class Connections:
 
     def read(self):
         try:
-            data=json.loads(self.path.read_text())
+            data=json.loads(self.path.read_text(encoding='utf-8'))
             if not isinstance(data,dict):raise ValueError()
             return data
         except FileNotFoundError:return {}
@@ -114,7 +113,7 @@ class Connections:
 
     def catalog(self):
         data=self.read();rows=[]
-        try:checks=json.loads(self.check_path.read_text())
+        try:checks=json.loads(self.check_path.read_text(encoding='utf-8'))
         except (OSError,ValueError):checks={}
         if not isinstance(checks,dict):checks={}
         for kind,spec in SCHEMA.items():
@@ -127,13 +126,12 @@ class Connections:
 
     def _write(self,kind,update):
         self.state.mkdir(parents=True,exist_ok=True,mode=0o700)
-        with (self.state/'.lock').open('a') as lock:
-            os.chmod(lock.name,0o600);fcntl.flock(lock,fcntl.LOCK_EX)
+        with file_lock(self.state / '.lock'):
             data=self.read();value=update(data);data[kind]=value
             tmp=self.state/('.connections.'+uuid.uuid4().hex)
             try:
-                with os.fdopen(os.open(tmp,os.O_WRONLY|os.O_CREAT|os.O_EXCL,0o600),'w') as f:json.dump(data,f,ensure_ascii=False)
-                tmp.replace(self.path)
+                with os.fdopen(os.open(tmp,os.O_WRONLY|os.O_CREAT|os.O_EXCL,0o600),'w',encoding='utf-8') as f:json.dump(data,f,ensure_ascii=False)
+                replace_file(tmp, self.path)
             finally:tmp.unlink(missing_ok=True)
         return self.get(kind)
 
@@ -223,7 +221,8 @@ class Connections:
             source=self.home/('.'+kind)/('projects' if kind=='claude' else 'state_5.sqlite')
             ok=source.exists();message='로컬 세션 저장소를 확인했습니다.' if ok else '로컬 세션 저장소를 찾지 못했습니다. 해당 도구를 먼저 실행해 주세요.'
         elif kind=='summary':
-            code,_=run([cli('claude'),'--version']);ok=code==0
+            command=windows_agent_command('claude') if IS_WINDOWS else [cli('claude')]
+            ok=bool(command) and run([*command,'--version'])[0]==0
             message='Claude CLI를 확인했습니다. 로그인·모델 실행은 점검하지 않았습니다.' if ok else 'Claude CLI 설치를 확인해 주세요.'
         if kind in ('jira','gitlab') and not ok:
             message={
@@ -242,18 +241,17 @@ class Connections:
 
     def _save_check(self,kind,values,result):
         self.state.mkdir(parents=True,exist_ok=True,mode=0o700)
-        with (self.state/'.lock').open('a') as lock:
-            os.chmod(lock.name,0o600);fcntl.flock(lock,fcntl.LOCK_EX)
+        with file_lock(self.state / '.lock'):
             if self.get(kind)!=values:
                 return {'ok':False,'status':'config_changed','message':'확인 중 설정이 변경됐습니다. 다시 확인해 주세요.','checked_at':time.time()}
             result={**result,'checked_at':time.time(),'fingerprint':values_hash(values)}
-            try:checks=json.loads(self.check_path.read_text())
+            try:checks=json.loads(self.check_path.read_text(encoding='utf-8'))
             except (OSError,ValueError):checks={}
             if not isinstance(checks,dict):checks={}
             checks[kind]=result;tmp=self.state/('.checks.'+uuid.uuid4().hex)
             try:
-                with os.fdopen(os.open(tmp,os.O_WRONLY|os.O_CREAT|os.O_EXCL,0o600),'w') as f:json.dump(checks,f,ensure_ascii=False)
-                tmp.replace(self.check_path)
+                with os.fdopen(os.open(tmp,os.O_WRONLY|os.O_CREAT|os.O_EXCL,0o600),'w',encoding='utf-8') as f:json.dump(checks,f,ensure_ascii=False)
+                replace_file(tmp, self.check_path)
             finally:tmp.unlink(missing_ok=True)
         return result
 
@@ -282,4 +280,4 @@ class Connections:
         return '\n'.join(lines)
 
 
-STORE=Connections(Path(__file__).resolve().parent/'.actions')
+STORE=Connections(DATA_DIR / '.actions')

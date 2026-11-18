@@ -2,19 +2,21 @@
 from __future__ import annotations
 import json
 import hashlib
-import fcntl
-from contextlib import contextmanager
 import os
 from pathlib import Path
 import re
 import shlex
 import shutil
 import subprocess
+import sys
 import threading
 import time
 import uuid
 from session_delivery import SessionDelivery, validate_prompt, prompt_hash, skill_request_text
 from connections import Connections
+from platform_support import (IS_WINDOWS, file_lock, powershell_command, replace_file,
+                              windows_agent_command, write_powershell_launcher)
+from runtime_paths import FROZEN, RESOURCE_ROOT
 try:
     import tomllib
 except ImportError:
@@ -29,7 +31,7 @@ def skill_rules(home,cwd):
         # Never bypass a disabled skill when configuration cannot be read.
         try:
             if tomllib is None:return None
-            config=tomllib.loads(path.read_text())
+            config=tomllib.loads(path.read_text(encoding='utf-8'))
             rules.extend(config.get('skills',{}).get('config',[]))
         except (OSError,ValueError,TypeError):return None
     return rules
@@ -50,13 +52,13 @@ def skill_enabled(path,name,rules):
 
 
 def read_json(path,default=None):
-    try:return json.loads(Path(path).read_text())
+    try:return json.loads(Path(path).read_text(encoding='utf-8'))
     except (OSError,ValueError):return {} if default is None else default
 
 
 def metadata(path):
     try:
-        text=path.read_text()[:65536]
+        text=path.read_text(encoding='utf-8')[:65536]
     except (OSError,UnicodeError):return {}
     if not text.startswith('---'):return {}
     parts=text.split('---',2)
@@ -68,14 +70,30 @@ def metadata(path):
     return result
 
 
+def powershell_quote(value):
+    return "'" + str(value).replace("'", "''") + "'"
+
+
 def executable(agent):
+    if IS_WINDOWS:
+        return next(iter(windows_agent_command(agent)), None)
     home=Path.home()
     candidates=([home/'.local/bin/claude'] if agent=='claude' else sorted(home.glob('.nvm/versions/node/*/bin/codex'),key=lambda p:p.stat().st_mtime,reverse=True))
     candidates += [Path(p) for p in [shutil.which(agent),'/opt/homebrew/bin/'+agent,'/usr/local/bin/'+agent] if p]
     return next((str(p) for p in candidates if p.is_file() and os.access(p,os.X_OK)),None)
 
 
+def agent_command(agent, home):
+    if IS_WINDOWS:
+        return windows_agent_command(agent, home)
+    cli = executable(agent)
+    return [cli] if cli else []
+
+
 def open_terminal(path,app=''):
+    if IS_WINDOWS:
+        subprocess.Popen(powershell_command(path), creationflags=subprocess.CREATE_NEW_CONSOLE)
+        return
     args=['/usr/bin/open']+(['-a',app] if app else [])+[str(path)]
     result=subprocess.run(args,capture_output=True,text=True,timeout=10)
     if result.returncode:raise RuntimeError('새 터미널 창을 열지 못했습니다.')
@@ -88,20 +106,16 @@ class ActionStore:
         self.delivery=SessionDelivery(self.state,self.home)
         self.connections=Connections(self.state,self.home)
 
-    @contextmanager
     def editing(self):
         self.state.mkdir(parents=True,exist_ok=True,mode=0o700)
-        with (self.state/'.lock').open('a') as lock:
-            os.chmod(lock.name,0o600);fcntl.flock(lock,fcntl.LOCK_EX)
-            try:yield
-            finally:fcntl.flock(lock,fcntl.LOCK_UN)
+        return file_lock(self.state / '.lock')
 
     def save(self,path,value):
         tmp=path.with_name('.'+path.name+'.'+uuid.uuid4().hex)
         try:
-            with os.fdopen(os.open(tmp,os.O_WRONLY|os.O_CREAT|os.O_EXCL,0o600),'w') as f:
+            with os.fdopen(os.open(tmp,os.O_WRONLY|os.O_CREAT|os.O_EXCL,0o600),'w',encoding='utf-8') as f:
                 json.dump(value,f,ensure_ascii=False)
-            tmp.replace(path)
+            replace_file(tmp, path)
         finally:tmp.unlink(missing_ok=True)
 
     def settings(self):
@@ -118,6 +132,8 @@ class ActionStore:
         for key,value in changes.items():
             if key not in defaults or type(value) is not type(defaults[key]):raise ValueError('지원하지 않는 설정 값입니다.')
             if key=='launch_app' and value:
+                if IS_WINDOWS:
+                    raise ValueError('Windows에서는 기본 PowerShell 터미널을 사용합니다. 시스템 기본값을 선택해 주세요.')
                 app=Path(value).expanduser()
                 if not app.is_absolute() or app.suffix!='.app' or not (app/'Contents/Info.plist').is_file():raise ValueError('설치된 터미널 앱의 전체 .app 경로를 입력해 주세요.')
                 changes={**changes,'launch_app':str(app.resolve())}
@@ -132,7 +148,18 @@ class ActionStore:
                 for key,value in values.items() if isinstance(value,dict)]
 
     def guide(self,cwd):
-        wb=shlex.quote(str(Path(__file__).resolve().parent/'wb'));folder=shlex.quote(str(cwd))
+        if IS_WINDOWS:
+            folder = powershell_quote(cwd)
+            command = [sys.executable, 'wb'] if FROZEN else [sys.executable, RESOURCE_ROOT / 'wb']
+            wb = '& ' + ' '.join(powershell_quote(arg) for arg in command)
+            terminal_help = '새 터미널을 선택하면 기본 PowerShell 창에서 실행합니다.'
+        else:
+            folder = shlex.quote(str(cwd))
+            wb = shlex.quote(sys.executable) + ' wb' if FROZEN else shlex.quote(str(RESOURCE_ROOT / 'wb'))
+            terminal_help = (
+                '새 터미널을 선택하면 macOS의 .command 기본 앱을 사용합니다. 별도 앱은 전체 경로로 설정하세요.\n'
+                f"{wb} actions configure --launch-app '/Applications/<터미널 앱>.app'"
+            )
         return self.connections.guide(wb)+'\n\n'+f'''작업 보드 연결·바로가기 등록 안내
 
 이 도움말은 Claude와 Codex 모두 사용할 수 있습니다. 사용자가 원하는 버튼과 실행 위치를 확인한 뒤 등록하세요. 등록은 스킬을 실행하지 않습니다.
@@ -148,8 +175,7 @@ class ActionStore:
 {wb} actions remove --skill '<등록된 ID>'
 5. 서버·터미널 자동 연결 설정:
 {wb} actions configure --auto-servers on --auto-terminal on
-6. 세션 화면에서 스킬을 선택한 뒤 요청 내용을 함께 입력하고 실행할 수 있습니다. 기본 실행 위치는 현재 세션입니다. 연결이 끊기면 새 세션으로 자동 실행하지 않습니다. 선택 창에서 새 터미널을 직접 선택한 경우에만 macOS의 .command 기본 앱을 사용합니다. 별도 실행 앱은 .command 실행 지원을 확인한 뒤 전체 경로로 설정하세요:
-{wb} actions configure --launch-app '/Applications/<터미널 앱>.app'
+6. 세션 화면에서 스킬을 선택한 뒤 요청 내용을 함께 입력하고 실행할 수 있습니다. 기본 실행 위치는 현재 세션입니다. 연결이 끊기면 새 세션으로 자동 실행하지 않습니다. {terminal_help}
 기본 앱으로 복원: {wb} actions configure --launch-app system
 
 마지막으로 actions list를 다시 실행해 저장 결과를 확인하세요. 설정 화면과 세션 버튼에 자동 반영됩니다. 버튼 이름·스킬·앱을 추가하기 위해 제품 소스를 수정하지 마세요. 다른 등록을 임의로 지우지 말고, 사용자가 실행을 요청하지 않았다면 스킬을 실행하지 마세요. 허용된 로컬 명령 실행 권한과 파일 권한을 그대로 따르세요.'''
@@ -206,6 +232,34 @@ class ActionStore:
         if not item:raise ValueError('스킬이 제거되었거나 활성화되지 않았습니다.')
         return self.delivery.send(session,item,request_id,prompt)
 
+    def write_launcher(self, directory, identifier, args, cwd, *, env=None, label=''):
+        note = '이 컴퓨터의 CLI 로그인 정보를 변경합니다. 인증을 마치면 작업 보드의 연결 확인을 눌러 주세요.'
+        if IS_WINDOWS:
+            path = directory / (identifier + '.json')
+            write_powershell_launcher(path, args, cwd, env=env, label=f'{label}\n{note}' if label else '',
+                                      remove_agent_context=not label)
+            return path
+
+        path = directory / (identifier + '.command')
+        tool_path = os.pathsep.join(dict.fromkeys([
+            str(Path(args[0]).parent), str(self.home / '.local/bin'), '/opt/homebrew/bin',
+            os.environ.get('PATH', '/usr/bin:/bin:/usr/sbin:/sbin'),
+        ]))
+        lines = ['#!/bin/zsh', 'cd -- ' + shlex.quote(str(cwd)) + ' || exit 1', 'export PATH=' + shlex.quote(tool_path)]
+        if label:
+            lines.extend('export ' + key + '=' + shlex.quote(value) for key, value in (env or {}).items())
+            lines.extend([
+                'printf "%s\\n" ' + shlex.quote(label), 'printf "%s\\n" ' + shlex.quote(note),
+                shlex.join(args), 'result=$?',
+                'printf "%s\\n" ' + shlex.quote('작업 보드로 돌아가 연결 확인을 눌러 주세요. 이 창은 닫아도 됩니다.'),
+                'exit "$result"',
+            ])
+        else:
+            lines.append('exec /usr/bin/env -u CLAUDECODE -u CLAUDE_CODE_SESSION_ID -u CODEX_THREAD_ID ' + shlex.join(args))
+        path.write_text('\n'.join(lines) + '\n', encoding='utf-8')
+        path.chmod(0o700)
+        return path
+
     def login(self,kind,request_id,switch=False):
         if not isinstance(request_id,str) or not re.fullmatch(r'[A-Za-z0-9-]{8,80}',request_id):
             raise ValueError('로그인 요청을 확인할 수 없습니다.')
@@ -219,15 +273,7 @@ class ActionStore:
             self.requests={k:v for k,v in self.requests.items() if now-v['at']<600}
             if signature in self.requests:return self.requests[signature]
             directory=self.state/'launchers';directory.mkdir(parents=True,exist_ok=True,mode=0o700)
-            launcher=directory/(str(uuid.uuid4())+'.command')
-            path=os.pathsep.join(dict.fromkeys([str(Path(args[0]).parent),str(self.home/'.local/bin'),'/opt/homebrew/bin',os.environ.get('PATH','/usr/bin:/bin:/usr/sbin:/sbin')]))
-            lines=['#!/bin/zsh','cd -- '+shlex.quote(cwd)+' || exit 1','export PATH='+shlex.quote(path)]
-            lines+=['export '+key+'='+shlex.quote(value) for key,value in env.items()]
-            lines+=['printf "%s\\n" '+shlex.quote(label),
-                    'printf "%s\\n" '+shlex.quote('이 Mac의 CLI 로그인 정보를 변경합니다. 인증을 마치면 작업 보드의 연결 확인을 눌러 주세요.'),
-                    shlex.join(args),'result=$?',
-                    'printf "%s\\n" '+shlex.quote('작업 보드로 돌아가 연결 확인을 눌러 주세요. 이 창은 닫아도 됩니다.'),'exit "$result"']
-            launcher.write_text('\n'.join(lines)+'\n');launcher.chmod(0o700)
+            launcher = self.write_launcher(directory, str(uuid.uuid4()), args, cwd, env=env, label=label)
             try:open_terminal(launcher,self.settings()['launch_app'])
             except Exception:
                 launcher.unlink(missing_ok=True);raise
@@ -242,7 +288,7 @@ class ActionStore:
         if not cwd.is_dir():raise ValueError('작업 폴더가 없습니다.')
         with self.lock,self.editing():
             now=time.time();records_path=self.state/'launch-requests.json'
-            try:records=json.loads(records_path.read_text()) if records_path.exists() else {}
+            try:records=json.loads(records_path.read_text(encoding='utf-8')) if records_path.exists() else {}
             except (OSError,ValueError):raise ValueError('이전 실행 기록을 읽지 못했습니다. 새 터미널이 이미 열렸는지 확인해 주세요.')
             if not isinstance(records,dict):raise ValueError('이전 실행 기록을 확인할 수 없습니다.')
             signature=hashlib.sha256(json.dumps([identifier,str(cwd),request_id]).encode()).hexdigest()
@@ -254,16 +300,13 @@ class ActionStore:
                 return previous
             item=next((s for s in self.catalog(cwd) if s['id']==identifier),None)
             if not item:raise ValueError('스킬이 제거되었거나 활성화되지 않았습니다.')
-            cli=executable(item['agent'])
-            if not cli:raise ValueError('실행할 '+item['agent']+' CLI가 없습니다.')
+            command = agent_command(item['agent'], self.home)
+            if not command:raise ValueError('실행할 '+item['agent']+' CLI가 없습니다.')
             ident=str(uuid.uuid4())
             prompt=skill_request_text(item,prompt,current=False)
-            args=([cli,'--session-id',ident,'--name',item['label'],prompt] if item['agent']=='claude' else [cli,'-C',str(cwd),prompt])
+            args=([*command,'--session-id',ident,'--name',item['label'],prompt] if item['agent']=='claude' else [*command,'-C',str(cwd),prompt])
             directory=self.state/'launchers';directory.mkdir(parents=True,exist_ok=True,mode=0o700)
-            launcher=directory/(ident+'.command')
-            path=os.pathsep.join(dict.fromkeys([str(Path(cli).parent),str(self.home/'.local/bin'),'/opt/homebrew/bin',os.environ.get('PATH','/usr/bin:/bin:/usr/sbin:/sbin')]))
-            text='#!/bin/zsh\ncd -- '+shlex.quote(str(cwd))+' || exit 1\nexport PATH='+shlex.quote(path)+'\nexec /usr/bin/env -u CLAUDECODE -u CLAUDE_CODE_SESSION_ID -u CODEX_THREAD_ID '+shlex.join(args)+'\n'
-            launcher.write_text(text);launcher.chmod(0o700)
+            launcher = self.write_launcher(directory, ident, args, cwd)
             result={'id':ident,'status':'pending','at':now,'label':item['label'],'agent':item['agent'],'launcher':str(launcher),'prompt_hash':fingerprint}
             records[signature]=result;self.save(records_path,records)
             try:open_terminal(launcher,self.settings()['launch_app'])

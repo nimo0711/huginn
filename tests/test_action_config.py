@@ -1,4 +1,4 @@
-import concurrent.futures,contextlib,io,json,tempfile,unittest
+import concurrent.futures,contextlib,io,json,sys,tempfile,unittest
 from pathlib import Path
 from unittest.mock import patch
 import board_actions as actions
@@ -33,6 +33,7 @@ class ConfigTests(unittest.TestCase):
   def add(sid):actions.ActionStore(self.root/'state',self.home).favorite(sid,True,self.cwd)
   with concurrent.futures.ThreadPoolExecutor(max_workers=4) as pool:list(pool.map(add,ids))
   self.assertEqual({x['id'] for x in self.store.shortcuts(self.cwd)},set(ids))
+ @unittest.skipIf(sys.platform == 'win32', 'requires macOS terminal application association')
  def test_launcher_uses_system_association_or_configured_app(self):
   with patch.object(actions.subprocess,'run') as run:
    run.return_value.returncode=0

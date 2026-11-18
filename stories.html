@@ -3,7 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>작업 기록 · 작업 보드</title>
+<title>작업 기록 · Forkrail</title>
+<link rel="icon" type="image/png" href="/assets/brand.png">
 <style>
 :root{--bg:#0c0e16;--panel:#14171d;--hover:#1d222b;--text:#eeeeee;--sub:#b8b8b8;--faint:#a7a7a7;--line:#2c2c2c;--line2:#2c2c2c;--accent:#4c6df1;--good:#83dea9;--goodbg:#83dea90f;--warn:#f6b72f;--warnbg:#f6b72f0f;--hold:#a7a7a7;--holdbg:#1d222b}
 *{box-sizing:border-box}
@@ -157,7 +158,7 @@ function render(d) {
   const focusMore = focused?.id === 'more';
   $("clock").textContent = `${stamp(d.now)} · 5초마다 새로 고침`;
   const live = d.sessions.filter((s) => s.active);
-  document.title = '작업 기록 · 작업 보드';
+  document.title = '작업 기록 · Forkrail';
   $('sessions-label').textContent = `최근 기록한 세션 ${d.sessions.length}개 · 작업 중 ${live.length}개`;
   $("sessions").innerHTML = d.sessions.length ? d.sessions.map((s) => `
     <div class="sess ${s.active ? "" : "idle"}">

@@ -38,7 +38,7 @@ def read_plan(path, root):
         if stat.st_size > 256 * 1024:
             return None
         items = checklist(file.read_text(encoding='utf-8'))
-        return {'items': items, 'rel': str(relative), 'ts': stat.st_mtime,
+        return {'items': items, 'rel': relative.as_posix(), 'ts': stat.st_mtime,
                 'source': '계획서 체크리스트'} if items else None
     except (OSError, ValueError, UnicodeError):
         return None

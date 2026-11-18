@@ -1,3 +1,4 @@
+import os
 import json
 import sqlite3
 import unittest
@@ -190,7 +191,7 @@ class CurrentContextTests(unittest.TestCase):
         self.assertNotIn(plan,task['plan_refs'])
         c.execute('INSERT INTO thread_items VALUES (?,?,?,?,?,?)',('thread','turn','fileChange',json.dumps({'status':'completed','changes':[{'path':plan}]}),1004,4))
         task=scan._codex_turn(c,'thread','turn','inProgress',1,0)
-        self.assertIn(plan,task['plan_refs'])
+        self.assertIn(os.path.realpath(plan), task['plan_refs'])
 
     def test_queued_user_feedback_keeps_tail_of_long_pasted_example(self):
         info=scan._new_info()

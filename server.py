@@ -8,7 +8,9 @@ import secrets
 import sqlite3
 import threading
 import time
+from contextlib import closing
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from socketserver import TCPServer
 from pathlib import Path
 from urllib.parse import parse_qs, unquote, urlparse
 
@@ -17,14 +19,18 @@ import sprint
 import usage
 import local_runtime
 import board_actions
+import branding
+from runtime_paths import DATA_DIR, DB_PATH, RESOURCE_ROOT, SPOOL_DIR, release_info
+from platform_support import IS_WINDOWS
 
-HOME = Path(__file__).resolve().parent
-DB_PATH = Path(os.environ.get("WORK_BOARD_DB", HOME / "board.db"))
+HOME = RESOURCE_ROOT
 PORT = int(os.environ.get("WORK_BOARD_PORT", "8790"))
 ACTION_TOKEN = secrets.token_urlsafe(32)
-ACTIONS = board_actions.ActionStore(HOME / ".actions")
+ACTIONS = board_actions.ActionStore(DATA_DIR / ".actions")
 SESSION_IDLE_SEC = 30 * 60
-SPOOL = os.environ.get("WORK_BOARD_SPOOL", "/tmp/work-board-spool")
+SPOOL = SPOOL_DIR
+RELEASE = release_info()
+INSTANCE = os.environ.get("FORKRAIL_INSTANCE", "")
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS events (
@@ -67,7 +73,8 @@ def connect() -> sqlite3.Connection:
 
 
 def init_db() -> None:
-    with connect() as conn:
+    Path(DB_PATH).parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+    with closing(connect()) as conn, conn:
         conn.executescript(SCHEMA)
 
 
@@ -93,7 +100,7 @@ def _event_row(payload: dict) -> tuple[dict, float]:
 
 def add_event(payload: dict) -> int:
     row, ts = _event_row(payload)
-    with _lock, connect() as conn:
+    with _lock, closing(connect()) as conn, conn:
         cur = conn.execute(
             f"INSERT INTO events (ts, {', '.join(FIELDS)}) VALUES (?, {', '.join('?' * len(FIELDS))})",
             [ts, *(row[name] for name in FIELDS)],
@@ -212,7 +219,7 @@ def sessions(conn: sqlite3.Connection) -> list[dict]:
 
 
 def state(story: str | None, limit: int) -> dict:
-    with connect() as conn:
+    with closing(connect()) as conn, conn:
         all_stories = stories(conn)
         chosen = story or (all_stories[0]["story"] if all_stories else "")
         return {
@@ -294,6 +301,10 @@ class Handler(BaseHTTPRequestHandler):
             return
         if url.path == "/":
             self._send(200, (HOME / "index.html").read_bytes(), "text/html; charset=utf-8")
+        elif url.path == "/assets/brand.svg":
+            self._send(200, branding.icon_svg().encode(), "image/svg+xml; charset=utf-8")
+        elif url.path == "/assets/brand.png":
+            self._send(200, branding.icon_png(), "image/png")
         elif url.path == "/api/state":
             try:
                 q = parse_qs(url.query, keep_blank_values=True, max_num_fields=100)
@@ -333,7 +344,8 @@ class Handler(BaseHTTPRequestHandler):
         elif url.path.startswith("/doc/"):
             self._doc(unquote(url.path[len("/doc/"):]))
         elif url.path == "/api/health":
-            self._json(200, {"ok": True})
+            self._json(200, {"ok": True, "app": RELEASE["name"], "api": 1,
+                             "version": RELEASE["version"], "instance": INSTANCE})
         else:
             self._json(404, {"error": "없는 경로"})
 
@@ -341,8 +353,12 @@ class Handler(BaseHTTPRequestHandler):
         if "\x00" in rel:
             self._json(400, {"error": "문서 경로가 올바르지 않습니다."})
             return
+        relative = Path(rel)
+        if relative.anchor or IS_WINDOWS and any(":" in part for part in relative.parts):
+            self._json(404, {"error": "없는 문서"})
+            return
         root = os.path.realpath(os.path.expanduser("~/vtm/문서"))
-        real = os.path.realpath(os.path.join(root, rel))
+        real = os.path.realpath(os.path.join(root, relative))
         if not real.startswith(root + os.sep) or not os.path.isfile(real):
             self._json(404, {"error": "없는 문서"})
             return
@@ -372,7 +388,7 @@ class Handler(BaseHTTPRequestHandler):
         if not src:
             self._json(400, {"error": "src 필요"})
             return
-        with _lock, connect() as conn:
+        with _lock, closing(connect()) as conn, conn:
             if dst:
                 conn.execute("INSERT INTO aliases (src, dst) VALUES (?, ?) ON CONFLICT(src) DO UPDATE SET dst = excluded.dst", (src, dst))
             else:
@@ -449,6 +465,8 @@ class Handler(BaseHTTPRequestHandler):
                 launched = ACTIONS.launch(body.get("skill"), session["cwd_path"], body.get("request_id"), body.get("prompt", ""))
                 result = {k: v for k,v in launched.items() if k != "launcher"}
             elif action == "focus":
+                if IS_WINDOWS:
+                    raise ValueError("Windows에서는 터미널 앱에서 해당 세션을 직접 선택해 주세요.")
                 procs = local_runtime.processes()
                 terminal = local_runtime.session_terminal(session, procs)
                 if not terminal: raise ValueError("실행 중인 터미널 앱을 찾을 수 없습니다.")
@@ -487,11 +505,36 @@ def drain_spool() -> None:
         time.sleep(3)
 
 
+class LoopbackServer(ThreadingHTTPServer):
+    # Windows SO_REUSEADDR would let a second server take an existing listener.
+    allow_reuse_address = not IS_WINDOWS
+
+    def server_bind(self):
+        if IS_WINDOWS:
+            import socket
+            self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_EXCLUSIVEADDRUSE, 1)
+        # This server is loopback-only. HTTPServer's reverse DNS lookup can
+        # stall startup on offline machines and hosted runners.
+        TCPServer.server_bind(self)
+        self.server_name, self.server_port = self.server_address[:2]
+
+
+def create_server():
+    global PORT
+    httpd = LoopbackServer(("127.0.0.1", PORT), Handler)
+    try:
+        init_db()
+    except BaseException:
+        httpd.server_close()
+        raise
+    PORT = httpd.server_port
+    return httpd
+
+
 def main() -> None:
-    init_db()
-    threading.Thread(target=drain_spool, daemon=True).start()
-    httpd = ThreadingHTTPServer(("127.0.0.1", PORT), Handler)
-    httpd.serve_forever()
+    with create_server() as httpd:
+        threading.Thread(target=drain_spool, daemon=True).start()
+        httpd.serve_forever()
 
 
 if __name__ == "__main__":

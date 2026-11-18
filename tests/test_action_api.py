@@ -75,6 +75,9 @@ class ApiTests(unittest.TestCase):
    item=store.catalog(root)[0];session={'id':'thread-1','agent':'codex','cwd_path':str(root)};prompt='한글\n'*1300
    rpc=FakeRPC();rpc.thread['cwd']=str(root)
    h=self.handler({'action':'deliver','sid':'thread-1','skill':item['id'],'request_id':'prompt-request','prompt':prompt})
-   with patch.object(server,'ACTIONS',store),patch.object(server.scan,'all_sessions',return_value=[session]),patch.object(store.delivery,'codex_rpc',return_value=rpc):h._action()
+   # FakeRPC supplies a supported direct connection on every runner.
+   with patch.object(server,'ACTIONS',store), patch.object(server.scan,'all_sessions',return_value=[session]), \
+        patch('session_delivery.IS_WINDOWS', False), patch.object(store.delivery,'codex_rpc',return_value=rpc):
+    h._action()
    self.assertEqual(h.result[0],200);self.assertEqual(h.result[1]['status'],'accepted')
    sent=next(p for method,p in rpc.calls if method=='turn/start');self.assertTrue(sent['input'][0]['text'].endswith(prompt))

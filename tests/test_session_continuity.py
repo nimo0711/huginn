@@ -47,7 +47,7 @@ class SessionContinuityTests(unittest.TestCase):
     def test_followup_preserves_the_earlier_unfinished_plan(self):
         plan = self.root / '기능/계획서/계획.md'
         plan.parent.mkdir(parents=True)
-        plan.write_text('- [x] 구현\n- [ ] 검증\n')
+        plan.write_text('- [x] 구현\n- [ ] 검증\n', encoding='utf-8')
         first = scan._new_task('구현', 1)
         first['plan_refs'] = [str(plan)]
         scan._note(first, 2, '검증이 남아 있습니다.')
@@ -85,7 +85,7 @@ class SessionContinuityTests(unittest.TestCase):
     def test_archived_pending_plan_blocks_completion_until_checked(self):
         plan = self.root / '기능/계획서/계획.md'
         plan.parent.mkdir(parents=True)
-        plan.write_text('- [ ] 검증\n')
+        plan.write_text('- [ ] 검증\n', encoding='utf-8')
         with patch.object(scan, 'DOC_ROOT', str(self.root)):
             info = scan._new_info()
             for i in range(45):
@@ -98,7 +98,7 @@ class SessionContinuityTests(unittest.TestCase):
             archived = next((t for t in before if t.get('history')), None)
             self.assertIsNotNone(archived)
             self.assertEqual(archived['history']['total'] - archived['history']['done'], 1)
-            plan.write_text('- [x] 검증\n')
+            plan.write_text('- [x] 검증\n', encoding='utf-8')
             after = scan._finish(info['tasks'], True, 47)
             archived = next(t for t in after if t.get('history'))
             self.assertEqual(archived['history']['total'], archived['history']['done'])

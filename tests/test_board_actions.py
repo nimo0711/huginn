@@ -2,6 +2,7 @@ import json
 import os
 from pathlib import Path
 import subprocess
+import sys
 import tempfile
 import unittest
 from unittest.mock import patch
@@ -32,6 +33,7 @@ class ActionTests(unittest.TestCase):
  def test_unknown_skill_cannot_supply_arbitrary_command_or_path(self):
   self.skill()
   with self.assertRaises(ValueError):self.store.launch('/tmp/evil; touch x',self.cwd,'unique-request')
+ @unittest.skipIf(sys.platform == 'win32', 'requires macOS .command shell launcher')
  def test_launcher_quotes_paths_and_prompt_and_never_bypasses_permissions(self):
   p=self.skill('review','Review work')
   cli=self.root/'fake tool';cli.write_text('#!/bin/sh\nprintf "%s\\n" "$@" > "$WB_TEST_ARGS"\n');cli.chmod(0o700)
@@ -48,10 +50,11 @@ class ActionTests(unittest.TestCase):
   self.assertNotIn('skip-permissions',args)
  def test_open_failure_is_not_reported_as_started_and_can_be_retried(self):
   self.skill();item=self.store.catalog(self.cwd)[0]
-  with patch.object(actions,'executable',return_value='/bin/echo'),patch.object(actions,'open_terminal',side_effect=RuntimeError('no terminal')):
+  with patch.object(actions,'agent_command',return_value=[sys.executable]),patch.object(actions,'open_terminal',side_effect=RuntimeError('no terminal')):
    with self.assertRaises(RuntimeError):self.store.launch(item['id'],self.cwd,'retry-click')
-  with patch.object(actions,'executable',return_value='/bin/echo'),patch.object(actions,'open_terminal',return_value=None):
+  with patch.object(actions,'agent_command',return_value=[sys.executable]),patch.object(actions,'open_terminal',return_value=None):
    self.assertEqual(self.store.launch(item['id'],self.cwd,'retry-click')['status'],'opened')
+ @unittest.skipIf(sys.platform == 'win32', 'requires macOS .command shell launcher')
  def test_codex_launcher_preserves_project_skill_and_permissions(self):
   p=self.skill(agent='codex');cli=self.root/'fake-codex';dest=self.root/'codex-args'
   cli.write_text('#!/bin/sh\nprintf "%s\\n" "$PWD" "$@" > "$WB_TEST_ARGS"\n');cli.chmod(0o700)
@@ -73,6 +76,7 @@ class ActionTests(unittest.TestCase):
   (self.home/'.codex/config.toml').write_text('[[skills.config]]\nname="review"\nenabled=false\n')
   with self.assertRaises(ValueError):self.store.launch(item['id'],self.cwd,'stale-choice')
 
+ @unittest.skipIf(sys.platform == 'win32', 'requires macOS .command shell launcher')
  def test_new_terminal_preserves_prompt_as_data_for_both_agents(self):
   for agent in ['claude','codex']:
    self.skill(agent=agent);cli=self.root/('fake-'+agent);dest=self.root/(agent+'-prompt.json');marker=self.root/'should-not-exist'

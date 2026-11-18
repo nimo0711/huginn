@@ -168,7 +168,7 @@ test('usage regression: numerical tables explain local coverage and all failure 
   const view=b.run('dashView()');
   assert.ok(view.includes('<table') && view.includes('1,234,567'));
   assert.ok(view.includes('시간별 수치 보기') && view.includes('일별 수치 보기'));
-  assert.ok(view.includes('이 Mac에 기록된') && view.includes('data-usage-source="codex"'));
+  assert.ok(view.includes('이 컴퓨터에 기록된') && view.includes('data-usage-source="codex"'));
   assert.ok(view.includes('data-key="usage-coverage"') && view.includes('수집'));
   assert.ok(view.includes('RareFailure'));
 });

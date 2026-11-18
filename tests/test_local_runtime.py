@@ -1,12 +1,15 @@
 import unittest
+import sys
 from unittest.mock import patch
 import local_runtime as runtime
 
 class RuntimeTests(unittest.TestCase):
+ @unittest.skipIf(sys.platform == 'win32', 'requires macOS lsof discovery')
  def test_listener_addresses_are_kept_and_lan_only_binding_is_excluded(self):
   output='p11\ntIPv6\nn[::1]:5173\np21\ntIPv4\nn127.0.0.1:5173\nn192.168.0.2:3000\nn*:8000\n'
   with patch.object(runtime,'run',return_value=output):ports=runtime.listeners()
   self.assertEqual(ports,[{'pid':11,'port':5173,'host':'::1'},{'pid':21,'port':5173,'host':'127.0.0.1'},{'pid':21,'port':8000,'host':'127.0.0.1'}])
+ @unittest.skipIf(sys.platform == 'win32', 'requires macOS lsof discovery')
  def test_codex_shared_transcripts_only_identify_terminal_not_server_owner(self):
   a='00000000-0000-0000-0000-000000000001';b='00000000-0000-0000-0000-000000000002'
   procs={10:{'ppid':1,'comm':'/bin/codex'},11:{'ppid':10,'comm':'node'}}

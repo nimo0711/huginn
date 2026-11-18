@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+from contextlib import ExitStack, closing
+
 import calendar
+import copy
 import glob
 import json
 import os
@@ -12,6 +15,8 @@ import local_runtime
 import threading
 import time
 import connections
+from platform_support import pid_alive, run_hidden
+from runtime_paths import DATA_DIR, DB_PATH
 
 import blocks
 import enrich
@@ -92,17 +97,13 @@ def _para(text: str, limit: int = 2000) -> str:
 
 
 def _alive(pid: int) -> bool:
-    try:
-        os.kill(pid, 0)
-        return True
-    except OSError:
-        return False
+    return pid_alive(pid)
 
 
 def _short_dir(path: str) -> str:
     if not path:
         return ""
-    path = path.replace(HOME, "~")
+    path = path.replace(HOME, "~").replace(os.sep, "/")
     parts = path.split("/")
     return "/".join(parts[-2:]) if len(parts) > 3 else path
 
@@ -158,15 +159,23 @@ def _new_task(prompt: str, ts: float) -> dict:
 
 
 STORY_RE = re.compile(r"\b([A-Z][A-Z0-9]+-\d+)\b")
-PATH_RE = re.compile(r"(?:^|[\s'\"=(])((?:" + re.escape(HOME) + r"|~)/[^\s'\"`;|&)<>]+)")
+_PATH_SEPARATOR = r'[/\\]' if os.name == 'nt' else '/'
+_HOME_FOR_PATHS = re.escape(HOME.replace(os.sep, '/')).replace('/', _PATH_SEPARATOR)
+PATH_RE = re.compile(
+    r"(?:^|[\s'\"=(])((?:" + _HOME_FOR_PATHS + r"|~)" + _PATH_SEPARATOR + r"[^\s'\"`;|&)<>]+)",
+    re.IGNORECASE if os.name == 'nt' else 0,
+)
 IGNORED_DIRS = (".claude", ".codex", "Library", "Downloads", "Desktop", "Applications")
 
 
 def _area(path: str) -> str:
-    path = path.replace("~/", HOME + "/", 1)
-    if not path.startswith(HOME + "/"):
+    home = HOME.replace(os.sep, '/')
+    path = path.replace(os.sep, '/').replace('~/', home + '/', 1)
+    home_prefix = home + '/'
+    in_home = path.casefold().startswith(home_prefix.casefold()) if os.name == 'nt' else path.startswith(home_prefix)
+    if not in_home:
         return ""
-    parts = path[len(HOME) + 1:].split("/")
+    parts = path[len(home_prefix):].split("/")
     if not parts[0] or parts[0] in IGNORED_DIRS or parts[0].startswith(".") or "node_modules" in parts:
         return ""
     if parts[0] == "vtm" and len(parts) > 2 and parts[1] in (".worktrees", "wt"):
@@ -466,7 +475,7 @@ DOC_ROOT = os.path.realpath(os.path.expanduser("~/vtm/문서"))
 
 def _plan_reference(task: dict, paths: list) -> None:
     for path in paths:
-        if not path or not path.endswith('.md') or '/계획서/' not in path:
+        if not path or not path.endswith('.md') or '/계획서/' not in path.replace(os.sep, '/'):
             continue
         real = os.path.realpath(os.path.expanduser(path))
         if not real.startswith(DOC_ROOT + os.sep):
@@ -489,7 +498,7 @@ def _doc(task: dict, path: str, ts: float, created: bool) -> None:
         if d["path"] == real:
             d["ts"] = ts
             return
-    docs.append({"path": real, "rel": os.path.relpath(real, DOC_ROOT), "ts": ts, "created": created})
+    docs.append({"path": real, "rel": os.path.relpath(real, DOC_ROOT).replace(os.sep, "/"), "ts": ts, "created": created})
 
 
 def _doc_paths(text: str) -> list:
@@ -601,10 +610,10 @@ def _activity_text(text: str) -> str:
     return '\n'.join(out)
 
 
-BOARD_DB = os.path.join(os.path.dirname(os.path.abspath(__file__)), "board.db")
+BOARD_DB = os.fspath(DB_PATH)
 
 
-JIRA_CACHE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "jira_titles.json")
+JIRA_CACHE = os.path.join(DATA_DIR, "jira_titles.json")
 _jira: dict = {}
 _jira_tried: dict = {}
 _jira_lock = threading.Lock()
@@ -612,7 +621,7 @@ _jira_lock = threading.Lock()
 
 def _load_jira() -> None:
     try:
-        with open(JIRA_CACHE) as f:
+        with open(JIRA_CACHE, encoding="utf-8") as f:
             _jira.update(json.load(f))
     except (OSError, ValueError):
         pass
@@ -620,9 +629,9 @@ def _load_jira() -> None:
 
 def _fetch_jira(key: str) -> None:
     try:
-        out = subprocess.run(
+        out = run_hidden(
             [connections.cli('acli'), "jira", "workitem", "view", key, "--fields", "summary", "--json"],
-            capture_output=True, text=True, timeout=20,
+            capture_output=True, encoding="utf-8", errors="replace", timeout=20,
         ).stdout
         title = (json.loads(out).get("fields") or {}).get("summary") or ""
     except (OSError, ValueError, subprocess.SubprocessError):
@@ -633,7 +642,8 @@ def _fetch_jira(key: str) -> None:
     with _jira_lock:
         _jira[key] = title
         try:
-            with open(JIRA_CACHE, "w") as f:
+            os.makedirs(os.path.dirname(JIRA_CACHE), exist_ok=True)
+            with open(JIRA_CACHE, "w", encoding="utf-8") as f:
                 json.dump(_jira, f, ensure_ascii=False)
         except OSError:
             pass
@@ -649,9 +659,8 @@ _load_jira()
 def _story_titles() -> dict:
     titles: dict = {}
     try:
-        con = sqlite3.connect(BOARD_DB, timeout=1)
-        rows = con.execute("SELECT story, title FROM events WHERE kind = 'story' AND title != '' ORDER BY ts").fetchall()
-        con.close()
+        with closing(sqlite3.connect(BOARD_DB, timeout=1)) as con:
+            rows = con.execute("SELECT story, title FROM events WHERE kind = 'story' AND title != '' ORDER BY ts").fetchall()
         titles = {k: re.sub(r"^(\s*\[[^\]]*\])+\s*", "", t) for k, t in rows}
     except sqlite3.Error:
         pass
@@ -728,7 +737,7 @@ def claude_sessions(now: float) -> list[dict]:
     live: dict[str, dict] = {}
     for f in glob.glob(os.path.join(CLAUDE_SESSIONS, "*.json")):
         try:
-            with open(f) as fh:
+            with open(f, encoding="utf-8") as fh:
                 d = json.JSONDecoder().raw_decode(fh.read().lstrip())[0]
         except (OSError, ValueError):
             continue
@@ -803,7 +812,7 @@ def _subagents(base: str, now: float) -> dict:
     running, done = [], 0
     for meta_path in glob.glob(os.path.join(base, "subagents", "*.meta.json")):
         try:
-            with open(meta_path) as f:
+            with open(meta_path, encoding="utf-8") as f:
                 meta = json.load(f)
         except (OSError, ValueError):
             continue
@@ -881,15 +890,43 @@ def _codex_turn(hist: sqlite3.Connection, tid: str, turn_id: str, status: str, s
 
 
 _codex_past = {}
+_codex_recent = {}
 
 
-def _codex_tasks(hist, tid, turns, branch):
+def _recent_codex_tasks(hist, tid, turns, identity):
+    columns = {row[1] for row in hist.execute('PRAGMA table_info(thread_items)')}
+    if 'updated_at_ordinal' not in columns:
+        # Older databases cannot prove that an item was not edited in place.
+        _codex_recent.pop(identity, None)
+        return [_codex_turn(hist, tid, turn, status, float(started or 0), float(completed or 0))
+                for turn, status, started, completed, _ in reversed(turns)]
+    previous = _codex_recent.get(identity, {})
+    current = {}
+    recent = []
+    for turn, status, started, completed, ordinal in reversed(turns):
+        revision = hist.execute(
+            'SELECT count(*), max(rollout_ordinal), max(updated_at_ordinal) FROM thread_items '
+            'WHERE thread_id=? AND turn_id=?', (tid, turn)).fetchone()
+        signature = (status, started, completed, ordinal, revision)
+        saved = previous.get(turn)
+        if saved is None or saved[0] != signature:
+            task = _codex_turn(hist, tid, turn, status, float(started or 0), float(completed or 0))
+            saved = (signature, task)
+        current[turn] = saved
+        # Response decoration and consumers must never change the cached source.
+        recent.append(copy.deepcopy(saved[1]))
+    _codex_recent[identity] = current
+    return recent
+
+
+def _codex_tasks(hist, tid, turns, branch, database_identity):
     """Parse recent turn bodies; aggregate older turns once per database lifetime."""
     oldest = turns[-1][4]
-    identity = (os.path.realpath(CODEX_HISTORY), os.stat(CODEX_HISTORY).st_ino, tid, branch)
-    for old_identity in list(_codex_past):
-        if old_identity[2] == tid and old_identity != identity:
-            _codex_past.pop(old_identity, None)
+    identity = (*database_identity, tid, branch)
+    for cache in (_codex_past, _codex_recent):
+        for old_identity in list(cache):
+            if old_identity[2] == tid and old_identity != identity:
+                cache.pop(old_identity, None)
     saved = _codex_past.get(identity)
     old_count = hist.execute('SELECT count(*) FROM thread_turns WHERE thread_id=? AND rollout_ordinal<?',
                              (tid, oldest)).fetchone()[0]
@@ -906,66 +943,75 @@ def _codex_tasks(hist, tid, turns, branch):
         saved['through'] = ordinal
         saved['count'] += 1
         saved['unfinished'] |= status == 'inProgress'
-    recent = [_codex_turn(hist, tid, t, status, float(started or 0), float(completed or 0))
-              for t, status, started, completed, _ in reversed(turns)]
+    recent = _recent_codex_tasks(hist, tid, turns, identity)
     return sorted(saved['history'], key=lambda t: t['last_ts']) + recent
 
 
 def codex_sessions(now: float) -> list[dict]:
     if not os.path.exists(CODEX_STATE):
         return []
-    try:
-        st = sqlite3.connect(Path(CODEX_STATE).as_uri() + '?mode=ro', uri=True, timeout=1)
-        hist = sqlite3.connect(Path(CODEX_HISTORY).as_uri() + '?mode=ro', uri=True, timeout=1)
-        rows = st.execute(
-            "SELECT id, updated_at, cwd, title, git_branch, source, created_at FROM threads "
-            "WHERE archived = 0 AND updated_at > ? ORDER BY updated_at DESC LIMIT 40",
-            (int(now - WINDOW_SEC),),
-        ).fetchall()
-    except sqlite3.Error:
-        return []
-    live_ids = {row[0] for row in rows}
-    for identity in list(_codex_past):
-        if identity[2] not in live_ids:
-            _codex_past.pop(identity, None)
-    out = []
-    for tid, updated, cwd, title, branch, source, created in rows:
-        if "subagent" in str(source or ""):
-            continue
+    with ExitStack() as databases:
         try:
-            turns = hist.execute(
-                "SELECT turn_id, status, started_at, completed_at, rollout_ordinal FROM thread_turns WHERE thread_id = ? "
-                "ORDER BY rollout_ordinal DESC LIMIT ?",
-                (tid, TASKS_KEPT),
+            database_identity = (os.path.realpath(CODEX_HISTORY), os.stat(CODEX_HISTORY).st_ino)
+            st = databases.enter_context(closing(sqlite3.connect(Path(CODEX_STATE).as_uri() + '?mode=ro', uri=True, timeout=1)))
+            hist = databases.enter_context(closing(sqlite3.connect(Path(CODEX_HISTORY).as_uri() + '?mode=ro', uri=True, timeout=1)))
+            if database_identity != (os.path.realpath(CODEX_HISTORY), os.stat(CODEX_HISTORY).st_ino):
+                raise sqlite3.OperationalError('History database replaced while opening')
+            # The open handle retains this identity even if its path is replaced later.
+            rows = st.execute(
+                "SELECT id, updated_at, cwd, title, git_branch, source, created_at FROM threads "
+                "WHERE archived = 0 AND updated_at > ? ORDER BY updated_at DESC LIMIT 40",
+                (int(now - WINDOW_SEC),),
             ).fetchall()
-            tasks = _codex_tasks(hist, tid, turns, branch or '') if turns else []
-        except sqlite3.Error:
-            continue
-        tasks = [t for t in tasks if t.get('history') or t["prompt"] or t["notes"] or t["n_steps"] or t["n_checks"]]
-        if not tasks:
-            continue
-        if not tasks[0]["prompt"]:
-            tasks[0]["prompt"] = _clean(title or "", 400)
-        running = any(s == "inProgress" for _, s, _, _, _ in turns[:1])
-        done = _finish(tasks, running, now)
-        idle_state = "입력 대기" if done[-1].get("ask") else "쉬는 중"
-        out.append({
-            "agent": "codex",
-            "cwd_path": cwd or "",
-            "created_at": float(created or 0),
-            "role": "외부 평가" if re.search(r'검토|평가|\breview\b|\baudit\b', title or '', re.I) else "위임 작업",
-            "id": tid,
-            "name": "Claude가 부른 Codex" if source == "exec" else "",
-            "state": "작업 중" if running else (idle_state if now - updated < 1800 else "종료됨"),
-            "cwd": _short_dir(cwd or ""),
-            "branch": branch or "",
-            "tasks": done,
-            "works": _works(tasks, branch or "", TITLES),
-            "last_ts": float(updated),
-        })
-    st.close()
-    hist.close()
-    return out
+        except (OSError, sqlite3.Error):
+            return []
+        live_ids = {row[0] for row in rows}
+        for cache in (_codex_past, _codex_recent):
+            for identity in list(cache):
+                if identity[2] not in live_ids:
+                    cache.pop(identity, None)
+        out = []
+        for tid, updated, cwd, title, branch, source, created in rows:
+            if "subagent" in str(source or ""):
+                continue
+            try:
+                turns = hist.execute(
+                    "SELECT turn_id, status, started_at, completed_at, rollout_ordinal FROM thread_turns WHERE thread_id = ? "
+                    "ORDER BY rollout_ordinal DESC LIMIT ?",
+                    (tid, TASKS_KEPT),
+                ).fetchall()
+                if not turns:
+                    for cache in (_codex_past, _codex_recent):
+                        for identity in list(cache):
+                            if identity[2] == tid:
+                                cache.pop(identity, None)
+                    continue
+                tasks = _codex_tasks(hist, tid, turns, branch or '', database_identity)
+            except sqlite3.Error:
+                continue
+            tasks = [t for t in tasks if t.get('history') or t["prompt"] or t["notes"] or t["n_steps"] or t["n_checks"]]
+            if not tasks:
+                continue
+            if not tasks[0]["prompt"]:
+                tasks[0]["prompt"] = _clean(title or "", 400)
+            running = any(s == "inProgress" for _, s, _, _, _ in turns[:1])
+            done = _finish(tasks, running, now)
+            idle_state = "입력 대기" if done[-1].get("ask") else "쉬는 중"
+            out.append({
+                "agent": "codex",
+                "cwd_path": cwd or "",
+                "created_at": float(created or 0),
+                "role": "외부 평가" if re.search(r'검토|평가|\breview\b|\baudit\b', title or '', re.I) else "위임 작업",
+                "id": tid,
+                "name": "Claude가 부른 Codex" if source == "exec" else "",
+                "state": "작업 중" if running else (idle_state if now - updated < 1800 else "종료됨"),
+                "cwd": _short_dir(cwd or ""),
+                "branch": branch or "",
+                "tasks": done,
+                "works": _works(tasks, branch or "", TITLES),
+                "last_ts": float(updated),
+            })
+        return out
 
 
 TITLES: dict = {}
@@ -974,9 +1020,8 @@ ALIASES: dict = {}
 
 def _aliases() -> dict:
     try:
-        con = sqlite3.connect(BOARD_DB, timeout=1)
-        rows = con.execute("SELECT src, dst FROM aliases").fetchall()
-        con.close()
+        with closing(sqlite3.connect(BOARD_DB, timeout=1)) as con:
+            rows = con.execute("SELECT src, dst FROM aliases").fetchall()
     except sqlite3.Error:
         return {}
     return dict(rows)

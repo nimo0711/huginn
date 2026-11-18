@@ -3,6 +3,8 @@ import json
 import sys
 from pathlib import Path
 from board_actions import ActionStore
+from platform_support import IS_WINDOWS
+from runtime_paths import DATA_DIR
 
 
 def main(argv=None,store=None):
@@ -21,15 +23,15 @@ def main(argv=None,store=None):
     p=sub.add_parser('remove');p.add_argument('--skill',required=True)
     p=sub.add_parser('configure')
     p.add_argument('--auto-servers',choices=['on','off']);p.add_argument('--auto-terminal',choices=['on','off'])
-    p.add_argument('--launch-app',help='system 또는 .command 실행을 지원하는 설치 앱의 전체 경로')
-    args=parser.parse_args(argv);store=store or ActionStore(Path(__file__).resolve().parent/'.actions')
+    p.add_argument('--launch-app',help='system(기본 PowerShell)' if IS_WINDOWS else 'system 또는 .command 실행을 지원하는 설치 앱의 전체 경로')
+    args=parser.parse_args(argv);store=store or ActionStore(DATA_DIR / '.actions')
     cwd=Path(getattr(args,'cwd',Path.cwd())).expanduser().resolve()
     try:
         if not cwd.is_dir():raise ValueError('작업 폴더가 없습니다.')
         if args.action=='connections':
             action=args.connection_action
             if action=='list':result=store.connections.catalog()
-            elif action=='save':result=store.connections.save(args.kind,json.loads(Path(args.file).read_text() if args.file else args.values))
+            elif action=='save':result=store.connections.save(args.kind,json.loads(Path(args.file).read_text(encoding="utf-8") if args.file else args.values))
             elif action=='remove':result=store.connections.remove(args.kind)
             else:result=store.connections.check(args.kind)
             print(json.dumps(result,ensure_ascii=False,indent=2));return 0

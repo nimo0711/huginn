@@ -61,7 +61,7 @@ class ServerGuardTests(unittest.TestCase):
             return db.execute('SELECT count(*) FROM events').fetchone()[0]
 
     def test_foreign_host_cannot_read_any_board_route(self):
-        paths = ['/', '/stories', '/api/state', '/api/sessions', '/api/actions', '/doc/example.html', '/api/health']
+        paths = ['/', '/stories', '/assets/brand.svg', '/assets/brand.png', '/api/state', '/api/sessions', '/api/actions', '/doc/example.html', '/api/health']
         for path in paths:
             with self.subTest(path=path):
                 h = self.handler(path, host='attacker.example:8790')

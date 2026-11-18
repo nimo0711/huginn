@@ -19,6 +19,7 @@ import subprocess
 import threading
 import time
 import uuid
+from platform_support import IS_WINDOWS, replace_file
 
 
 def validate_prompt(prompt):
@@ -44,7 +45,12 @@ class RPCError(ValueError):
     pass
 
 
+_WINDOWS_UNAVAILABLE = 'Windows에서는 현재 세션에 직접 보낼 수 없습니다. 새 터미널을 선택해 주세요.'
+
+
 def private_path(path,kind):
+    if IS_WINDOWS:
+        raise ValueError(_WINDOWS_UNAVAILABLE)
     p=Path(path).resolve(strict=True);info=p.stat()
     check=stat.S_ISSOCK if kind=='socket' else stat.S_ISREG
     if not check(info.st_mode) or info.st_uid!=os.getuid() or info.st_mode & 0o077:
@@ -178,7 +184,7 @@ class SessionDelivery:
         pid=session.get('pid')
         if not isinstance(pid,int) or pid<=0:raise ValueError('실행 중인 Claude 연결을 찾을 수 없습니다.')
         directory=self.home/'.claude/sessions'
-        try:meta=json.loads((directory/(str(pid)+'.json')).read_text())
+        try:meta=json.loads((directory/(str(pid)+'.json')).read_text(encoding='utf-8'))
         except (OSError,ValueError):raise ValueError('실행 중인 Claude 연결을 찾을 수 없습니다.')
         if (meta.get('pid')!=pid or meta.get('sessionId')!=session['id'] or meta.get('peerProtocol')!=1
                 or Path(meta.get('cwd','/')).resolve()!=Path(session['cwd_path']).resolve()
@@ -186,13 +192,14 @@ class SessionDelivery:
             raise ValueError('Claude 세션 연결이 변경되었습니다. 새로 고침해 주세요.')
         address=meta.get('messagingSocketPath','');private_path(address,'socket')
         key=directory/(str(pid)+'.'+hashlib.sha256(address.encode()).hexdigest()+'.key')
-        try:auth=json.loads(private_path(key,'file').read_text())
+        try:auth=json.loads(private_path(key,'file').read_text(encoding='utf-8'))
         except (OSError,ValueError):raise ValueError('Claude의 인증된 메시지 연결을 찾을 수 없습니다.')
         if auth.get('procStart')!=meta['procStart'] or not isinstance(auth.get('peerToken'),str) or not auth['peerToken']:
             raise ValueError('Claude 연결 인증 정보가 변경되었습니다.')
         return meta,auth['peerToken']
     def describe(self,session):
         if not session:return {'available':False,'message':'연결할 세션을 선택해 주세요.'}
+        if IS_WINDOWS:return {'available':False,'message':_WINDOWS_UNAVAILABLE}
         try:
             if session['agent']=='claude':self.claude_target(session)
             elif session['agent']=='codex':
@@ -205,13 +212,13 @@ class SessionDelivery:
         return self.state/(hashlib.sha256((sid+'\0'+request_id).encode()).hexdigest()+'.json')
     def lookup(self,sid,request_id):
         if not isinstance(request_id,str) or not re.fullmatch(r'[A-Za-z0-9-]{8,80}',request_id):return None
-        try:return json.loads(self.file(sid,request_id).read_text())
+        try:return json.loads(self.file(sid,request_id).read_text(encoding='utf-8'))
         except (OSError,ValueError):return None
     def save(self,row):
         self.state.mkdir(parents=True,exist_ok=True,mode=0o700)
         dest=self.file(row['sid'],row['request_id']);temp=dest.with_suffix('.'+uuid.uuid4().hex)
-        with os.fdopen(os.open(temp,os.O_CREAT|os.O_EXCL|os.O_WRONLY,0o600),'w') as f:json.dump(row,f,ensure_ascii=False)
-        temp.replace(dest)
+        with os.fdopen(os.open(temp,os.O_CREAT|os.O_EXCL|os.O_WRONLY,0o600),'w',encoding='utf-8') as f:json.dump(row,f,ensure_ascii=False)
+        replace_file(temp, dest)
     def update(self,row,status):
         row.update(status=status,message=MESSAGES[status],ok=status not in ('denied','expired','refused','dropped'),updated_at=time.time())
         self.save(row);return dict(row)
@@ -252,6 +259,7 @@ class SessionDelivery:
         threading.Thread(target=receive,daemon=True,name='skill-receipts').start()
         return address
     def send(self,session,skill,request_id,prompt=""):
+        if IS_WINDOWS:raise ValueError(_WINDOWS_UNAVAILABLE)
         prompt=validate_prompt(prompt);fingerprint=prompt_hash(prompt)
         if not isinstance(request_id,str) or not re.fullmatch(r'[A-Za-z0-9-]{8,80}',request_id):raise ValueError('실행 요청을 확인할 수 없습니다.')
         if skill['agent']!=session['agent']:raise ValueError('현재 세션과 같은 도구의 스킬을 선택해 주세요.')
