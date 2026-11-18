@@ -3,7 +3,7 @@ import WebKit
 import UserNotifications
 
 let boardURL = URL(string: "http://127.0.0.1:8790/")!
-let appName = Bundle.main.object(forInfoDictionaryKey: "CFBundleDisplayName") as? String ?? "Moa"
+let appName = Bundle.main.object(forInfoDictionaryKey: "CFBundleDisplayName") as? String ?? "Forkrail"
 
 final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKUIDelegate, UNUserNotificationCenterDelegate {
     var window: NSWindow!

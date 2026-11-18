@@ -10,6 +10,8 @@ export CLANG_MODULE_CACHE_PATH="$build_dir/swift-cache"
 xcrun swiftc -O -module-cache-path "$build_dir/swift-cache" "$repo_dir/app/main.swift" -o "$app_dir/Contents/MacOS/WorkBoard"
 xcrun swiftc -O -module-cache-path "$build_dir/swift-cache" "$repo_dir/app/icon.swift" -o "$build_dir/draw-icon"
 "$build_dir/draw-icon" "$build_dir/AppIcon.iconset" "$repo_dir/app/brand.json"
+web_icon=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["web_image"])' "$repo_dir/app/brand.json")
+cp "$build_dir/AppIcon.iconset/icon_128x128.png" "$repo_dir/$web_icon"
 iconutil -c icns "$build_dir/AppIcon.iconset" -o "$app_dir/Contents/Resources/AppIcon.icns"
 cp "$repo_dir/app/Info.plist" "$app_dir/Contents/Info.plist"
 plutil -lint "$app_dir/Contents/Info.plist"

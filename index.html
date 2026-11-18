@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Moa</title>
-<link rel="icon" type="image/svg+xml" href="/assets/brand.svg">
+<title>Forkrail</title>
+<link rel="icon" type="image/png" href="/assets/brand.png">
 <style>
 :root {
   --bg: #111214; --side: #141517; --panel: #18191c; --panel2: #1e2023; --hover: #23252a; --line: rgba(236,236,238,.08); --line2: rgba(236,236,238,.14);
@@ -1153,7 +1153,7 @@ h1,h2,h3,p { margin-top:0; }
 <a class="skip-link" href="#main">본문으로</a>
 <div class="app">
   <aside aria-label="세션 탐색">
-    <div class="brand"><span class="brand-icon"><img src="/assets/brand.svg" width="32" height="32" alt=""></span><div><strong>Moa</strong><small>AI 작업을 한눈에</small></div><button class="mobile-settings" data-open-settings aria-label="설정"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M7 1L9 1L9.5 3L10.5 3.5L12.5 2.5L13.5 3.5L12.5 5.5L13 6.5L15 7L15 9L13 9.5L12.5 10.5L13.5 12.5L12.5 13.5L10.5 12.5L9.5 13L9 15L7 15L6.5 13L5.5 12.5L3.5 13.5L2.5 12.5L3.5 10.5L3 9.5L1 9L1 7L3 6.5L3.5 5.5L2.5 3.5L3.5 2.5L5.5 3.5L6.5 3Z"/><circle cx="8" cy="8" r="2"/></svg></button><button class="mobile-menu" aria-expanded="false">메뉴</button></div>
+    <div class="brand"><span class="brand-icon"><img src="/assets/brand.png" width="32" height="32" alt=""></span><div><strong>Forkrail</strong><small>AI 작업을 한눈에</small></div><button class="mobile-settings" data-open-settings aria-label="설정"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M7 1L9 1L9.5 3L10.5 3.5L12.5 2.5L13.5 3.5L12.5 5.5L13 6.5L15 7L15 9L13 9.5L12.5 10.5L13.5 12.5L12.5 13.5L10.5 12.5L9.5 13L9 15L7 15L6.5 13L5.5 12.5L3.5 13.5L2.5 12.5L3.5 10.5L3 9.5L1 9L1 7L3 6.5L3.5 5.5L2.5 3.5L3.5 2.5L5.5 3.5L6.5 3Z"/><circle cx="8" cy="8" r="2"/></svg></button><button class="mobile-menu" aria-expanded="false">메뉴</button></div>
     <div class="sum">
       <div class="w"><b id="n-wait">0</b><span>나를 기다림</span></div>
       <div class="r"><b id="n-run">0</b><span>작업 중</span></div>
@@ -2267,7 +2267,7 @@ async function boardAction(action,fields,sid=ui.sid===SETTINGS?(ui.actionContext
   ui.actionBusy=true;setActionMessage(sid,action==='launch'?'새 터미널 창을 여는 중입니다.':action==='deliver'?'스킬 실행을 요청하는 중입니다.':action==='connection_check'?'연결과 조회 권한을 확인하고 있습니다.':action==='connection_login'?'로그인 창을 여는 중입니다.':'');render();
   try {
     const catalog=await loadActionCatalog(sid);
-    if(!catalog?.token)throw new Error('Moa에 연결하지 못했습니다. 새로 고친 뒤 다시 시도해 주세요.');
+    if(!catalog?.token)throw new Error('Forkrail에 연결하지 못했습니다. 새로 고친 뒤 다시 시도해 주세요.');
     const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),60000);
     let r,result;
     try {r=await fetch('/api/actions',{method:'POST',headers:{'Content-Type':'application/json','X-Work-Board-Token':catalog.token},body:JSON.stringify({action,sid,...fields}),signal:controller.signal});result=await r.json();}
@@ -2478,7 +2478,7 @@ function render(force=false) {
   const list = data.sessions;
   const cnt = p => rootSessions(list).filter(s => !isHidden(s) && displayPhase(s) === p).length;
   document.getElementById("n-wait").textContent = cnt("wait");
-  document.title = cnt("wait") ? `(${cnt("wait")}) Moa` : "Moa";
+  document.title = cnt("wait") ? `(${cnt("wait")}) Forkrail` : "Forkrail";
   document.getElementById("n-run").textContent = cnt("run");
   document.getElementById("n-stall").textContent = cnt("stall");
   if (ui.sid !== BOARD && ui.sid !== SPRINT && ui.sid !== DASH && ui.sid !== SETTINGS && !list.some(s => s.id === ui.sid)) {
@@ -2710,7 +2710,7 @@ async function refresh() {
     lastKey = "";
     for (const id of ["n-wait", "n-run", "n-stall"]) document.getElementById(id).textContent = "–";
     document.getElementById("tabs").innerHTML = "";
-    document.getElementById("main").innerHTML = `<div class="empty" role="alert"><h1>Moa에 연결할 수 없습니다</h1><p>3초마다 다시 연결합니다. 계속 표시되면 Moa 서비스가 실행 중인지 확인해 주세요.</p><button class="text-button" data-retry>지금 다시 연결</button></div>`;
+    document.getElementById("main").innerHTML = `<div class="empty" role="alert"><h1>Forkrail에 연결할 수 없습니다</h1><p>3초마다 다시 연결합니다. 계속 표시되면 Forkrail 서비스가 실행 중인지 확인해 주세요.</p><button class="text-button" data-retry>지금 다시 연결</button></div>`;
   }
 }
 
