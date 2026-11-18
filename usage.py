@@ -67,86 +67,90 @@ def _scan_file(path: str, size: int) -> None:
     if size <= st["offset"]:
         return
     sub = "subagents" in path.split(os.sep)
+    S = st["s"]
     with open(path, "rb") as f:
         f.seek(st["offset"])
-        chunk = f.read()
-    end = chunk.rfind(b"\n") + 1
-    S = st["s"]
-    for raw in chunk[:end].splitlines():
-        if not (b'"assistant"' in raw or b'"user"' in raw):
-            continue
-        try:
-            e = json.loads(raw)
-        except ValueError:
-            st['partial'].add('malformed')
-            continue
-        if not isinstance(e, dict):
-            st['partial'].add('malformed')
-            continue
-        day = _day(e.get("timestamp") or "")
-        if not day:
-            continue
-        if e.get("cwd") and not st.get("cwd"):
-            st["cwd"] = e["cwd"]
-        kind = e.get("type")
-        if kind == "system":
-            continue
-        msg = e.get("message") or {}
-        if not isinstance(msg, dict):
-            st['partial'].add('malformed')
-            continue
-        if kind == "user":
-            content = msg.get("content")
-            if isinstance(content, list):
-                for b in content:
-                    if isinstance(b, dict) and b.get('type') == 'tool_result':
-                        tid = b.get('tool_use_id')
-                        if tid in st['tool_ids'] and tid not in st.setdefault('result_ids', set()):
-                            call_day = st['tool_days'][tid]
-                            field = 'blocked' if b.get('is_error') and blocks.is_blocked(b.get('content')) else 'checked'
-                            _bump(S, field, call_day, st['tool_ids'][tid])
-                            st['result_ids'].add(tid)
-                            if b.get('is_error') and field != 'blocked':
-                                _bump(S, 'errors', call_day, st['tool_ids'][tid])
-            if not sub and _is_prompt(e):
-                _bump(S, "prompts", day)
-            continue
-        if kind != "assistant":
-            continue
-        for b in msg.get("content") or []:
-            if isinstance(b, dict) and b.get("type") == "tool_use":
-                if b.get('id') and b['id'] in st['tool_ids']:continue
-                name = b.get("name") or "기타"
-                name = "MCP" if name.startswith("mcp__") else name
-                st["tool_ids"][b.get("id") or ""] = name
-                st['tool_days'][b.get('id') or ''] = day
-                _bump(S, "tools", day, name)
-        u = msg.get("usage")
-        mid = msg.get("id")
-        if not isinstance(u, dict) or not mid:
-            continue
-        previous=st['ids'].get(mid)
-        try:
-            values={k:max(0,int(u.get(k,(previous or {}).get('values',{}).get(k,0)) or 0)) for k in ('input_tokens','cache_creation_input_tokens','cache_read_input_tokens','output_tokens')}
-            hour=datetime.fromisoformat(e['timestamp'].replace('Z','+00:00')).astimezone().hour
-        except (ValueError,TypeError,KeyError,OverflowError):continue
-        model=str(msg.get('model') or (previous or {}).get('model') or '')
-        if previous:
-            if values==previous['values'] and model==previous['model']:continue
-            old_total=sum(previous['values'].values());old_day=previous['day']
-            st['days'][old_day]-=old_total
-            _bump(S,'out',old_day,n=-previous['values']['output_tokens'])
-            _bump(S,'hours',old_day,previous['hour'],n=-old_total)
-            if previous['model'] and not previous['model'].startswith('<'):_bump(S,'models',old_day,previous['model'],n=-old_total)
-            day=old_day;hour=previous['hour']
-        st['ids'][mid]={'values':values,'day':day,'hour':hour,'model':model}
-        total = sum(values.values())
-        st["days"][day] = st["days"].get(day, 0) + total
-        if model and not model.startswith("<"):
-            _bump(S, "models", day, model, n=total)
-        _bump(S, "out", day, n=values['output_tokens'])
-        _bump(S, "hours", day, hour, n=total)
-    st["offset"] += end
+        for raw in f:
+            if not raw.endswith(b"\n"):
+                break
+            st["offset"] = f.tell()
+            try:
+                if not (b'"assistant"' in raw or b'"user"' in raw):
+                    continue
+                try:
+                    e = json.loads(raw)
+                except ValueError:
+                    st['partial'].add('malformed')
+                    continue
+                if not isinstance(e, dict):
+                    st['partial'].add('malformed')
+                    continue
+                day = _day(e.get("timestamp") or "")
+                if not day:
+                    continue
+                if e.get("cwd") and not st.get("cwd"):
+                    st["cwd"] = e["cwd"]
+                kind = e.get("type")
+                if kind == "system":
+                    continue
+                msg = e.get("message") or {}
+                if not isinstance(msg, dict):
+                    st['partial'].add('malformed')
+                    continue
+                if kind == "user":
+                    content = msg.get("content")
+                    if isinstance(content, list):
+                        for b in content:
+                            if isinstance(b, dict) and b.get('type') == 'tool_result':
+                                tid = b.get('tool_use_id')
+                                if tid in st['tool_ids'] and tid not in st.setdefault('result_ids', set()):
+                                    call_day = st['tool_days'][tid]
+                                    field = 'blocked' if b.get('is_error') and blocks.is_blocked(b.get('content')) else 'checked'
+                                    _bump(S, field, call_day, st['tool_ids'][tid])
+                                    st['result_ids'].add(tid)
+                                    if b.get('is_error') and field != 'blocked':
+                                        _bump(S, 'errors', call_day, st['tool_ids'][tid])
+                    if not sub and _is_prompt(e):
+                        _bump(S, "prompts", day)
+                    continue
+                if kind != "assistant":
+                    continue
+                for b in msg.get("content") or []:
+                    if isinstance(b, dict) and b.get("type") == "tool_use":
+                        if b.get('id') and b['id'] in st['tool_ids']:continue
+                        name = b.get("name") or "기타"
+                        name = "MCP" if name.startswith("mcp__") else name
+                        st["tool_ids"][b.get("id") or ""] = name
+                        st['tool_days'][b.get('id') or ''] = day
+                        _bump(S, "tools", day, name)
+                u = msg.get("usage")
+                mid = msg.get("id")
+                if not isinstance(u, dict) or not mid:
+                    continue
+                previous=st['ids'].get(mid)
+                try:
+                    values={k:max(0,int(u.get(k,(previous or {}).get('values',{}).get(k,0)) or 0)) for k in ('input_tokens','cache_creation_input_tokens','cache_read_input_tokens','output_tokens')}
+                    hour=datetime.fromisoformat(e['timestamp'].replace('Z','+00:00')).astimezone().hour
+                except (ValueError,TypeError,KeyError,OverflowError):continue
+                model=str(msg.get('model') or (previous or {}).get('model') or '')
+                if previous:
+                    if values==previous['values'] and model==previous['model']:continue
+                    old_total=sum(previous['values'].values());old_day=previous['day']
+                    st['days'][old_day]-=old_total
+                    _bump(S,'out',old_day,n=-previous['values']['output_tokens'])
+                    _bump(S,'hours',old_day,previous['hour'],n=-old_total)
+                    if previous['model'] and not previous['model'].startswith('<'):_bump(S,'models',old_day,previous['model'],n=-old_total)
+                    day=old_day;hour=previous['hour']
+                st['ids'][mid]={'values':values,'day':day,'hour':hour,'model':model}
+                total = sum(values.values())
+                st["days"][day] = st["days"].get(day, 0) + total
+                if model and not model.startswith("<"):
+                    _bump(S, "models", day, model, n=total)
+                _bump(S, "out", day, n=values['output_tokens'])
+                _bump(S, "hours", day, hour, n=total)
+            except (ValueError, TypeError, AttributeError, OverflowError):
+                # A malformed complete record must not become an invisible gap.
+                st['partial'].add('malformed')
 
 
 def _project(st: dict) -> str:
