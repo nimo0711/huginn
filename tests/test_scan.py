@@ -1,11 +1,14 @@
 import os
 import json
 import sqlite3
+from pathlib import Path
+import tempfile
 import unittest
 from unittest.mock import patch
 
 import scan
 import enrich
+from document_fixtures import document_connection
 
 
 class QuestionTests(unittest.TestCase):
@@ -175,15 +178,20 @@ class WorkAttributionTests(unittest.TestCase):
 
 
 class CurrentContextTests(unittest.TestCase):
+    def setUp(self):
+        temporary=tempfile.TemporaryDirectory();self.addCleanup(temporary.cleanup)
+        self.root=Path(temporary.name)
+        self.enterContext(document_connection(self.root))
+
     def test_codex_followup_keeps_tail_and_successful_edit_links_current_plan(self):
         c=sqlite3.connect(':memory:')
         self.addCleanup(c.close)
         c.execute('CREATE TABLE thread_items (thread_id,turn_id,item_type,item_json,created_at_ms,rollout_ordinal)')
         feedback='이전 업무의 긴 설명입니다. '*100+'지금 제목이 왜 다르게 나오나요?'
-        plan=scan.HOME+'/vtm/문서/화면/개선/계획서/구현.md'
+        plan=str(self.root/'화면/개선/계획서/구현.md')
         messages=[('userMessage',{'content':[{'text':'보드를 수정해 주세요.'}]}),
                   ('userMessage',{'content':[{'text':feedback}]}),
-                  ('commandExecution',{'command':'cat '+plan,'cwd':scan.HOME+'/vtm'})]
+                  ('commandExecution',{'command':'cat '+plan,'cwd':str(self.root)})]
         for i,(kind,data) in enumerate(messages):
             c.execute('INSERT INTO thread_items VALUES (?,?,?,?,?,?)',('thread','turn',kind,json.dumps(data),1000+i,i))
         task=scan._codex_turn(c,'thread','turn','inProgress',1,0)

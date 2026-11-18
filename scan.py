@@ -295,7 +295,7 @@ def _open_task(info: dict, prompt: str, ts: float) -> None:
 
 def _task_progress(task):
     return next((p for path in reversed(task.get('plan_refs', []))
-                 if (p := progress.read_plan(path, DOC_ROOT)) and p.get('ts', 0) >= task['ts']), None)
+                 if (p := progress.read_plan(path)) and p.get('ts', 0) >= task['ts']), None)
 
 
 def _archive_task(history, task, branch=''):
@@ -321,7 +321,7 @@ def _archive_task(history, task, branch=''):
     if completed:
         plan = _task_progress(task)
         if plan and any(i['state'] != 'done' for i in plan['items']):
-            path = str(Path(DOC_ROOT) / plan['rel'])
+            path = str(Path(connections.STORE.document_root()) / plan['rel'])
             pending = row['history']['plans'].setdefault(path, {'count': 0, 'ts': task['ts']})
             pending['count'] += count
             pending['ts'] = max(pending['ts'], task['ts'])
@@ -470,16 +470,24 @@ def _feed(info: dict, line: str) -> None:
 
 
 DOC_EXT = {".html", ".htm", ".md", ".pdf", ".xlsx", ".docx", ".pptx", ".png", ".svg"}
-DOC_ROOT = os.path.realpath(os.path.expanduser("~/vtm/문서"))
+_document_config = None
+
+
+def _refresh_document_cache():
+    global _document_config
+    signature=connections.values_hash(connections.STORE.get('documents'))
+    if signature!=_document_config:
+        _cache.clear();_codex_past.clear();_codex_recent.clear()
+        _document_config=signature
 
 
 def _plan_reference(task: dict, paths: list) -> None:
     for path in paths:
         if not path or not path.endswith('.md') or '/계획서/' not in path.replace(os.sep, '/'):
             continue
-        real = os.path.realpath(os.path.expanduser(path))
-        if not real.startswith(DOC_ROOT + os.sep):
-            continue
+        location=connections.STORE.document_location(path)
+        if not location:continue
+        real=location[0]
         refs = task.setdefault('plan_refs', [])
         if real in refs:
             refs.remove(real)
@@ -490,24 +498,25 @@ def _plan_reference(task: dict, paths: list) -> None:
 def _doc(task: dict, path: str, ts: float, created: bool) -> None:
     if not path:
         return
-    real = os.path.realpath(path)
-    if not real.startswith(DOC_ROOT + os.sep):
-        return
+    location=connections.STORE.document_location(path)
+    if not location:return
+    real,relative=location
     docs = task.setdefault("docs", [])
     for d in docs:
         if d["path"] == real:
             d["ts"] = ts
             return
-    docs.append({"path": real, "rel": os.path.relpath(real, DOC_ROOT).replace(os.sep, "/"), "ts": ts, "created": created})
+    docs.append({"path": real, "rel": relative, "ts": ts, "created": created})
 
 
 def _doc_paths(text: str) -> list:
-    return [p for p in _cmd_paths(text) if os.path.splitext(p)[1].lower() in DOC_EXT and os.path.realpath(p).startswith(DOC_ROOT + os.sep)]
+    return [p for p in _cmd_paths(text) if os.path.splitext(p)[1].lower() in DOC_EXT and connections.STORE.document_location(p)]
 
 
 def _confirm_docs(pend: tuple, end: float) -> None:
     task, paths, start = pend
     for p in paths:
+        if not connections.STORE.document_location(p):continue
         try:
             m = os.path.getmtime(p)
         except OSError:
@@ -518,7 +527,7 @@ def _confirm_docs(pend: tuple, end: float) -> None:
 
 def _live_docs(tasks: list) -> None:
     for t in tasks:
-        t["docs"] = [d for d in t.get("docs") or [] if os.path.exists(d["path"])]
+        t["docs"] = [d for d in t.get("docs") or [] if connections.STORE.document_location(d['path']) and os.path.exists(d["path"])]
 
 
 def _parse_claude(path: str) -> dict:
@@ -582,7 +591,7 @@ def _finish(tasks: list[dict], running: bool, now: float) -> list[dict]:
         if t.get('history'):
             history = dict(t['history'])
             history['done'] += sum(v['count'] for path, v in history['plans'].items()
-                                   if (p := progress.read_plan(path, DOC_ROOT)) and p.get('ts', 0) >= v['ts']
+                                   if (p := progress.read_plan(path)) and p.get('ts', 0) >= v['ts']
                                    and all(item['state'] == 'done' for item in p['items']))
             t['history'] = history
         if i == len(tasks) - 1 and not running:
@@ -726,7 +735,7 @@ def _works(tasks: list, session_branch: str, titles: dict) -> list:
                 context = {"area": w["key"], "objective": next(t["request"] for t in turns if t["request"]),
                            "turns": turns if len(turns) <= 8 else turns[:2] + turns[-6:]}
                 summary = title_summary.get(context)
-                w["title"] = summary["title"] or ("작업 제목 정리 중" if summary["state"] == "pending" else "작업 제목 미확인")
+                w["title"] = "" if summary["state"] == "disabled" else summary["title"] or ("작업 제목 정리 중" if summary["state"] == "pending" else "작업 제목 미확인")
                 w["title_source"] = "summary"
                 w["title_state"] = summary["state"]
     works.sort(key=lambda w: w["tasks"][-1])
@@ -734,6 +743,7 @@ def _works(tasks: list, session_branch: str, titles: dict) -> list:
 
 
 def claude_sessions(now: float) -> list[dict]:
+    _refresh_document_cache()
     live: dict[str, dict] = {}
     for f in glob.glob(os.path.join(CLAUDE_SESSIONS, "*.json")):
         try:
@@ -948,6 +958,7 @@ def _codex_tasks(hist, tid, turns, branch, database_identity):
 
 
 def codex_sessions(now: float) -> list[dict]:
+    _refresh_document_cache()
     if not os.path.exists(CODEX_STATE):
         return []
     with ExitStack() as databases:

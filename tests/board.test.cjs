@@ -565,6 +565,54 @@ test('connection settings render schema values and preserve an editing draft',()
  assert.ok(!b.run('settingsView()').includes('value="ABC"'));
 });
 
+test('fresh board offers explicit agent connections and optional work sources',()=>{
+ const b=board();
+ b.run('data={sessions:[],connections:["claude","codex","git","documents","jira","gitlab","summary"].map(kind=>({kind,label:kind,description:"연결",registered:false,values:{enabled:false},fields:[],source_paths:kind==="claude"?["/Users/another person/.claude/projects"]:[],help:"원본을 변경하지 않습니다."}))}');
+ const view=b.run('overview()');
+ assert.ok(view.includes('data-key="connection-onboarding"'));
+ for(const kind of ['claude','codex','git','documents','jira','gitlab','summary'])assert.ok(view.includes(`data-connect-kind="${kind}"`));
+ assert.ok(view.includes('/Users/another person/.claude/projects'));
+ assert.match(view,/<details[^>]*data-key="setup-source-claude"[^>]*><summary>기록 위치<\/summary>/);
+ assert.ok(!/<details[^>]*data-key="setup-source-claude"[^>]*\bopen\b/.test(view));
+ assert.ok(!view.includes('context-table'));
+ b.run('openConnection("claude",true)');
+ assert.equal(b.run('ui.connectionDraft.enabled'),true);
+ assert.equal(b.run('data.connections[0].values.enabled'),false);
+ b.run('data.connections[0].registered=true;data.connections[0].values.enabled=true');
+ assert.ok(!b.run('overview()').includes('data-key="connection-onboarding"'));
+});
+
+test('work names stay generic for any repository when AI summaries are disabled',()=>{
+ const b=board();assert.equal(b.run('workName({key:"work-board"})'),'work-board');
+});
+
+test('a fresh installation opens connection setup even when the browser remembers an old tab',async()=>{
+ const b=board();
+ b.run('render=()=>{};ui.sid=SETTINGS;ui.fromLink=false;fetch=async()=>({ok:true,json:async()=>({now:Date.now()/1000,sessions:[],connections:[{kind:"claude",registered:false,values:{enabled:false}}]})})');
+ await b.run('refresh()');assert.equal(b.run('ui.sid'),'__board');
+ b.run('ui.sid=SETTINGS');await b.run('refresh()');assert.equal(b.run('ui.sid'),'__settings');
+});
+
+test('agent setup exposes read locations before saving and missing sources after checking',()=>{
+ const b=board();
+ b.run('data={sessions:[]};ui.actionData={"":{connections:[{kind:"codex",label:"Codex",description:"세션",registered:false,values:{enabled:false},fields:[],source_paths:["/Users/another person/.codex/state_5.sqlite"],help:"원본 보존"}]}};openConnection("codex",true)');
+ let view=b.run('connectionsView()');
+ assert.ok(view.includes('/Users/another person/.codex/state_5.sqlite'));
+ assert.ok(view.includes('연결 시작'));
+ b.run('ui.connectionEdit=null;ui.actionData[""].connections[0].registered=true;ui.actionData[""].connections[0].values.enabled=true;ui.actionData[""].connections[0].check={status:"missing_source",ok:false,checked_at:Date.now()/1000,message:"저장소를 찾지 못했습니다"}');
+ view=b.run('connectionsView()');
+ assert.ok(view.includes('기록 위치 확인'));assert.ok(view.includes('저장소를 찾지 못했습니다'));
+});
+
+test('macOS updates open a DMG with drag instructions while Windows keeps its installer',()=>{
+ const b=board();b.run('data={sessions:[]};ui.updates={status:"ready",available:true,os:"macos"}');
+ let view=b.run('updatesView()');
+ assert.ok(view.includes('Applications'));assert.ok(view.includes('드래그'));
+ assert.ok(view.includes('DMG 열기'));
+ b.run('ui.updates.os="windows"');view=b.run('updatesView()');
+ assert.ok(view.includes('업데이트 설치'));assert.ok(!view.includes('Applications'));
+});
+
 test('current-session skills match the connected agent and disconnected delivery stays disabled',()=>{
  const b=board();load(b,fixture());b.run('W.s.agent="codex";ui.skillContext={sid:W.s.id};ui.actionData={[W.s.id]:{connection:{available:false,message:"연결 없음"},skills:[{id:"c",agent:"claude",name:"claude-only",label:"claude-only"},{id:"x",agent:"codex",name:"codex-only",label:"codex-only"}]}}');
  b.run('skillDraft(W.s.id).selected="x";ui.skillStep="compose"');const html=b.run('skillDialogContent()');assert.ok(html.includes('현재 세션에서 실행'));assert.ok(!html.includes('claude-only'));assert.ok(html.includes('codex-only'));assert.ok(html.includes('data-run-skill="x" disabled'));assert.ok(html.includes('연결 없음'));
@@ -595,7 +643,7 @@ test('browser update settings link to official releases and distinguish installa
 });
 test('update settings show bounded progress, recoverable states and safe links without raw errors',()=>{
  const b=board();b.run('data={sessions:[]};ui.settingsTab="updates"');
- for(const [status,match] of [['available','업데이트 다운로드'],['ready','업데이트 설치'],['auth_required','접근 권한'],['unpublished','게시된 릴리즈'],['current','최신 버전'],['error','다시 확인'],['installing','다음 실행']]) {
+ for(const [status,match] of [['available','업데이트 다운로드'],['ready','DMG 열기'],['auth_required','접근 권한'],['unpublished','게시된 릴리즈'],['current','최신 버전'],['error','다시 확인'],['installing','Applications']]) {
   b.set({status,available:true,current_version:'1.2.0',latest_version:'1.2.1',os:'macos',signed:false,message:'secret technical /tmp/token',release_url:'javascript:alert(1)'});b.run('ui.updates=input');
   const view=b.run('settingsView()');assert.ok(view.includes(match),status);assert.ok(!view.includes('secret technical'));assert.ok(!view.includes('javascript:'));assert.ok(!view.includes('설치가 완료'));
  }

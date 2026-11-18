@@ -29,6 +29,20 @@
     if (!sessionsResponse.ok || !Array.isArray(sessions.sessions)) {
       throw new Error("WebView could not load board sessions");
     }
+    if (!Array.isArray(sessions.connections) ||
+        !["claude", "codex", "summary", "git", "jira", "gitlab", "documents"].every(kind => sessions.connections.some(row => row.kind === kind)) ||
+        sessions.connections.some(row => row.values?.enabled !== false || row.registered !== false)) {
+      throw new Error("Fresh installation unexpectedly enabled or registered a connection");
+    }
+    const deadline = Date.now() + 10000;
+    while (!document.querySelector('[data-key="connection-onboarding"]') && Date.now() < deadline) {
+      await new Promise(resolve => setTimeout(resolve, 100));
+    }
+    if (!document.querySelector('[data-key="connection-onboarding"]') ||
+        !document.querySelector('[data-connect-kind="claude"]') ||
+        !document.querySelector('[data-connect-kind="codex"]')) {
+      throw new Error("Fresh installation did not render connection setup");
+    }
 
     const catalogResponse = await fetch("/api/actions", { cache: "no-store" });
     const catalog = await catalogResponse.json();

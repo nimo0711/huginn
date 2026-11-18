@@ -1572,7 +1572,7 @@ function wDetail(W, i) {
     + `<section><details class="whole"><summary>보고 원문 전체 보기</summary><div class="full">${md(r.result)}</div></details></section>`;
 }
 
-function workName(w) { return w.key === "work-board" ? "작업 보드 (work-board)" : w.key; }
+function workName(w) { return w.key; }
 
 const SPRINT = "__sprint";
 const bigTok = n => n >= 1e9 ? `${(n / 1e9).toFixed(1)}B` : n >= 1e6 ? `${Math.round(n / 1e6)}M` : n >= 1e3 ? `${Math.round(n / 1e3)}k` : String(n || 0);
@@ -2114,7 +2114,17 @@ function detailSheet(s, W) {
   const title = ui.stage === "history" ? "진행 기록" : ui.stage === 3 ? "결과 상세" : ui.stage === 0 ? "계획 상세" : "작업 상세";
   return `<div class="sheet-bg" data-close="1"></div><div class="sheet" data-key="sheet-${esc(workKey(W))}-${ui.stage}" role="dialog" aria-modal="true" aria-label="${title}"><div class="sh"><b>${title}</b><span class="sub">${esc(workName(W.w))}</span><button data-close="1" aria-label="닫기">닫기 ${SVG('<path d="m4 4 8 8M12 4l-8 8"/>')}</button></div><div class="sb">${ui.stage === "history" ? historyContent(W) : wDetail(W, ui.stage)}</div></div>`;
 }
-function connectionRows() { return ui.actionData?.['']?.connections || []; }
+function connectionRows() { return ui.actionData?.['']?.connections || data?.connections || []; }
+function connectionSetup() {
+  const rows=connectionRows(),pending=ui.actionBusy?' disabled':'';
+  const button=(row,label)=>`<button class="soft-button ${['claude','codex'].includes(row.kind)?'settings-primary':'settings-secondary'}" data-connect-kind="${esc(row.kind)}"${pending}>${esc(label)}</button>`;
+  return `<section class="result-panel"><div class="section-heading"><div><h2>사용하는 AI를 선택하세요</h2><p class="quiet">선택한 도구의 연결을 저장하면 최근 세션이 표시됩니다. 원본 대화와 로그인은 그대로 유지됩니다.</p></div></div>
+  <div class="connection-list">${rows.filter(x=>['claude','codex'].includes(x.kind)).map(row=>`<div class="connection-row"><div class="connection-description"><div class="connection-name"><strong>${esc(row.label)}</strong><span class="connection-state">${row.registered?'중지':'아직 연결하지 않음'}</span></div><p>${esc(row.description)}</p></div><div class="action-buttons">${button(row,row.label+' 연결')}</div><details class="connection-details" data-key="setup-source-${esc(row.kind)}"><summary>기록 위치</summary><div class="connection-details-body"><p>현재 사용자의 기본 기록 저장소입니다.</p>${(row.source_paths || []).map(path=>`<p>${esc(path)}</p>`).join('')}</div></details></div>`).join('')}</div>
+  <p class="settings-note">연결 전에는 세션 수집과 AI 제목 요약을 실행하지 않습니다.</p></section>
+  <section class="result-panel"><div class="section-heading"><div><h2>작업 정보 더하기 <span class="quiet">· 선택</span></h2><p class="quiet">본인의 Git 작업 폴더, 계획서·산출물 폴더, Jira 프로젝트, GitLab 그룹을 등록할 수 있습니다. 나중에 설정에서 추가해도 됩니다.</p></div></div>
+  <div class="action-buttons">${['git','documents','jira','gitlab','summary'].map(kind=>rows.find(x=>x.kind===kind)).filter(Boolean).map(row=>button(row,row.label+(row.registered?' 설정':' 추가'))).join('')}</div>
+  <p class="settings-note">AI 제목 요약은 별도 선택 기능이며, 켜면 Claude 사용량이 발생합니다.</p></section>`;
+}
 function openConnection(kind,adding=false) {
   const row=connectionRows().find(x=>x.kind===kind);if(!row)return;
   ui.connectionEdit=kind;ui.connectionAdding=adding;ui.connectionDraft=JSON.parse(JSON.stringify(row.values));
@@ -2141,14 +2151,15 @@ function connectionsView() {
     <div class="settings-form-section"><div><h3>사용 설정</h3></div><div>${ui.connectionAdding?`<label class="settings-field">연결 종류<select data-connection-kind${pending}>${available.map(x=>`<option value="${esc(x.kind)}"${x.kind===row.kind?' selected':''}>${esc(x.label)}</option>`).join('')}</select></label>`:''}
     <label class="settings-row"><span>보드에서 사용<p>끄면 이 연결의 정보 수집을 중지합니다.</p></span><span class="settings-switch"><input type="checkbox" data-connection-field="enabled" aria-label="보드에서 사용"${draft.enabled?' checked':''}${pending}><span aria-hidden="true"></span></span></label></div></div>
     <div class="settings-form-section"><div><h3>연결 정보</h3><p>저장 후 연결 확인으로 접근 여부를 확인하세요.</p></div><div>${row.fields.map(f=>`<label class="settings-field">${esc(f.label)}${f.type==='paths'?`<textarea data-key="connection-field-${esc(row.kind)}-${esc(f.key)}" data-connection-field="${esc(f.key)}" rows="3"${pending}>${esc((draft[f.key] || []).join('\n'))}</textarea>`:`<input data-key="connection-field-${esc(row.kind)}-${esc(f.key)}" data-connection-field="${esc(f.key)}" type="${f.type==='url'?'url':'text'}" value="${esc(draft[f.key] || '')}" autocomplete="off"${pending}>`}<small class="quiet">${esc(f.hint || '')}</small></label>`).join('')}
-    <details class="connection-details" data-key="connection-editor-help-${esc(row.kind)}"><summary>설정 도움말</summary><p class="connection-help quiet">${esc(row.help)}</p></details></div></div>
-    <div class="settings-form-footer"><button class="text-button" type="button" data-connection-cancel${pending}>취소</button><button class="soft-button settings-primary connection-save" type="submit"${pending}>설정 저장</button></div>
+    ${row.source_paths?.length?`<div class="connection-details-body"><p>읽을 기록 위치</p>${row.source_paths.map(path=>`<p>${esc(path)}</p>`).join('')}<p>${esc(row.help)}</p></div>`:`<details class="connection-details" data-key="connection-editor-help-${esc(row.kind)}"><summary>설정 도움말</summary><p class="connection-help quiet">${esc(row.help)}</p></details>`}</div></div>
+    <div class="settings-form-footer"><button class="text-button" type="button" data-connection-cancel${pending}>취소</button><button class="soft-button settings-primary connection-save" type="submit"${pending}>${ui.connectionAdding && draft.enabled?'연결 시작':'설정 저장'}</button></div>
     </form></section>`;
   }
+  if(!registered.length)return connectionSetup();
   return `<section class="result-panel"><div class="section-heading"><div><h2>등록한 연결</h2><p class="quiet">등록 ${registered.length}개 · 사용 설정 켜짐 ${registered.filter(x=>x.values.enabled).length}개</p></div><button class="soft-button settings-primary" data-connection-add${!available.length || ui.actionBusy?' disabled':''}>${SVG('<path d="M8 2v12M2 8h12"/>')} 연결 추가</button></div>
   <div class="connection-list">${registered.map(x=>{
     const check=connectionCheck(x),remote=['jira','gitlab'].includes(x.kind),old=check && Date.now()/1000-check.checked_at>300;
-    const state=!x.values.enabled?'중지':!check?'확인 필요':old?'재확인 필요':({connected:'연결 확인됨',available:x.kind==='summary'?'CLI 확인됨':'사용 가능',login_required:'인증 필요',site_mismatch:'사이트 불일치',permission_denied:'권한 부족',cli_missing:'설치 필요',network_error:'접속 실패',timeout:'응답 지연',disabled:'중지'}[check.status] || '확인 필요');
+    const state=!x.values.enabled?'중지':!check?'확인 필요':old?'재확인 필요':({connected:'연결 확인됨',available:x.kind==='summary'?'CLI 확인됨':'사용 가능',login_required:'인증 필요',site_mismatch:'사이트 불일치',permission_denied:'권한 부족',cli_missing:'설치 필요',missing_source:'기록 위치 확인',network_error:'접속 실패',timeout:'응답 지연',disabled:'중지'}[check.status] || '확인 필요');
     const tone=x.values.enabled && check && !old?(check.ok?'is-ok':'is-error'):'';
     return `<div class="connection-row" data-key="connection-${esc(x.kind)}"><div class="connection-description"><div class="connection-name"><strong>${esc(x.label)}</strong><span class="connection-state ${tone}">${state}</span></div>${remote?`<p class="connection-target">${esc(x.kind==='jira'?x.values.site+' · '+x.values.project:x.values.host+' · '+x.values.group)}</p>`:''}<p>${esc(x.description)}</p></div><div class="action-buttons"><button class="soft-button" data-connection-check="${esc(x.kind)}"${pending}>연결 확인</button><button class="text-button" data-connection-edit="${esc(x.kind)}"${pending}>설정</button></div>
     <details class="connection-details" data-key="connection-details-${esc(x.kind)}"${check && !check.ok && x.values.enabled?' open':''}><summary>${remote?'확인 내역·로그인':'확인 내역·관리'}</summary><div class="connection-details-body">${check?`<p class="connection-check ${check.ok?'is-ok':'is-error'}" role="status">${esc(check.message)}<small>${md2(check.checked_at)} ${hm(check.checked_at)} 확인</small></p>`:'<p>아직 연결을 확인하지 않았습니다.</p>'}${connectionAuth(x,check,pending)}<p class="settings-note"><button class="text-button" data-connection-remove="${esc(x.kind)}"${pending}>이 연결 제거</button></p></div></details>
@@ -2240,6 +2251,7 @@ function updatesView() {
   const catalog=ui.actionData?.[''],state=ui.updates || {status:updateNative()?'idle':'unsupported',available:!!updateNative()};
   const status=state.status,available=state.available,pending=updatePending(),disabled=pending?' disabled':'';
   const os={macos:'macOS',windows:'Windows',other:'기타 운영체제'}[state.os || catalog?.environment?.os] || '운영체제 확인 필요';
+  const macos=(state.os || catalog?.environment?.os)==='macos';
   const cpu={'macos-arm64':'Apple Silicon','macos-x86_64':'Intel','windows-x64':'x64'}[state.target];
   const version=state.current_version || catalog?.app?.version || '버전 확인 필요';
   const messages={
@@ -2250,8 +2262,8 @@ function updatesView() {
     unpublished:['아직 게시된 릴리즈가 없습니다','배포 페이지에서 게시 여부를 확인한 뒤 다시 확인해 주세요.'],
     auth_required:['릴리즈 접근 권한이 필요합니다','이 컴퓨터의 GitHub CLI에서 접근 가능한 계정으로 로그인한 뒤 다시 확인해 주세요. 배포 페이지에서도 권한을 확인할 수 있습니다.'],
     downloading:['업데이트를 다운로드하고 있습니다','다운로드가 끝나면 파일 검증 후 설치 버튼이 표시됩니다.'],
-    ready:['업데이트를 설치할 준비가 됐습니다','설치를 누르면 확인 창과 운영체제 설치창이 열립니다.'],
-    installing:['설치창에서 진행해 주세요','설치 완료 여부는 Forkrail을 다음 실행할 때 현재 버전으로 확인합니다. 설치를 취소했다면 다시 확인할 수 있습니다.'],
+    ready:['업데이트를 설치할 준비가 됐습니다',macos?'DMG를 연 뒤 Forkrail을 종료하고, Forkrail.app을 Applications로 드래그해 교체하세요.':'설치를 누르면 확인 창과 운영체제 설치창이 열립니다.'],
+    installing:[macos?'DMG에서 앱을 교체해 주세요':'설치창에서 진행해 주세요',macos?'Forkrail을 종료하고 DMG의 Forkrail.app을 Applications로 드래그하세요. 교체 후 Applications에서 Forkrail을 다시 열면 현재 버전으로 확인할 수 있습니다.':'설치 완료 여부는 Forkrail을 다음 실행할 때 현재 버전으로 확인합니다. 설치를 취소했다면 다시 확인할 수 있습니다.'],
     error:['업데이트를 진행하지 못했습니다','연결이나 설치 파일 확인에 문제가 생겼습니다. 다시 확인해 주세요. 계속되면 배포 페이지에서 설치 파일을 확인할 수 있습니다.'],
     unsupported:['Forkrail 설치본이 필요합니다','이 실행 환경에서는 앱 안에서 업데이트할 수 없습니다. 배포 페이지에서 이 컴퓨터에 맞는 설치본을 받아 주세요.']
   };
@@ -2263,7 +2275,8 @@ function updatesView() {
     '업데이트를 처리하지 못했습니다. 네트워크 연결을 확인한 뒤 다시 시도해 주세요.',
     '업데이트 작업이 취소되었습니다.',
     '설치를 취소했습니다. 다운로드한 파일은 다시 설치할 수 있습니다.',
-    'OS 설치창을 열지 못했거나 실행을 취소했습니다. 다시 시도해 주세요.'
+    'OS 설치창을 열지 못했거나 실행을 취소했습니다. 다시 시도해 주세요.',
+    'DMG를 열지 못했거나 실행을 취소했습니다. 다시 시도해 주세요.'
   ];
   const detail=['error','ready'].includes(status) && safeDetails.includes(state.message)?state.message:defaultDetail;
   const bytes=Number(state.downloaded_bytes),total=Number(state.total_bytes),known=Number.isFinite(total) && total>0;
@@ -2277,7 +2290,7 @@ function updatesView() {
   <div class="settings-form-footer"><div class="action-buttons">
   ${available?`<button class="soft-button ${['available','ready'].includes(status)?'settings-secondary':'settings-primary'}" data-update-action="Check"${disabled}>${checkLabel}</button>`:''}
   ${available && status==='available'?`<button class="soft-button settings-primary" data-update-action="Download"${disabled}>업데이트 다운로드</button>`:''}
-  ${available && status==='ready'?`<button class="soft-button settings-primary" data-update-action="Install"${disabled}>업데이트 설치</button>`:''}
+  ${available && status==='ready'?`<button class="soft-button settings-primary" data-update-action="Install"${disabled}>${macos?'DMG 열기':'업데이트 설치'}</button>`:''}
   <a class="soft-button settings-secondary" href="${esc(releaseURL)}" target="_blank" rel="noopener noreferrer">배포 페이지 ${ARROW}</a></div></div></section>`;
 }
 function environmentValues(form,trim=false) {
@@ -2569,6 +2582,8 @@ function contextRow(entry) {
   </article>`;
 }
 function overview() {
+  const sources=connectionRows();
+  if(!data.sessions.length && sources.length && !sources.some(row=>['claude','codex'].includes(row.kind) && row.values.enabled))return `<div class="workspace-page settings-page" data-key="connection-onboarding"><header class="task-heading"><h1>Forkrail에 작업 연결하기</h1><p>Claude와 Codex의 작업을 한눈에 확인하세요. 가져올 기록은 직접 선택합니다.</p></header>${connectionSetup()}</div>`;
   const entries=boardEntries(), active=entries.filter(e=>e.kind!=="off"), attention=active.filter(e=>["wait","stall"].includes(e.kind)), running=active.filter(e=>e.kind==="run");
   const visible=ui.filter==="attention"?attention:ui.filter==="run"?running:active;
   const recent=entries.filter(e=>e.kind==="off" && (e.W.last.outcome==="완료" || e.W.life==="완료" || e.W.mrs.length || e.W.commits.length || e.W.files.length)).sort((a,b)=>b.W.endTs-a.W.endTs);
@@ -2841,8 +2856,14 @@ async function refresh() {
     if (!r.ok) throw new Error("sessions unavailable");
     const d = await r.json();
     offset = d.now - Date.now() / 1000;
-    const key = JSON.stringify([d.sessions, d.sprint, d.usage]);
+    const key = JSON.stringify([d.sessions, d.sprint, d.usage, d.connections]);
     data = d;
+    if(!ui.initialConnectionsLoaded && Array.isArray(d.connections)){
+      ui.initialConnectionsLoaded=true;
+      if(!ui.fromLink && !d.sessions.length && !d.connections.some(row=>row.registered)){
+        ui.sid=BOARD;ui.stage=null;ui.req=null;rememberNavigation(true);
+      }
+    }
     if (key !== lastKey) { lastKey = key; render(); }
   } catch (e) {
     data = null;stopUpdatePolling();
@@ -2862,6 +2883,14 @@ document.addEventListener('click',async e=>{
   if(ui.actionBusy)return;
   if(e.target.closest('[data-connection-retry]')){await loadActionCatalog('',true);return;}
   if(e.target.closest('[data-settings-retry]')){await loadActionCatalog(ui.actionContext || '',true);return;}
+  const connect=e.target.closest('[data-connect-kind]');if(connect){
+    ui.sid=SETTINGS;ui.settingsTab='connections';ui.stage=null;ui.req=null;ui.menu=false;
+    store.set('wb.sid',ui.sid);rememberNavigation();
+    await loadActionCatalog('',true);
+    const row=connectionRows().find(x=>x.kind===connect.dataset.connectKind);
+    if(row){openConnection(row.kind,!row.registered);if(['claude','codex'].includes(row.kind))ui.connectionDraft.enabled=true;}
+    render(true);document.getElementById('main').scrollTop=0;return;
+  }
   const edit=e.target.closest('[data-connection-edit]');if(edit){openConnection(edit.dataset.connectionEdit);render();return;}
   if(e.target.closest('[data-connection-add]')){const row=connectionRows().find(x=>!x.registered);if(row)openConnection(row.kind,true);render();return;}
   if(e.target.closest('[data-connection-cancel]')){ui.connectionEdit=null;render();return;}

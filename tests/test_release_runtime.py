@@ -69,9 +69,11 @@ class ReleaseRuntimeTests(unittest.TestCase):
 
     def test_serve_binds_loopback_and_reports_identity(self):
         data = self.root / '보드 기록'
-        doc = self.home / 'vtm/문서/example.html'
+        doc = self.home / '내 산출물/example.html'
         doc.parent.mkdir(parents=True)
         doc.write_text('<p>test document</p>', encoding='utf-8')
+        settings=data/'.actions';settings.mkdir(parents=True)
+        (settings/'connections.json').write_text(json.dumps({'documents':{'enabled':True,'root':str(doc.parent)}}),encoding='utf-8')
         with socket.socket() as probe:
             probe.bind(('127.0.0.1', 0))
             port = probe.getsockname()[1]

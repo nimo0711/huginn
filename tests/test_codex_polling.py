@@ -10,6 +10,7 @@ import unittest
 from unittest.mock import patch
 
 import scan
+from document_fixtures import document_connection
 
 
 class CodexPollingTests(unittest.TestCase):
@@ -125,7 +126,7 @@ class CodexPollingTests(unittest.TestCase):
         plan.parent.mkdir(parents=True)
         plan.write_text('- [ ] 검증\n', encoding='utf-8')
         self.add_item('fileChange', {'status': 'completed', 'changes': [{'path': str(plan)}]}, 3)
-        with patch.object(scan, 'DOC_ROOT', str(self.root)):
+        with document_connection(self.root):
             first = self.poll()
             self.assertEqual(first['tasks'][0]['progress']['items'][0]['state'], 'pending')
             first['tasks'][0]['areas']['wrong'] = 1
