@@ -6,7 +6,7 @@ Claude·Codex의 병렬 작업에서 세션의 관계, 현재 작업, 진척과 
 
 배포 대상은 Windows 10/11 x64, macOS 13 이상 Apple Silicon·Intel입니다. 설치 파일에는 Python 서비스가 포함됩니다. Python이나 Go를 사용자가 따로 설치할 필요가 없습니다.
 
-[GitHub Releases](https://github.com/nimo0711/work-board/releases)에서 운영체제에 맞는 파일을 받습니다. 저장소가 비공개이면 접근 권한이 있는 GitHub 계정으로 로그인해야 합니다. 아직 게시된 릴리즈가 없다면 [Actions의 설치 후보](https://github.com/nimo0711/work-board/actions)에서 시험 결과와 파일을 확인합니다.
+[GitHub Releases](https://github.com/nimo0711/forkrail/releases)에서 운영체제에 맞는 파일을 받습니다. 저장소가 비공개이면 접근 권한이 있는 GitHub 계정으로 로그인해야 합니다. 아직 게시된 릴리즈가 없다면 [Actions의 설치 후보](https://github.com/nimo0711/forkrail/actions)에서 시험 결과와 파일을 확인합니다.
 
 | 환경 | 설치 파일 | 실행 |
 | --- | --- | --- |
@@ -59,8 +59,8 @@ Windows는 로컬 Windows 사용자 기록을 읽습니다. WSL 내부 세션은
 Python 3.12를 권장합니다. Windows의 프로세스 탐지에는 psutil이 필요합니다.
 
 ```sh
-git clone https://github.com/nimo0711/work-board.git
-cd work-board
+git clone https://github.com/nimo0711/forkrail.git
+cd forkrail
 python -m pip install psutil==7.2.2
 python server.py
 ```
