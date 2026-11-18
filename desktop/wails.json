@@ -1,0 +1,13 @@
+{
+  "$schema": "https://wails.io/schemas/config.v2.json",
+  "name": "Forkrail",
+  "outputfilename": "Forkrail",
+  "frontend:dir": ".",
+  "wailsjsdir": ".",
+  "version": "2",
+  "info": {
+    "companyName": "Forkrail",
+    "productName": "Forkrail",
+    "productVersion": "1.2.0"
+  }
+}
