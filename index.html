@@ -905,6 +905,7 @@ h1,h2,h3,p { margin-top:0; }
 .settings-form-section .settings-field:last-child { margin-bottom:0; }
 .settings-form-footer { display:flex; align-items:center; justify-content:flex-end; gap:12px; padding-top:20px; border-top:1px solid var(--line); }
 .settings-form-footer p { margin:0 auto 0 0; font-size:12px; color:var(--dim); }
+.update-progress { display:block; width:100%; height:8px; margin:16px 0 8px; accent-color:var(--primary); }
 .settings-switch { display:inline-flex; align-items:center; position:relative; flex:none; min-height:44px; width:44px; cursor:pointer; }
 .settings-switch input[type=checkbox] { position:absolute; inset:0; width:100%; height:100%; margin:0; opacity:0; z-index:1; }
 .settings-switch > span { width:40px; height:24px; border:1px solid var(--dim); background:var(--panel2); border-radius:12px; }
@@ -1087,7 +1088,7 @@ h1,h2,h3,p { margin-top:0; }
  button,a[href],summary,select,[role="button"],.text-button,.soft-button,.action-buttons .soft-button,.settings-page .soft-button { min-height:44px; }
  a[href],summary { align-content:center; }
  .mobile-settings,.mobile-menu { height:44px; min-width:44px; }
- .settings-tabs { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:4px; }
+ .settings-tabs { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:4px; }
  .settings-page .settings-tabs .soft-button { padding:8px 4px; white-space:normal; text-align:center; }
  .settings-page > .task-heading { margin-bottom:0; }
  .settings-page .result-panel { padding:16px; }
@@ -1898,6 +1899,7 @@ function rememberNavigation(replace=false) {
   const method=replace || !history.state?.workBoard || history.state.sid===state.sid?'replaceState':'pushState';
   history[method](state,'','/?'+query.toString());store.set('wb.sid',state.sid);
 }
+window.addEventListener('pagehide',()=>stopUpdatePolling());
 window.addEventListener('popstate',event=>{
   ui.sid=new URLSearchParams(location.search).get('sid') || event.state?.sid || BOARD;
   ui.work=event.state?.workBoard?{...(event.state.work || {})}:{};
@@ -2152,20 +2154,156 @@ function connectionsView() {
     ${ui.connectionRemove===x.kind?`<div class="connection-confirm"><span>보드에서 ${esc(x.label)} 연결을 제거할까요?</span><button class="soft-button" data-connection-confirm="${esc(x.kind)}"${pending}>연결 제거</button><button class="text-button" data-connection-keep${pending}>취소</button></div>`:''}</div>`;
   }).join('') || '<div class="settings-empty"><strong>등록한 연결이 없습니다</strong><p>연결 추가에서 사용할 서비스나 로컬 기록을 선택하세요.</p></div>'}</div></section>`;
 }
+const OFFICIAL_RELEASES='https://github.com/nimo0711/forkrail/releases';
+function updateNative() {
+  const bridge=window.go?.main?.AppUpdates;
+  return bridge && ['Info','Check','Download','Install'].every(name=>typeof bridge[name]==='function')?bridge:null;
+}
+function updateVisible() {return !!data && ui.sid===SETTINGS && ui.settingsTab==='updates';}
+function updatePending() {return !!ui.updateBusy || ['checking','downloading'].includes(ui.updates?.status);}
+function updateReleaseURL(value) {
+  // The packaged repository is canonical; older servers use the official fallback.
+  return typeof value==='string' && /^https:\/\/github\.com\/[A-Za-z0-9][A-Za-z0-9-]*\/[A-Za-z0-9][A-Za-z0-9_.-]*\/releases(?:\/tag\/[A-Za-z0-9._+-]+)?$/.test(value)?value:OFFICIAL_RELEASES;
+}
+function normalizeUpdate(value) {
+  const statuses=['idle','checking','available','current','unpublished','auth_required','downloading','ready','installing','error','unsupported'];
+  if(!value || !statuses.includes(value.status))throw new Error('Invalid update state');
+  return {...value,available:value.available===true};
+}
+async function callUpdateNative(method) {
+  const bridge=updateNative();if(!bridge)throw new Error('Update bridge unavailable');
+  let timer;
+  try {
+    return normalizeUpdate(await Promise.race([Promise.resolve().then(()=>bridge[method]()),new Promise((_,reject)=>{
+      timer=setTimeout(()=>reject(new Error('Update response timeout')),method==='Download'?1800000:method==='Info'?10000:90000);
+    })]));
+  } finally {clearTimeout(timer);}
+}
+function stopUpdatePolling() {
+  clearTimeout(ui.updateTimer);ui.updateTimer=null;
+  if(ui.updateActive){ui.updateActive=false;ui.updateEpoch=(ui.updateEpoch || 0)+1;}
+}
+function scheduleUpdateInfo() {
+  if(!updateVisible() || ui.updateTimer || ui.updateInfoBusy)return;
+  const needsInfo=!ui.updates || ui.updates.status==='unsupported' && !updateNative() && (ui.updateAttempts || 0)<8 || updatePending();
+  if(!needsInfo)return;
+  ui.updateTimer=setTimeout(async()=>{ui.updateTimer=null;await readUpdateInfo();},750);
+}
+async function readUpdateInfo() {
+  if(!updateVisible() || ui.updateInfoBusy)return;
+  if(!updateNative()) {
+    ui.updateAttempts=(ui.updateAttempts || 0)+1;
+    ui.updates={status:'unsupported',available:false};
+    if(updateVisible())render(true);
+    scheduleUpdateInfo();return;
+  }
+  const epoch=ui.updateEpoch || 0,operation=ui.updateOperation || 0;
+  ui.updateInfoBusy=true;
+  try {
+    const value=await callUpdateNative('Info');
+    if(epoch===(ui.updateEpoch || 0) && operation===(ui.updateOperation || 0))ui.updates=value;
+  } catch(error) {
+    if(epoch===(ui.updateEpoch || 0) && operation===(ui.updateOperation || 0) && !ui.updateBusy)ui.updates={...ui.updates,status:'error',available:true};
+  } finally {
+    ui.updateInfoBusy=false;
+    if(updateVisible()){
+      if(epoch!==(ui.updateEpoch || 0)){readUpdateInfo();return;}
+      render(true);scheduleUpdateInfo();
+    }
+  }
+}
+function syncUpdates() {
+  if(!updateVisible()){stopUpdatePolling();return;}
+  if(!ui.updateActive) {
+    ui.updateActive=true;ui.updateAttempts=0;
+    // Bindings can arrive after the document; initialize on entry, then retry briefly.
+    readUpdateInfo();
+  } else scheduleUpdateInfo();
+}
+async function runUpdateAction(method) {
+  if(!['Check','Download','Install'].includes(method) || updatePending())return;
+  if(method==='Download' && ui.updates?.status!=='available' || method==='Install' && ui.updates?.status!=='ready')return;
+  if(!updateNative()){ui.updates={status:'unsupported',available:false};if(updateVisible())render(true);return;}
+  ui.updateBusy=true;ui.updateOperation=(ui.updateOperation || 0)+1;
+  ui.updates={...ui.updates,status:{Check:'checking',Download:'downloading',Install:'installing'}[method],available:true};
+  if(updateVisible()){render(true);scheduleUpdateInfo();}
+  try {ui.updates=await callUpdateNative(method);}
+  catch(error) {ui.updates={...ui.updates,status:'error',available:true};}
+  finally {
+    // Any older Info response must not overwrite this completed action.
+    ui.updateOperation++;ui.updateBusy=false;
+    if(updateVisible()){render(true);scheduleUpdateInfo();}
+  }
+}
+function updatesView() {
+  const catalog=ui.actionData?.[''],state=ui.updates || {status:updateNative()?'idle':'unsupported',available:!!updateNative()};
+  const status=state.status,available=state.available,pending=updatePending(),disabled=pending?' disabled':'';
+  const os={macos:'macOS',windows:'Windows',other:'기타 운영체제'}[state.os || catalog?.environment?.os] || '운영체제 확인 필요';
+  const cpu={'macos-arm64':'Apple Silicon','macos-x86_64':'Intel','windows-x64':'x64'}[state.target];
+  const version=state.current_version || catalog?.app?.version || '버전 확인 필요';
+  const messages={
+    idle:['업데이트를 확인해 주세요','게시된 새 버전이 있는지 확인합니다. 다운로드와 설치는 직접 선택할 수 있습니다.'],
+    checking:['새 버전을 확인하고 있습니다','릴리즈 정보를 가져오는 중입니다.'],
+    available:['새 버전을 사용할 수 있습니다','이 컴퓨터에 맞는 설치 파일을 내려받고 확인합니다.'],
+    current:['최신 버전을 사용하고 있습니다','현재 설치된 버전보다 새로운 릴리즈가 없습니다.'],
+    unpublished:['아직 게시된 릴리즈가 없습니다','배포 페이지에서 게시 여부를 확인한 뒤 다시 확인해 주세요.'],
+    auth_required:['릴리즈 접근 권한이 필요합니다','이 컴퓨터의 GitHub CLI에서 접근 가능한 계정으로 로그인한 뒤 다시 확인해 주세요. 배포 페이지에서도 권한을 확인할 수 있습니다.'],
+    downloading:['업데이트를 다운로드하고 있습니다','다운로드가 끝나면 파일 검증 후 설치 버튼이 표시됩니다.'],
+    ready:['업데이트를 설치할 준비가 됐습니다','설치를 누르면 확인 창과 운영체제 설치창이 열립니다.'],
+    installing:['설치창에서 진행해 주세요','설치 완료 여부는 Forkrail을 다음 실행할 때 현재 버전으로 확인합니다. 설치를 취소했다면 다시 확인할 수 있습니다.'],
+    error:['업데이트를 진행하지 못했습니다','연결이나 설치 파일 확인에 문제가 생겼습니다. 다시 확인해 주세요. 계속되면 배포 페이지에서 설치 파일을 확인할 수 있습니다.'],
+    unsupported:['Forkrail 설치본이 필요합니다','이 실행 환경에서는 앱 안에서 업데이트할 수 없습니다. 배포 페이지에서 이 컴퓨터에 맞는 설치본을 받아 주세요.']
+  };
+  const [title,defaultDetail]=messages[status] || messages.error;
+  // These native messages are intentionally fixed. Never show thrown errors or
+  // arbitrary transport diagnostics, which can contain paths or credentials.
+  const safeDetails=[
+    '배포 파일의 버전·대상·크기 또는 체크섬이 올바르지 않습니다.',
+    '업데이트를 처리하지 못했습니다. 네트워크 연결을 확인한 뒤 다시 시도해 주세요.',
+    '업데이트 작업이 취소되었습니다.',
+    '설치를 취소했습니다. 다운로드한 파일은 다시 설치할 수 있습니다.',
+    'OS 설치창을 열지 못했거나 실행을 취소했습니다. 다시 시도해 주세요.'
+  ];
+  const detail=['error','ready'].includes(status) && safeDetails.includes(state.message)?state.message:defaultDetail;
+  const bytes=Number(state.downloaded_bytes),total=Number(state.total_bytes),known=Number.isFinite(total) && total>0;
+  const percent=known?Math.max(0,Math.min(100,Math.floor((Number.isFinite(bytes)?bytes:0)/total*100))):0;
+  const releaseURL=updateReleaseURL(state.release_url || catalog?.app?.release_url);
+  const checkLabel=['auth_required','error','installing'].includes(status)?'다시 확인':'업데이트 확인';
+  return `<section class="result-panel" data-key="app-updates"><div class="section-heading"><div><h2>앱 업데이트</h2><p class="quiet">현재 버전 ${esc(version)} · ${esc(os)}${cpu?` · ${esc(cpu)}`:''}</p></div></div>
+  <div class="settings-form-section"><div><h3>${esc(title)}</h3>${state.latest_version?`<p>배포 버전 ${esc(state.latest_version)}</p>`:''}</div><div><p role="status" aria-live="polite">${esc(detail)}</p>
+  ${status==='downloading'?`<progress class="update-progress" aria-label="업데이트 다운로드 진행률" max="100"${known?` value="${percent}"`:''}></progress><p class="quiet">${known?`${percent}%`:'다운로드 크기 확인 중'}</p>`:''}
+  ${status==='ready'?`<p class="quiet">${state.signed?'배포 정보에 서명된 파일로 표시돼 있습니다. 설치 시 운영체제에서 확인합니다.':'서명되지 않은 배포 파일입니다. 설치 시 운영체제의 보안 확인이 필요할 수 있습니다.'}</p>`:''}</div></div>
+  <div class="settings-form-footer"><div class="action-buttons">
+  ${available?`<button class="soft-button" data-update-action="Check"${disabled}>${checkLabel}</button>`:''}
+  ${available && status==='available'?`<button class="soft-button settings-primary" data-update-action="Download"${disabled}>업데이트 다운로드</button>`:''}
+  ${available && status==='ready'?`<button class="soft-button settings-primary" data-update-action="Install"${disabled}>업데이트 설치</button>`:''}
+  <a class="soft-button" href="${esc(releaseURL)}" target="_blank" rel="noopener noreferrer">배포 페이지 ${ARROW}</a></div></div></section>`;
+}
+function environmentValues(form,trim=false) {
+  const result={};
+  for(const name of ['auto_servers','auto_terminal','launch_app']) {
+    const field=form.elements[name];if(!field)continue;
+    result[name]=name==='launch_app'?(trim?field.value.trim():field.value):field.checked;
+  }
+  return result;
+}
+
 function settingsView() {
   if(ui.actionContext && !data.sessions.some(s=>s.id===ui.actionContext))ui.actionContext='';
   const sid=ui.actionContext || '', catalog=ui.actionData?.[sid], globalCatalog=ui.actionData?.[''];
   const config=ui.environmentDraft || globalCatalog?.settings || {auto_servers:true,auto_terminal:true,launch_app:''};
+  const environment=globalCatalog?.environment || {};
   const shortcuts=catalog?.shortcuts || [],pending=ui.actionBusy?' disabled':'';
   const tab=ui.settingsTab || 'connections';
-  const tabs=[['connections','연결'],['environment','작업 환경'],['skills','스킬'],['guide','AI용 도움말']];
+  const tabs=[['connections','연결'],['environment','작업 환경'],['skills','스킬'],['guide','AI용 도움말'],['updates','앱 업데이트']];
   let content='';
   if(tab==='connections')content=connectionsView();
+  if(tab==='updates')content=updatesView();
   if(tab==='environment')content=`<section class="result-panel"><div class="section-heading"><div><h2>작업 환경</h2><p class="quiet">세션 화면에 표시할 버튼과 실행 앱을 정합니다.</p></div></div><form data-action-settings="1">
   <div class="settings-form-section"><div><h3>세션에서 바로 열기</h3><p>감지한 항목만 버튼으로 표시합니다.</p></div><div>
   <label class="settings-row"><span>로컬 서버<p>세션이 실행한 서버의 열기 버튼을 표시합니다.</p></span><span class="settings-switch"><input type="checkbox" name="auto_servers" aria-label="로컬 서버" ${config.auto_servers?'checked':''}${pending}><span aria-hidden="true"></span></span></label>
-  <label class="settings-row"><span>터미널 복귀<p>감지한 터미널 앱을 엽니다. 탭은 앱에서 선택합니다.</p></span><span class="settings-switch"><input type="checkbox" name="auto_terminal" aria-label="터미널 복귀" ${config.auto_terminal?'checked':''}${pending}><span aria-hidden="true"></span></span></label></div></div>
-  <div class="settings-form-section"><div><h3>새 터미널에서 실행</h3><p>스킬 실행 시 새 터미널을 선택한 경우에 사용합니다.</p></div><div><label class="settings-field">터미널 앱 경로 <span class="quiet">(선택)</span><input name="launch_app" value="${esc(config.launch_app)}" placeholder="시스템 기본 터미널"${pending}><small class="quiet">비워 두면 시스템 기본 터미널을 사용합니다. 지정하려면 설치된 터미널 앱의 전체 경로를 입력하세요.</small></label></div></div>
+  ${environment.terminal_focus_supported===true?`<label class="settings-row"><span>터미널 복귀<p>감지한 터미널 앱을 엽니다. 탭은 앱에서 선택합니다.</p></span><span class="settings-switch"><input type="checkbox" name="auto_terminal" aria-label="터미널 복귀" ${config.auto_terminal?'checked':''}${pending}><span aria-hidden="true"></span></span></label>`:''}</div></div>
+  <div class="settings-form-section"><div><h3>새 터미널에서 실행</h3><p>스킬 실행 시 새 터미널을 선택한 경우에 사용합니다.</p></div><div>${environment.terminal_app_configurable===true?`<label class="settings-field">터미널 앱 경로 <span class="quiet">(선택)</span><input name="launch_app" value="${esc(config.launch_app)}" placeholder="시스템 기본 터미널"${pending}><small class="quiet">비워 두면 시스템 기본 터미널을 사용합니다. 지정하려면 설치된 터미널 앱의 전체 경로를 입력하세요.</small></label>`:`<p>${environment.os==='windows'?'PowerShell에서 실행합니다.':'이 컴퓨터의 기본 실행 환경을 사용합니다.'}</p>`}</div></div>
   <div class="settings-form-footer"><p>이 컴퓨터의 모든 세션에 적용됩니다.</p><button class="soft-button settings-primary" type="submit"${pending || !globalCatalog?.settings?' disabled':''}>변경 저장</button></div></form></section>
 `;
   if(tab==='environment' && !globalCatalog?.settings)content=`<section class="result-panel"><h2>작업 환경</h2>${globalCatalog?.error?'<p class="quiet" role="alert">작업 환경을 불러오지 못했습니다.</p><button class="soft-button" data-connection-retry>다시 불러오기</button>':'<p class="quiet" role="status">작업 환경을 불러오는 중입니다.</p>'}</section>`;
@@ -2196,7 +2334,7 @@ function actionToolbar(W,settingsOnly=false) {
   const config=catalog?.settings || {};
   const pending=ui.actionBusy?' disabled':'';
   const servers=(settingsOnly || config.auto_servers===false?[]:runtime.servers || []).map(x=>`<a class="soft-button" data-server-url="${esc(x.url)}" href="${esc(x.url)}" target="_blank" rel="noopener noreferrer" title="${esc(x.evidence || '')}">${SVG('<rect x="2" y="3" width="12" height="10" rx="1"/><path d="M2 6h12M4 4.5h.1M6 4.5h.1"/>')}서버 :${x.port} ${ARROW}</a>`).join('');
-  const terminal=!settingsOnly && config.auto_terminal!==false && runtime.terminal?`<button class="soft-button" data-focus-session="${esc(W.s.id)}" title="${esc((runtime.terminal.app || "")+" · "+runtime.terminal.detail)}"${pending}>${SVG('<path d="m3 4 4 4-4 4M9 12h4"/>')}터미널 열기</button>`:'';
+  const terminal=!settingsOnly && config.auto_terminal!==false && catalog?.environment?.terminal_focus_supported!==false && runtime.terminal?`<button class="soft-button" data-focus-session="${esc(W.s.id)}" title="${esc((runtime.terminal.app || "")+" · "+runtime.terminal.detail)}"${pending}>${SVG('<path d="m3 4 4 4-4 4M9 12h4"/>')}터미널 열기</button>`:'';
   const favorites=(settingsOnly?[]:skills).filter(s=>s.favorite && s.agent===W.s.agent).slice(0,3).map(s=>`<button class="soft-button" data-compose-skill="${esc(s.id)}" title="${esc(s.agent==='claude'?'Claude':'Codex')} · 요청 내용을 입력하고 실행"${pending}>${SVG('<path d="m6 3 6 5-6 5z"/>')}${esc(s.label)}</button>`).join('');
   return `<div class="action-toolbar"><div class="action-buttons">${servers}${terminal}${favorites}<button class="soft-button" data-skill-menu="1" data-key="skill-menu" data-settings-only="${settingsOnly?'1':'0'}" aria-haspopup="dialog" aria-controls="skill-dialog" aria-expanded="${Boolean(ui.skillsOpen)}">${GRID}${settingsOnly?"바로가기 추가":"스킬 실행"} ${SVG('<path d="m4 6 4 4 4-4"/>')}</button></div>${actionMessage(W.s.id)?`<p class="action-feedback" role="status">${esc(actionMessage(W.s.id))}</p>`:''}</div>`;
 }
@@ -2472,6 +2610,7 @@ function syncMarkup(root, html) {
 }
 
 function render(force=false) {
+  syncUpdates();
   if (!data || ui.drag || !force && document.activeElement?.matches("select")) return;
   const focusBefore = document.activeElement?.dataset.focus;
   const hadSheet = !!document.querySelector(".sheet");
@@ -2670,7 +2809,7 @@ skillDialog.addEventListener('close',()=>{ui.skillsOpen=false;ui.skillContext=nu
 document.getElementById("main").addEventListener("submit",e=>{
   if(!e.target.matches('[data-action-settings]'))return;
   e.preventDefault();const form=e.target;
-  boardAction('configure',{settings:{auto_servers:form.elements.auto_servers.checked,auto_terminal:form.elements.auto_terminal.checked,launch_app:form.elements.launch_app.value.trim()}},'');
+  boardAction('configure',{settings:environmentValues(form,true)},'');
 });
 document.getElementById("main").addEventListener("change",e=>{
   if(e.target.matches('[data-settings-session]')){ui.actionContext=e.target.value;ui.skillQuery='';render(true);}
@@ -2705,7 +2844,7 @@ async function refresh() {
     data = d;
     if (key !== lastKey) { lastKey = key; render(); }
   } catch (e) {
-    data = null;
+    data = null;stopUpdatePolling();
     document.querySelector("aside").inert = false;
     lastKey = "";
     for (const id of ["n-wait", "n-run", "n-stall"]) document.getElementById(id).textContent = "–";
@@ -2717,6 +2856,7 @@ async function refresh() {
 document.addEventListener('click',async e=>{
   if(e.target.closest('[data-retry]')){refresh();return;}
   if(e.target.closest('[data-open-settings]')){ui.sid=SETTINGS;ui.stage=null;ui.req=null;ui.menu=false;store.set('wb.sid',ui.sid);rememberNavigation();render();document.getElementById('main').scrollTop=0;return;}
+  const update=e.target.closest('[data-update-action]');if(update){await runUpdateAction(update.dataset.updateAction);return;}
   const tab=e.target.closest('[data-settings-tab]');if(tab){ui.settingsTab=tab.dataset.settingsTab;render(true);return;}
   if(ui.actionBusy)return;
   if(e.target.closest('[data-connection-retry]')){await loadActionCatalog('',true);return;}
@@ -2733,7 +2873,7 @@ document.addEventListener('click',async e=>{
 document.getElementById('main').addEventListener('input',e=>{
   const key=e.target.dataset.connectionField;
   if(key && ui.connectionDraft){const field=connectionRows().find(x=>x.kind===ui.connectionEdit)?.fields.find(x=>x.key===key);ui.connectionDraft[key]=key==='enabled'?e.target.checked:field?.type==='paths'?e.target.value.split('\n').filter(x=>x.trim()):e.target.value;}
-  if(e.target.closest('[data-action-settings]')){const form=e.target.closest('form');ui.environmentDraft={auto_servers:form.elements.auto_servers.checked,auto_terminal:form.elements.auto_terminal.checked,launch_app:form.elements.launch_app.value};}
+  if(e.target.closest('[data-action-settings]')){const form=e.target.closest('form');ui.environmentDraft=environmentValues(form);}
 });
 document.getElementById('main').addEventListener('change',e=>{
   if(e.target.matches('[data-connection-kind]')){openConnection(e.target.value,true);render(true);}

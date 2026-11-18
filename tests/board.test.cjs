@@ -6,14 +6,14 @@ const vm = require('node:vm');
 
 const html = fs.readFileSync(process.env.BOARD_HTML || path.join(__dirname, '..', 'index.html'), 'utf8');
 const script = html.match(/<script>([\s\S]*?)<\/script>/)[1];
-function board() {
+function board(extra = {}) {
   const storage = new Map();
   const el = {addEventListener() {}, setAttribute() {}, classList: {toggle() {}}, querySelectorAll() { return []; }};
   const ctx = vm.createContext({URLSearchParams, Date, console,
     localStorage: {getItem: k => storage.get(k) ?? null, setItem: (k,v) => storage.set(k,v)},
     location: {search: ''}, history: {replaceState() {}},
     document: {getElementById: () => el, querySelector: () => el, addEventListener() {}},
-    window: {addEventListener() {}, getSelection: () => ''}, setInterval() {}, fetch: () => new Promise(() => {})});
+    window: {addEventListener() {}, getSelection: () => ''}, setInterval() {}, fetch: () => new Promise(() => {}), ...extra});
   vm.runInContext(script, ctx);
   return {run: s => vm.runInContext(s, ctx), set: value => ctx.input = value};
 }
@@ -568,4 +568,113 @@ test('connection settings render schema values and preserve an editing draft',()
 test('current-session skills match the connected agent and disconnected delivery stays disabled',()=>{
  const b=board();load(b,fixture());b.run('W.s.agent="codex";ui.skillContext={sid:W.s.id};ui.actionData={[W.s.id]:{connection:{available:false,message:"연결 없음"},skills:[{id:"c",agent:"claude",name:"claude-only",label:"claude-only"},{id:"x",agent:"codex",name:"codex-only",label:"codex-only"}]}}');
  b.run('skillDraft(W.s.id).selected="x";ui.skillStep="compose"');const html=b.run('skillDialogContent()');assert.ok(html.includes('현재 세션에서 실행'));assert.ok(!html.includes('claude-only'));assert.ok(html.includes('codex-only'));assert.ok(html.includes('data-run-skill="x" disabled'));assert.ok(html.includes('연결 없음'));
+});
+
+test('environment controls follow backend capabilities on Mac, Windows and older servers',()=>{
+ const b=board();b.run('data={sessions:[]};ui.settingsTab="environment"');
+ for(const [environment,terminal,path,shell] of [
+  [{os:'macos',terminal_focus_supported:true,terminal_app_configurable:true,shell_label:'터미널'},true,true,'터미널'],
+  [{os:'windows',terminal_focus_supported:false,terminal_app_configurable:false,shell_label:'PowerShell'},false,false,'PowerShell'],
+  [undefined,false,false,'이 컴퓨터']]) {
+  b.set({settings:{auto_servers:true,auto_terminal:true,launch_app:'/Applications/Terminal.app'},environment});b.run('ui.actionData={"":input}');
+  const view=b.run('settingsView()');assert.equal(view.includes('name="auto_terminal"'),terminal);assert.equal(view.includes('name="launch_app"'),path);assert.ok(view.includes(shell));
+ }
+});
+test('saving Windows environment preserves unsupported settings by omitting hidden fields',()=>{
+ const b=navigationBoard();b.run('ui.actionData={"":{settings:{auto_servers:true,auto_terminal:true,launch_app:"/Applications/Custom.app"}}};boardAction=(action,fields)=>{globalThis.saved=fields.settings}');
+ const form={matches:s=>s==='[data-action-settings]',elements:{auto_servers:{checked:false}}};
+ b.event('main','submit',{target:form,preventDefault(){}});
+ assert.deepEqual(JSON.parse(b.run('JSON.stringify(saved)')),{auto_servers:false});
+ b.event('main','input',{target:{dataset:{},closest:s=>s==='form'||s==='[data-action-settings]'?form:null}});
+ assert.deepEqual(JSON.parse(b.run('JSON.stringify(ui.environmentDraft)')),{auto_servers:false});
+});
+test('browser update settings link to official releases and distinguish installation requirements',()=>{
+ const b=board();b.run('data={sessions:[]};ui.settingsTab="updates";ui.actionData={"":{app:{version:"1.2.0-rc.1",release_url:"https://github.com/nimo0711/forkrail/releases"},environment:{os:"windows"}}}');
+ const view=b.run('settingsView()');assert.ok(view.includes('Windows'));assert.ok(view.includes('1.2.0-rc.1'));assert.ok(view.includes('설치본'));assert.ok(view.includes('href="https://github.com/nimo0711/forkrail/releases"'));assert.ok(!view.includes('data-update-action="Check"'));
+ b.run('ui.actionData={}');assert.ok(b.run('settingsView()').includes('href="https://github.com/nimo0711/forkrail/releases"'));
+});
+test('update settings show bounded progress, recoverable states and safe links without raw errors',()=>{
+ const b=board();b.run('data={sessions:[]};ui.settingsTab="updates"');
+ for(const [status,match] of [['available','업데이트 다운로드'],['ready','업데이트 설치'],['auth_required','접근 권한'],['unpublished','게시된 릴리즈'],['current','최신 버전'],['error','다시 확인'],['installing','다음 실행']]) {
+  b.set({status,available:true,current_version:'1.2.0',latest_version:'1.2.1',os:'macos',signed:false,message:'secret technical /tmp/token',release_url:'javascript:alert(1)'});b.run('ui.updates=input');
+  const view=b.run('settingsView()');assert.ok(view.includes(match),status);assert.ok(!view.includes('secret technical'));assert.ok(!view.includes('javascript:'));assert.ok(!view.includes('설치가 완료'));
+ }
+ b.run('ui.updates={status:"downloading",available:true,downloaded_bytes:1000,total_bytes:10}');
+ const progress=b.run('settingsView()');assert.ok(progress.includes('value="100"'));assert.ok(progress.includes('max="100"'));assert.ok(!progress.includes('10000%'));
+});
+function updateBoard() {
+ const timers=new Map();let sequence=0;
+ const b=board({setTimeout:(fn,ms)=>{const id=++sequence;timers.set(id,{fn,ms});return id;},clearTimeout:id=>timers.delete(id)});
+ b.run('render=()=>{};data={sessions:[]};ui.sid=SETTINGS;ui.settingsTab="updates"');
+ return {...b,timers,tick:async()=>{const entry=[...timers.entries()].find(([,t])=>t.ms<1000);if(entry){timers.delete(entry[0]);await entry[1].fn();await Promise.resolve();}}};
+}
+test('native binding appearing after startup initializes updates and leaving settings stops polling',async()=>{
+ const b=updateBoard();b.run('syncUpdates()');assert.ok(b.timers.size>0);
+ b.run('window.go={main:{AppUpdates:{Info:async()=>({status:"idle",available:true,current_version:"2.0.0",os:"windows"}),Check(){},Download(){},Install(){}}}}');
+ await b.tick();assert.equal(b.run('ui.updates.current_version'),'2.0.0');
+ b.run('ui.updates.status="downloading";syncUpdates()');assert.ok(b.timers.size>0);
+ b.run('ui.settingsTab="environment";syncUpdates()');assert.equal(b.timers.size,0);
+});
+test('rejected native actions clear busy state and repeated download clicks start one operation',async()=>{
+ const b=updateBoard();b.run('ui.updates={status:"available",available:true};window.go={main:{AppUpdates:{Info:async()=>ui.updates,Check:async()=>{throw new Error("private technical error")},Download:()=>new Promise(resolve=>{globalThis.finishDownload=resolve;globalThis.downloadCalls=(globalThis.downloadCalls||0)+1}),Install(){}}}}');
+ await b.run('runUpdateAction("Check")');assert.equal(b.run('ui.updateBusy'),false);assert.equal(b.run('ui.updates.status'),'error');assert.ok(!b.run('settingsView()').includes('private technical error'));
+ b.run('ui.updates.status="available"');const first=b.run('runUpdateAction("Download")');await b.run('runUpdateAction("Download")');assert.equal(b.run('downloadCalls'),1);
+ b.run('finishDownload({status:"ready",available:true,current_version:"1.0.0",latest_version:"1.0.1"})');await first;assert.equal(b.run('ui.updateBusy'),false);assert.equal(b.run('ui.updates.status'),'ready');
+ b.run('ui.sid=BOARD;syncUpdates()');assert.equal(b.timers.size,0);
+});
+
+test('unsupported terminal focus stays hidden even if old session runtime data remains',()=>{
+ const b=board();load(b,fixture({session:{runtime:{terminal:{label:'Old terminal',detail:'stale'}}}}));
+ b.run('ui.actionData={[W.s.id]:{environment:{os:"windows",terminal_focus_supported:false}}}');
+ assert.ok(!b.run('actionToolbar(W)').includes('data-focus-session'));
+});
+test('late native Info cannot overwrite a completed update check',async()=>{
+ const b=updateBoard();b.run('window.go={main:{AppUpdates:{Info:()=>new Promise(resolve=>{globalThis.finishInfo=resolve}),Check:async()=>({status:"available",available:true,latest_version:"2.0.1"}),Download(){},Install(){}}}}');
+ const info=b.run('readUpdateInfo()');await Promise.resolve();await b.run('runUpdateAction("Check")');
+ b.run('finishInfo({status:"idle",available:true})');await info;
+ assert.equal(b.run('ui.updates.status'),'available');assert.equal(b.run('ui.updates.latest_version'),'2.0.1');
+ b.run('ui.sid=BOARD;syncUpdates()');assert.equal(b.timers.size,0);
+});
+test('update Info timeout leaves a retry action rather than an endless loading state',async()=>{
+ const b=updateBoard();b.run('window.go={main:{AppUpdates:{Info:()=>new Promise(()=>{}),Check(){},Download(){},Install(){}}}}');
+ const info=b.run('readUpdateInfo()');await Promise.resolve();
+ const timeout=[...b.timers.values()].find(x=>x.ms===10000);assert.ok(timeout);timeout.fn();await info;
+ assert.equal(b.run('ui.updateInfoBusy'),false);assert.equal(b.run('ui.updates.status'),'error');assert.ok(b.run('settingsView()').includes('data-update-action="Check"'));
+});
+test('returning while an old Info call is pending reads fresh state once that call settles',async()=>{
+ const b=updateBoard();b.run('window.go={main:{AppUpdates:{Info:()=>new Promise(resolve=>{globalThis.finishInfo=resolve}),Check(){},Download(){},Install(){}}}};ui.updates={status:"idle",available:true};syncUpdates()');
+ await Promise.resolve();b.run('ui.settingsTab="environment";syncUpdates();ui.settingsTab="updates";syncUpdates()');
+ b.run('window.go.main.AppUpdates.Info=async()=>({status:"ready",available:true});finishInfo({status:"idle",available:true})');
+ await new Promise(resolve=>setImmediate(resolve));
+ assert.equal(b.run('ui.updates.status'),'ready');
+ b.run('ui.sid=BOARD;syncUpdates()');assert.equal(b.timers.size,0);
+});
+test('unknown and negative download lengths never display invalid progress values',()=>{
+ const b=board();b.run('data={sessions:[]};ui.settingsTab="updates"');
+ b.run('ui.updates={status:"downloading",available:true,downloaded_bytes:-5,total_bytes:100}');assert.ok(b.run('settingsView()').includes('value="0"'));
+ b.run('ui.updates.total_bytes=0');const view=b.run('settingsView()');assert.ok(!/<progress[^>]+value=/.test(view));assert.ok(!view.includes('NaN'));
+});
+
+test('release metadata controls the GitHub destination while malformed or foreign URLs use the fallback',()=>{
+ const b=board();b.run('data={sessions:[]};ui.settingsTab="updates"');
+ b.run('ui.actionData={"":{app:{release_url:"https://github.com/example-owner/Forkrail-next/releases"}}}');
+ assert.ok(b.run('settingsView()').includes('href="https://github.com/example-owner/Forkrail-next/releases"'));
+ b.run('ui.updates={status:"available",available:true,release_url:"https://github.com/example-owner/Forkrail-next/releases/tag/v2.0.0-rc.1",target:"macos-arm64",os:"macos"}');
+ const view=b.run('settingsView()');assert.ok(view.includes('href="https://github.com/example-owner/Forkrail-next/releases/tag/v2.0.0-rc.1"'));assert.ok(view.includes('macOS · Apple Silicon'));assert.ok(!view.includes('macos-arm64'));
+ for(const url of ['javascript:alert(1)','https://github.com.evil.test/a/b/releases','https://github.com/a/b/releases?token=secret','https://github.com/a/../releases']) {
+  b.set(url);b.run('ui.updates.release_url=input');assert.ok(b.run('settingsView()').includes('href="https://github.com/nimo0711/forkrail/releases"'));
+ }
+});
+
+test('known native failure and cancellation messages remain actionable without exposing unexpected errors',()=>{
+ const b=board();b.run('data={sessions:[]};ui.settingsTab="updates"');
+ for(const [status,message] of [
+  ['error','배포 파일의 버전·대상·크기 또는 체크섬이 올바르지 않습니다.'],
+  ['error','업데이트를 처리하지 못했습니다. 네트워크 연결을 확인한 뒤 다시 시도해 주세요.'],
+  ['error','업데이트 작업이 취소되었습니다.'],
+  ['ready','설치를 취소했습니다. 다운로드한 파일은 다시 설치할 수 있습니다.'],
+  ['ready','OS 설치창을 열지 못했거나 실행을 취소했습니다. 다시 시도해 주세요.']]) {
+  b.set({status,message,available:true});b.run('ui.updates=input');assert.ok(b.run('settingsView()').includes(message));
+ }
+ b.run('ui.updates.message="GET https://private.test?token=secret failed"');assert.ok(!b.run('settingsView()').includes('token=secret'));
 });

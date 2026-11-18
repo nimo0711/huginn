@@ -4,8 +4,10 @@ import json
 import math
 import mimetypes
 import os
+import re
 import secrets
 import sqlite3
+import sys
 import threading
 import time
 from contextlib import closing
@@ -31,6 +33,21 @@ SESSION_IDLE_SEC = 30 * 60
 SPOOL = SPOOL_DIR
 RELEASE = release_info()
 INSTANCE = os.environ.get("FORKRAIL_INSTANCE", "")
+
+
+def action_environment() -> dict:
+    macos = sys.platform == 'darwin'
+    windows = sys.platform == 'win32'
+    return {"os": "macos" if macos else "windows" if windows else "other",
+            "terminal_app_configurable": macos, "terminal_focus_supported": macos,
+            "shell_label": "PowerShell" if windows else "터미널"}
+
+
+def app_metadata() -> dict:
+    repository = RELEASE.get('repository', '')
+    valid = isinstance(repository, str) and re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9-]*/[A-Za-z0-9][A-Za-z0-9_.-]*', repository)
+    return {"version": RELEASE["version"],
+            "release_url": f'https://github.com/{repository}/releases' if valid else ''}
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS events (
@@ -338,6 +355,7 @@ class Handler(BaseHTTPRequestHandler):
                 cwd=session['cwd_path'] if session else str(ACTIONS.home)
                 self._json(200, {"token": ACTION_TOKEN, "skills": ACTIONS.catalog(cwd),
                     "settings": ACTIONS.settings(), "shortcuts": ACTIONS.shortcuts(cwd), "guide": ACTIONS.guide(cwd),
+                    "environment": action_environment(), "app": app_metadata(),
                     "connections": ACTIONS.connections.catalog(),
                     "connection": ACTIONS.delivery.describe(session),
                     "delivery": ACTIONS.delivery.lookup(sid,(parse_qs(url.query).get("request_id") or [""])[0])})
