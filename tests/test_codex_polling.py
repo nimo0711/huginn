@@ -3,6 +3,8 @@ import json
 import os
 from pathlib import Path
 import sqlite3
+import sys
+from contextlib import closing
 import tempfile
 import unittest
 from unittest.mock import patch
@@ -101,14 +103,14 @@ class CodexPollingTests(unittest.TestCase):
     def test_cached_results_do_not_freeze_plan_files_or_keep_response_mutations(self):
         plan = self.root / '기능/계획서/계획.md'
         plan.parent.mkdir(parents=True)
-        plan.write_text('- [ ] 검증\n')
+        plan.write_text('- [ ] 검증\n', encoding='utf-8')
         self.add_item('fileChange', {'status': 'completed', 'changes': [{'path': str(plan)}]}, 3)
         with patch.object(scan, 'DOC_ROOT', str(self.root)):
             first = self.poll()
             self.assertEqual(first['tasks'][0]['progress']['items'][0]['state'], 'pending')
             first['tasks'][0]['areas']['wrong'] = 1
             first['tasks'][0]['notes'][0]['text'] = '오염된 응답'
-            plan.write_text('- [x] 검증\n')
+            plan.write_text('- [x] 검증\n', encoding='utf-8')
             second = self.poll()
         self.assertEqual(second['tasks'][0]['progress']['items'][0]['state'], 'done')
         self.assertEqual(second['tasks'][0]['now'], '분석 중입니다.')
@@ -118,7 +120,7 @@ class CodexPollingTests(unittest.TestCase):
         self.poll()
         replacement = self.root / 'replacement.sqlite'
         self.make_history(replacement)
-        with sqlite3.connect(replacement) as db:
+        with closing(sqlite3.connect(replacement)) as db, db:
             db.execute("INSERT INTO thread_turns VALUES('s','t','inProgress',1,NULL,1)")
             for ordinal, text in [(1, '교체된 요청'), (2, '교체된 결과')]:
                 db.execute('INSERT INTO thread_items VALUES(?,?,?,?,?,?,?)',
@@ -130,7 +132,7 @@ class CodexPollingTests(unittest.TestCase):
         self.poll()
         replacement = self.root / 'legacy.sqlite'
         self.make_history(replacement, revisions=False)
-        with sqlite3.connect(replacement) as db:
+        with closing(sqlite3.connect(replacement)) as db, db:
             db.execute("INSERT INTO thread_turns VALUES('s','t','inProgress',1,NULL,1)")
             db.execute('INSERT INTO thread_items VALUES(?,?,?,?,?,?)',
                        ('s', 't', 'agentMessage', json.dumps({'text': '구버전 결과'}), 2000, 2))
@@ -163,6 +165,7 @@ class CodexPollingTests(unittest.TestCase):
         self.add_item('agentMessage', {'text': '복구된 이력'}, 2)
         self.assertEqual(self.poll()['tasks'][0]['now'], '복구된 이력')
 
+    @unittest.skipIf(sys.platform == 'win32', 'requires replacing a database while SQLite holds it open')
     def test_replacement_after_connect_cannot_cache_old_rows_under_new_database(self):
         replacement = self.root / 'replacement.sqlite'
         with sqlite3.connect(self.history) as old, sqlite3.connect(replacement) as new:

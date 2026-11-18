@@ -13,7 +13,7 @@ class PlanProgressTests(unittest.TestCase):
             root=Path(d)
             plan=root/'기획/화면/계획서/진행.md'
             plan.parent.mkdir(parents=True)
-            plan.write_text('# 작업 계획\n- [x] 원인 확인\n- [~] 구현\n- [ ] 검증\n```md\n- [x] 예제\n```\n')
+            plan.write_text('# 작업 계획\n- [x] 원인 확인\n- [~] 구현\n- [ ] 검증\n```md\n- [x] 예제\n```\n', encoding='utf-8')
             result=progress.read_plan(str(plan),str(root))
             self.assertEqual([i['state'] for i in result['items']],['done','active','pending'])
             self.assertEqual(result['rel'],'기획/화면/계획서/진행.md')
@@ -22,9 +22,18 @@ class PlanProgressTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d:
             root=Path(d)/'docs';root.mkdir()
             outside=Path(d)/'outside.md';outside.write_text('- [x] old task')
-            link=root/'계획서/link.md';link.parent.mkdir();link.symlink_to(outside)
-            for path in (outside,link,root/'AGENTS.md'):
-                self.assertIsNone(progress.read_plan(str(path),str(root)))
+            for path in (outside, root / 'AGENTS.md'):
+                self.assertIsNone(progress.read_plan(str(path), str(root)))
+            link = root / '계획서/link.md'
+            link.parent.mkdir()
+            with self.subTest(symbolic_link=True):
+                try:
+                    link.symlink_to(outside)
+                except OSError as error:
+                    if getattr(error, 'winerror', None) != 1314:
+                        raise
+                    self.skipTest('Windows runner lacks permission to create symlinks')
+                self.assertIsNone(progress.read_plan(str(link), str(root)))
 
     def test_new_request_does_not_inherit_previous_request_checklist(self):
         first=scan._new_task('이전 작업',1)

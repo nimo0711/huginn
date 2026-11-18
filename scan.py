@@ -13,6 +13,8 @@ import local_runtime
 import threading
 import time
 import connections
+from platform_support import pid_alive, run_hidden
+from runtime_paths import DATA_DIR, DB_PATH
 
 import blocks
 import enrich
@@ -93,17 +95,13 @@ def _para(text: str, limit: int = 2000) -> str:
 
 
 def _alive(pid: int) -> bool:
-    try:
-        os.kill(pid, 0)
-        return True
-    except OSError:
-        return False
+    return pid_alive(pid)
 
 
 def _short_dir(path: str) -> str:
     if not path:
         return ""
-    path = path.replace(HOME, "~")
+    path = path.replace(HOME, "~").replace(os.sep, "/")
     parts = path.split("/")
     return "/".join(parts[-2:]) if len(parts) > 3 else path
 
@@ -159,15 +157,23 @@ def _new_task(prompt: str, ts: float) -> dict:
 
 
 STORY_RE = re.compile(r"\b([A-Z][A-Z0-9]+-\d+)\b")
-PATH_RE = re.compile(r"(?:^|[\s'\"=(])((?:" + re.escape(HOME) + r"|~)/[^\s'\"`;|&)<>]+)")
+_PATH_SEPARATOR = r'[/\\]' if os.name == 'nt' else '/'
+_HOME_FOR_PATHS = re.escape(HOME.replace(os.sep, '/')).replace('/', _PATH_SEPARATOR)
+PATH_RE = re.compile(
+    r"(?:^|[\s'\"=(])((?:" + _HOME_FOR_PATHS + r"|~)" + _PATH_SEPARATOR + r"[^\s'\"`;|&)<>]+)",
+    re.IGNORECASE if os.name == 'nt' else 0,
+)
 IGNORED_DIRS = (".claude", ".codex", "Library", "Downloads", "Desktop", "Applications")
 
 
 def _area(path: str) -> str:
-    path = path.replace("~/", HOME + "/", 1)
-    if not path.startswith(HOME + "/"):
+    home = HOME.replace(os.sep, '/')
+    path = path.replace(os.sep, '/').replace('~/', home + '/', 1)
+    home_prefix = home + '/'
+    in_home = path.casefold().startswith(home_prefix.casefold()) if os.name == 'nt' else path.startswith(home_prefix)
+    if not in_home:
         return ""
-    parts = path[len(HOME) + 1:].split("/")
+    parts = path[len(home_prefix):].split("/")
     if not parts[0] or parts[0] in IGNORED_DIRS or parts[0].startswith(".") or "node_modules" in parts:
         return ""
     if parts[0] == "vtm" and len(parts) > 2 and parts[1] in (".worktrees", "wt"):
@@ -467,7 +473,7 @@ DOC_ROOT = os.path.realpath(os.path.expanduser("~/vtm/문서"))
 
 def _plan_reference(task: dict, paths: list) -> None:
     for path in paths:
-        if not path or not path.endswith('.md') or '/계획서/' not in path:
+        if not path or not path.endswith('.md') or '/계획서/' not in path.replace(os.sep, '/'):
             continue
         real = os.path.realpath(os.path.expanduser(path))
         if not real.startswith(DOC_ROOT + os.sep):
@@ -490,7 +496,7 @@ def _doc(task: dict, path: str, ts: float, created: bool) -> None:
         if d["path"] == real:
             d["ts"] = ts
             return
-    docs.append({"path": real, "rel": os.path.relpath(real, DOC_ROOT), "ts": ts, "created": created})
+    docs.append({"path": real, "rel": os.path.relpath(real, DOC_ROOT).replace(os.sep, "/"), "ts": ts, "created": created})
 
 
 def _doc_paths(text: str) -> list:
@@ -602,10 +608,10 @@ def _activity_text(text: str) -> str:
     return '\n'.join(out)
 
 
-BOARD_DB = os.path.join(os.path.dirname(os.path.abspath(__file__)), "board.db")
+BOARD_DB = os.fspath(DB_PATH)
 
 
-JIRA_CACHE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "jira_titles.json")
+JIRA_CACHE = os.path.join(DATA_DIR, "jira_titles.json")
 _jira: dict = {}
 _jira_tried: dict = {}
 _jira_lock = threading.Lock()
@@ -613,7 +619,7 @@ _jira_lock = threading.Lock()
 
 def _load_jira() -> None:
     try:
-        with open(JIRA_CACHE) as f:
+        with open(JIRA_CACHE, encoding="utf-8") as f:
             _jira.update(json.load(f))
     except (OSError, ValueError):
         pass
@@ -621,9 +627,9 @@ def _load_jira() -> None:
 
 def _fetch_jira(key: str) -> None:
     try:
-        out = subprocess.run(
+        out = run_hidden(
             [connections.cli('acli'), "jira", "workitem", "view", key, "--fields", "summary", "--json"],
-            capture_output=True, text=True, timeout=20,
+            capture_output=True, encoding="utf-8", errors="replace", timeout=20,
         ).stdout
         title = (json.loads(out).get("fields") or {}).get("summary") or ""
     except (OSError, ValueError, subprocess.SubprocessError):
@@ -634,7 +640,8 @@ def _fetch_jira(key: str) -> None:
     with _jira_lock:
         _jira[key] = title
         try:
-            with open(JIRA_CACHE, "w") as f:
+            os.makedirs(os.path.dirname(JIRA_CACHE), exist_ok=True)
+            with open(JIRA_CACHE, "w", encoding="utf-8") as f:
                 json.dump(_jira, f, ensure_ascii=False)
         except OSError:
             pass
@@ -729,7 +736,7 @@ def claude_sessions(now: float) -> list[dict]:
     live: dict[str, dict] = {}
     for f in glob.glob(os.path.join(CLAUDE_SESSIONS, "*.json")):
         try:
-            with open(f) as fh:
+            with open(f, encoding="utf-8") as fh:
                 d = json.JSONDecoder().raw_decode(fh.read().lstrip())[0]
         except (OSError, ValueError):
             continue
@@ -804,7 +811,7 @@ def _subagents(base: str, now: float) -> dict:
     running, done = [], 0
     for meta_path in glob.glob(os.path.join(base, "subagents", "*.meta.json")):
         try:
-            with open(meta_path) as f:
+            with open(meta_path, encoding="utf-8") as f:
                 meta = json.load(f)
         except (OSError, ValueError):
             continue

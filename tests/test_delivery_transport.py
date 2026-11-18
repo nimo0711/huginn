@@ -9,9 +9,11 @@ import tempfile
 import threading
 import time
 import unittest
+import sys
 from unittest.mock import patch
 import session_delivery as d
 
+@unittest.skipIf(sys.platform == 'win32', 'requires Unix-socket owner and mode validation')
 class TransportTests(unittest.TestCase):
  def setUp(self):
   self.tmp=tempfile.TemporaryDirectory();self.addCleanup(self.tmp.cleanup);self.root=Path(self.tmp.name)

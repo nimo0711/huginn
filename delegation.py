@@ -13,7 +13,7 @@ def _thread(path):
         stamp = (path.stat().st_mtime_ns, path.stat().st_size)
         if path in _cache and _cache[path][0] == stamp:
             return _cache[path][1]
-        with path.open() as f:
+        with path.open(encoding="utf-8") as f:
             head = f.read(4096)
         match = THREAD.search(head) if head.startswith('[codex] Starting Codex task thread.') else None
         child = match.group(1) if match else None

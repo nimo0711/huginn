@@ -12,6 +12,8 @@ import subprocess
 import threading
 import time
 import connections
+from platform_support import IS_WINDOWS, replace_file, windows_agent_command, run_hidden
+from runtime_paths import DATA_DIR, RESOURCE_ROOT
 
 
 SYSTEM = """사용자의 작업 요청들을 읽고 작업 보드에 표시할 한국어 제목 하나를 만드세요.
@@ -39,15 +41,18 @@ def _valid(title):
 
 
 def generate(context,model=None):
-    executable = shutil.which("claude") or str(Path.home() / ".local/bin/claude")
-    command = [executable, "-p", "--safe-mode", "--tools", "", "--strict-mcp-config",
+    if IS_WINDOWS:
+        cli = windows_agent_command('claude') or [connections.cli('claude')]
+    else:
+        cli = [shutil.which("claude") or str(Path.home() / ".local/bin/claude")]
+    command = [*cli, "-p", "--safe-mode", "--tools", "", "--strict-mcp-config",
                "--no-session-persistence", "--disable-slash-commands",
                "--output-format", "json", "--json-schema", json.dumps(SCHEMA),
                "--system-prompt", SYSTEM, "--model", model or connections.STORE.get('summary')['model'], "--effort", "low",
                "--max-budget-usd", "0.05"]
-    result = subprocess.run(command, input=json.dumps(context, ensure_ascii=False),
-                            capture_output=True, text=True, timeout=45,
-                            cwd=str(Path(__file__).resolve().parent))
+    result = run_hidden(command, input=json.dumps(context, ensure_ascii=False),
+                            capture_output=True, encoding="utf-8", errors="replace", timeout=45,
+                        cwd=str(RESOURCE_ROOT))
     if result.returncode:
         raise ValueError("title process failed")
     output = json.loads(result.stdout)
@@ -69,7 +74,7 @@ class TitleCache:
         self.pending = set()
         self.entries = {}
         try:
-            saved = json.loads(self.path.read_text())
+            saved = json.loads(self.path.read_text(encoding="utf-8"))
             if isinstance(saved, dict):
                 self.entries = {k: v for k, v in saved.items()
                                 if isinstance(v, dict) and _valid(v.get("title"))
@@ -126,13 +131,14 @@ class TitleCache:
         temporary = self.path.with_name("." + self.path.name + "." + str(os.getpid()))
         try:
             saved = {k: v for k, v in self.entries.items() if v["title"]}
-            temporary.write_text(json.dumps(saved, ensure_ascii=False))
-            temporary.replace(self.path)
+            self.path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+            temporary.write_text(json.dumps(saved, ensure_ascii=False), encoding="utf-8")
+            replace_file(temporary, self.path)
         except OSError:
             pass
 
 
-_cache = TitleCache(Path(__file__).with_name("work_titles.json"))
+_cache = TitleCache(DATA_DIR / "work_titles.json")
 
 
 def get(context):

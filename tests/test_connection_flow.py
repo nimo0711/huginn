@@ -1,4 +1,4 @@
-import json, tempfile, unittest
+import json, sys, tempfile, unittest
 from pathlib import Path
 from unittest.mock import patch
 from types import SimpleNamespace
@@ -59,12 +59,18 @@ class ConnectionFlowTests(unittest.TestCase):
   with patch('connections.subprocess.run',return_value=response(code=1,err='HTTP 401 secret-user glpat-private-value')):value=self.conn.check('jira')
   self.assertNotIn('private',json.dumps(value));self.assertNotIn('secret-user',self.conn.check_path.read_text())
  def test_login_script_targets_registered_site_and_never_stores_credentials(self):
-  with patch('board_actions.open_terminal') as opened:
+  with patch('connections.cli', return_value=sys.executable), patch('board_actions.open_terminal') as opened:
    result=self.store.login('jira','login-request-0001')
-  script=Path(opened.call_args.args[0]).read_text()
+  path=Path(opened.call_args.args[0])
+  script=path.read_text(encoding='utf-8')
+  if sys.platform == 'win32':
+   job=json.loads(script)
+   self.assertEqual(job['exe'],sys.executable)
+   self.assertEqual(job['cwd'],str(self.root))
+   self.assertEqual(job['removeEnv'],[])
   self.assertIn('test.atlassian.net',script);self.assertIn('auth login --web',script)
   self.assertEqual(result['status'],'login_opened');self.assertNotIn('--token',script)
-  with patch('board_actions.open_terminal') as opened:
+  with patch('connections.cli', return_value=sys.executable), patch('board_actions.open_terminal') as opened:
    self.store.login('jira','login-request-0001');opened.assert_not_called()
  def test_ai_guide_explains_manual_auth_and_separate_verification(self):
   guide=self.conn.guide('wb')

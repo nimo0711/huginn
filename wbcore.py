@@ -3,21 +3,29 @@ from __future__ import annotations
 import argparse
 import json
 import os
+from pathlib import Path
 import re
 import subprocess
 import sys
 import time
 import urllib.request
+import platform_support
+from runtime_paths import SPOOL_DIR
 
 URL = os.environ.get("WORK_BOARD_URL", "http://127.0.0.1:8790")
-SPOOL = os.environ.get("WORK_BOARD_SPOOL", "/tmp/work-board-spool")
+SPOOL = SPOOL_DIR
 STORY_RE = re.compile(r"\b([A-Z][A-Z0-9]+-\d+)\b")
 AGENTS = ("claude", "codex")
 
 
 def _run(args: list[str], cwd: str | None = None) -> str:
+    if platform_support.IS_WINDOWS and args[0] == "git":
+        git = platform_support.cli_path("git")
+        if not git:
+            return ""
+        args = [git, *args[1:]]
     try:
-        return subprocess.run(args, cwd=cwd, capture_output=True, text=True, timeout=3).stdout.strip()
+        return platform_support.run_hidden(args, cwd=cwd, capture_output=True, encoding="utf-8", errors="replace", timeout=3).stdout.strip()
     except (OSError, subprocess.SubprocessError):
         return ""
 
@@ -25,10 +33,17 @@ def _run(args: list[str], cwd: str | None = None) -> str:
 def agent_process() -> tuple[str, int]:
     pid = os.getppid()
     for _ in range(20):
-        line = _run(["ps", "-o", "ppid=,comm=", "-p", str(pid)])
-        if not line:
-            break
-        ppid, _, comm = line.strip().partition(" ")
+        if platform_support.IS_WINDOWS:
+            try:
+                process = platform_support.psutil.Process(pid)
+                comm, ppid = process.name(), str(process.ppid())
+            except platform_support.psutil.Error:
+                break
+        else:
+            line = _run(["ps", "-o", "ppid=,comm=", "-p", str(pid)])
+            if not line:
+                break
+            ppid, _, comm = line.strip().partition(" ")
         name = os.path.basename(comm.strip()).lower()
         for agent in AGENTS:
             if name == agent or name.startswith(agent + "-") or name.startswith(agent + "."):
@@ -46,7 +61,7 @@ def agent_process() -> tuple[str, int]:
 def git_context(cwd: str) -> tuple[str, str]:
     top = _run(["git", "rev-parse", "--show-toplevel"], cwd)
     common = _run(["git", "rev-parse", "--path-format=absolute", "--git-common-dir"], cwd)
-    repo = os.path.basename(os.path.dirname(common)) if common.endswith("/.git") else os.path.basename(top)
+    repo = Path(common).parent.name if Path(common).name == ".git" else Path(top).name
     branch = _run(["git", "branch", "--show-current"], cwd)
     return repo, branch
 
@@ -96,10 +111,11 @@ def post(events: list[dict], quiet: bool = False) -> bool:
     return False
 
 
-def main() -> int:
-    if len(sys.argv)>1 and sys.argv[1]=='actions':
+def main(argv=None) -> int:
+    argv = sys.argv[1:] if argv is None else argv
+    if argv[:1] == ['actions']:
         from actions_cli import main as actions_main
-        return actions_main(sys.argv[2:])
+        return actions_main(argv[1:])
     parser = argparse.ArgumentParser(prog="wb", description="작업 보드에 한 줄 기록")
     sub = parser.add_subparsers(dest="cmd", required=True)
 
@@ -126,7 +142,7 @@ def main() -> int:
     p.add_argument("before")
     p.add_argument("after")
 
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
     base = context()
     if args.story:
         base["story"] = args.story

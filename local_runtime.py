@@ -15,6 +15,8 @@ import threading
 import time
 from urllib.parse import urlsplit, urlunsplit
 
+import platform_support
+
 
 def run(args, timeout=3):
     try:
@@ -76,6 +78,11 @@ def remember_start(task,output,started,completed):
 
 
 def processes():
+    if platform_support.IS_WINDOWS:
+        return {proc.pid: {'ppid': proc.info['ppid'], 'tty': '?',
+                           'comm': proc.info['exe'] or proc.info['name'] or '',
+                           'started': proc.info['create_time'] or 0}
+                for proc in platform_support.psutil.process_iter(['ppid', 'exe', 'name', 'create_time'])}
     result = {}
     for line in run(['/bin/ps','-axo','pid=,ppid=,tty=,lstart=,comm=']).splitlines():
         parts = line.strip().split(None, 8)
@@ -87,6 +94,17 @@ def processes():
 
 
 def listeners():
+    if platform_support.IS_WINDOWS:
+        psutil = platform_support.psutil
+        try:
+            sockets = psutil.net_connections(kind='tcp')
+        except (OSError, psutil.Error):
+            return []
+        loopback = {'0.0.0.0': '127.0.0.1', '127.0.0.1': '127.0.0.1',
+                    '::': '::1', '::1': '::1'}
+        bindings = {(row.pid, loopback[row.laddr.ip], row.laddr.port) for row in sockets
+                    if row.status == psutil.CONN_LISTEN and row.pid and row.laddr and row.laddr.ip in loopback}
+        return [{'pid': pid, 'host': host, 'port': port} for pid, host, port in sorted(bindings)]
     result = []; pid = None; family = ''
     for line in run(['/usr/sbin/lsof','-nP','-iTCP','-sTCP:LISTEN','-Fptn'], 4).splitlines():
         if line.startswith('p') and line[1:].isdigit():
@@ -113,10 +131,27 @@ def owner(pid, procs, roots):
     return None
 
 
+def process_name(process):
+    name = os.path.basename(process.get('comm', ''))
+    return name.lower().removesuffix('.exe') if platform_support.IS_WINDOWS else name
+
+
 def codex_roots(procs, ids):
+    if not ids:
+        return {}
     roots = {}
     for pid, proc in procs.items():
-        if os.path.basename(proc['comm']) != 'codex-code-mode-host':continue
+        if process_name(proc) != 'codex-code-mode-host':continue
+        if platform_support.IS_WINDOWS:
+            psutil = platform_support.psutil
+            try:
+                current = psutil.Process(pid)
+                if abs(current.create_time() - proc['started']) <= 0.01:
+                    thread_id = current.environ().get('CODEX_THREAD_ID')
+                    if thread_id in ids:roots[pid] = thread_id
+            except (OSError, psutil.Error):
+                pass
+            continue
         # Only extract the public thread identifier; other environment values are
         # never logged, returned, or persisted.
         raw = run(['/bin/ps','eww','-p',str(pid),'-o','command='])
@@ -131,6 +166,26 @@ def codex_roots(procs, ids):
 
 
 def codex_open_threads(procs):
+    if platform_support.IS_WINDOWS:
+        psutil = platform_support.psutil
+        found = {}
+        transcript_root = (Path.home() / '.codex' / 'sessions').resolve()
+        for pid, process in procs.items():
+            if process_name(process) != 'codex':
+                continue
+            try:
+                current = psutil.Process(pid)
+                if abs(current.create_time() - process['started']) > 0.01:
+                    continue
+                files = current.open_files()
+            except (OSError, psutil.Error):
+                continue
+            for file in files:
+                path = Path(file.path)
+                match = re.fullmatch(r'rollout-.*?([0-9a-f-]{36})\.jsonl', path.name)
+                if match and path.is_relative_to(transcript_root):
+                    found.setdefault(pid, set()).add(match[1])
+        return found
     pids=[str(pid) for pid,p in procs.items() if os.path.basename(p.get('comm',''))=='codex']
     if not pids:return {}
     found={};pid=0
@@ -145,7 +200,7 @@ def codex_open_threads(procs):
 def codex_thread_roots(ids):
     found={}
     try:
-        with sqlite3.connect('file:'+str(Path.home()/'.codex/state_5.sqlite')+'?mode=ro',uri=True,timeout=1) as conn:
+        with sqlite3.connect((Path.home()/'.codex/state_5.sqlite').as_uri()+'?mode=ro',uri=True,timeout=1) as conn:
             for sid in ids:
                 current=sid;seen=set()
                 while current not in seen and len(seen)<40:
@@ -161,6 +216,8 @@ def codex_thread_roots(ids):
 
 
 def terminal_for(pid, procs):
+    if platform_support.IS_WINDOWS:
+        return None
     seen = set()
     while pid and pid not in seen:
         seen.add(pid);proc = procs.get(pid,{})
@@ -178,6 +235,8 @@ def terminal_for(pid, procs):
 
 
 def codex_terminals(procs, ids):
+    if platform_support.IS_WINDOWS:
+        return {}
     # A shared app server can hold several threads. Its open transcript proves
     # which terminal app can be opened, but never owns all of their servers.
     pids=[str(pid) for pid,p in procs.items() if os.path.basename(p.get('comm',''))=='codex']
@@ -194,6 +253,8 @@ def codex_terminals(procs, ids):
 
 
 def session_terminal(session,procs):
+    if platform_support.IS_WINDOWS:
+        return None
     terminal=terminal_for(session.get('pid',0),procs)
     if terminal or session.get('agent')!='codex':return terminal
     for pid in codex_roots(procs,{session['id']}):
@@ -204,7 +265,7 @@ def session_terminal(session,procs):
 
 def user_listener(row,procs):
     # Agent control endpoints also speak HTTP; they are not preview servers.
-    name=os.path.basename(procs.get(row['pid'],{}).get('comm',''))
+    name=process_name(procs.get(row['pid'],{}))
     return name not in ('claude','codex','codex-code-mode-host')
 
 
@@ -215,6 +276,8 @@ def output_session_owners(sessions, procs, ports):
     ownership evidence. The live descriptor must point into a known session's
     scratchpad in this user's Claude temporary namespace. Never read log contents.
     """
+    if platform_support.IS_WINDOWS:
+        return {}
     ids = {s['id'] for s in sessions if s.get('agent') == 'claude'}
     pids = {p['pid'] for p in ports if p['pid'] in procs and user_listener(p, procs)}
     if not ids or not pids:return {}
@@ -321,6 +384,8 @@ def refresh(sessions):
 
 def attach(sessions):
     global _busy
+    if not sessions:
+        return sessions
     with _lock:
         stale = time.time()-_at > 10
         if stale and not _busy:

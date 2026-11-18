@@ -1,12 +1,12 @@
 """Serve the same Forkrail artwork used to package the native app icon."""
 import base64
 import json
-from pathlib import Path
+from runtime_paths import RESOURCE_ROOT
 
 
 def icon_png():
-    root = Path(__file__).resolve().parent
-    brand = json.loads((root / 'app/brand.json').read_text())
+    root = RESOURCE_ROOT
+    brand = json.loads((root / 'app/brand.json').read_text(encoding="utf-8"))
     return (root / brand['web_image']).read_bytes()
 
 

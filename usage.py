@@ -161,7 +161,7 @@ def _project(st: dict) -> str:
 
 def _limit() -> dict:
     try:
-        with open(CLAUDE_JSON) as f:
+        with open(CLAUDE_JSON, encoding="utf-8") as f:
             cached = json.load(f).get("cachedUsageUtilization") or {}
     except (OSError, ValueError):
         return {}

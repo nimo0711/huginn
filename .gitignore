@@ -21,3 +21,7 @@ dist/
 *.zip
 .pytest_cache/
 .coverage
+.release-venv/
+desktop/build/
+desktop/wailsjs/
+*.spec

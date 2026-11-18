@@ -3,6 +3,7 @@ import os
 from pathlib import Path
 import tempfile
 import unittest
+import sys
 from unittest.mock import patch
 import session_delivery as delivery
 
@@ -19,6 +20,7 @@ class FakeRPC:
   if self.error:raise self.error
   return {'turn':{'id':'turn-1','status':'inProgress'}}
 
+@unittest.skipIf(sys.platform == 'win32', 'requires Unix-socket direct session delivery support')
 class DeliveryTests(unittest.TestCase):
  def setUp(self):
   self.tmp=tempfile.TemporaryDirectory();self.addCleanup(self.tmp.cleanup)
