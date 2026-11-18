@@ -1,7 +1,8 @@
 {
   "name": "Forkrail",
-  "version": "1.2.0-rc.1",
+  "version": "1.2.0-rc.2",
   "package_version": "1.2.0",
   "bundle_id": "app.forkrail.desktop",
+  "repository": "nimo0711/forkrail",
   "platforms": ["macos-arm64", "macos-x86_64", "windows-x64"]
 }

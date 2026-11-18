@@ -15,6 +15,15 @@
       throw new Error("WebView did not reach the bundled Forkrail service");
     }
 
+    const updateInfo = window.go?.main?.AppUpdates?.Info;
+    if (!updateInfo) throw new Error("Native update bindings are missing");
+    const update = await updateInfo();
+    if (update.available !== true || update.current_version !== version || update.status !== "idle" ||
+        !["macos-arm64", "macos-x86_64", "windows-x64"].includes(update.target) ||
+        update.os !== (update.target === "windows-x64" ? "windows" : "macos")) {
+      throw new Error("Bundled native update metadata does not match this app");
+    }
+
     const sessionsResponse = await fetch("/api/sessions", { cache: "no-store" });
     const sessions = await sessionsResponse.json();
     if (!sessionsResponse.ok || !Array.isArray(sessions.sessions)) {

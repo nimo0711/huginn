@@ -41,6 +41,7 @@ type desktopApp struct {
 	cancel     context.CancelFunc
 	startOnce  sync.Once
 	board      *boardService
+	updates    *AppUpdates
 	proxy      http.Handler
 	startErr   error
 	runtimeMu  sync.Mutex
@@ -159,6 +160,11 @@ func defaultDataDir() (string, error) {
 func runDesktop(config serviceConfig, smoke *UISmoke, smokeRoot string) error {
 	ctx, cancel := context.WithCancel(context.Background())
 	app := &desktopApp{config: config, ctx: ctx, cancel: cancel}
+	executable, _ := os.Executable()
+	updateCfg, _ := nativeUpdateConfig(executable, config.version)
+	app.updates = newAppUpdates(ctx, updateCfg, nil)
+	app.updates.confirmInstall = app.confirmUpdateInstall
+	app.updates.afterLaunch = func() { app.withRuntime(wailsruntime.Quit) }
 	defer app.close()
 
 	opts := &options.App{
@@ -171,6 +177,7 @@ func runDesktop(config serviceConfig, smoke *UISmoke, smokeRoot string) error {
 		OnStartup:        app.setRuntimeContext,
 		OnDomReady:       app.domReady,
 		OnShutdown:       func(context.Context) { app.close() },
+		Bind:             []interface{}{app.updates},
 	}
 	if smoke == nil {
 		opts.SingleInstanceLock = &options.SingleInstanceLock{
@@ -184,7 +191,7 @@ func runDesktop(config serviceConfig, smoke *UISmoke, smokeRoot string) error {
 		}
 	} else {
 		opts.Windows.WebviewUserDataPath = filepath.Join(smokeRoot, "webview")
-		opts.Bind = []interface{}{smoke}
+		opts.Bind = append(opts.Bind, smoke)
 		opts.OnStartup = func(ctx context.Context) {
 			app.setRuntimeContext(ctx)
 			smoke.startWatchdog(ctx)
@@ -233,10 +240,34 @@ func (app *desktopApp) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 func (app *desktopApp) close() {
 	app.cancel()
+	if app.updates != nil {
+		app.updates.shutdown()
+	}
 	app.startOnce.Do(func() {})
 	if app.board != nil {
 		app.board.stop()
 	}
+}
+
+func (app *desktopApp) confirmUpdateInstall(state UpdateState) (bool, error) {
+	app.runtimeMu.Lock()
+	ctx := app.runtimeCtx
+	app.runtimeMu.Unlock()
+	if ctx == nil {
+		return false, errors.New("native dialog unavailable")
+	}
+	signature := "서명되지 않은 시험 배포입니다. OS 보안 정책에 따라 설치가 차단될 수 있습니다."
+	if state.Signed {
+		signature = "운영체제에서 설치 파일의 서명을 확인했습니다."
+	}
+	answer, err := wailsruntime.MessageDialog(ctx, wailsruntime.MessageDialogOptions{
+		Type:  wailsruntime.QuestionDialog,
+		Title: "Forkrail 업데이트 설치",
+		Message: "Forkrail " + state.LatestVersion + " 설치창을 여시겠습니까?\n\n" + signature +
+			"\n\n설치창을 열면 이 앱을 종료합니다. 별도로 실행한 서비스는 종료하지 않습니다. 설치 후 앱을 다시 실행해 주세요.",
+		Buttons: []string{"설치창 열기", "취소"}, DefaultButton: "취소", CancelButton: "취소",
+	})
+	return answer == "설치창 열기", err
 }
 
 func (app *desktopApp) setRuntimeContext(ctx context.Context) {

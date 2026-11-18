@@ -61,6 +61,9 @@ def validate_config(value, tag=None):
         raise ValueError('Installer version does not match release')
     if not re.fullmatch(r'[A-Za-z][A-Za-z0-9-]*(?:\.[A-Za-z][A-Za-z0-9-]*)+',value.get('bundle_id','')):
         raise ValueError('Invalid bundle identifier')
+    repository=value.get('repository','')
+    if not isinstance(repository,str) or not re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9-]*/[A-Za-z0-9][A-Za-z0-9_.-]*',repository):
+        raise ValueError('Invalid GitHub release repository')
     if value.get('platforms')!=list(TARGETS):raise ValueError('Unknown release platforms')
     if tag is not None and tag!='v'+value['version']:
         raise ValueError('Tag must match release.json: v'+value['version'])
