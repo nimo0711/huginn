@@ -101,42 +101,26 @@ def package_mac(release,target,work,service,built,signed,output):
     info.write_bytes(plistlib.dumps(data));verify_macos_bundle(app,target);sign_mac(app,signed)
     run([app/'Contents/Resources/service/forkrail-service','self-test'],timeout=60)
     stem=release['name']+'-'+release['version']+'-'+target
-    pkg=output/(stem+'.pkg');components=work/'components.plist'
-    run(['pkgbuild','--analyze','--root',work/'package',components])
-    rows=plistlib.loads(components.read_bytes())
-    for row in rows:row.update(BundleIsRelocatable=False,BundleOverwriteAction='upgrade')
-    components.write_bytes(plistlib.dumps(rows))
-    cmd=['pkgbuild','--root',work/'package','--component-plist',components,
-         '--identifier',release['bundle_id'],'--version',release['package_version'],'--install-location','/']
-    component=work/'Forkrail-component.pkg'
-    run([*cmd,component])
-    distribution=work/'Distribution.xml'
-    from xml.sax.saxutils import escape
-    arch='arm64' if target=='macos-arm64' else 'x86_64'
-    distribution.write_text('<?xml version="1.0" encoding="utf-8"?>\n'
-        '<installer-gui-script minSpecVersion="2"><title>Forkrail</title>'
-        '<options customize="never" require-scripts="false" hostArchitectures="'+arch+'"/>'
-        '<volume-check script="true"><allowed-os-versions><os-version min="13.0"/></allowed-os-versions></volume-check>'
-        '<must-close><app id="'+escape(release['bundle_id'])+'"/></must-close>'
-        '<choices-outline><line choice="default"/></choices-outline>'
-        '<choice id="default" visible="false"><pkg-ref id="'+escape(release['bundle_id'])+'"/></choice>'
-        '<pkg-ref id="'+escape(release['bundle_id'])+'" version="'+release['package_version']+'">Forkrail-component.pkg</pkg-ref>'
-        '</installer-gui-script>',encoding='utf-8')
-    product=['productbuild','--distribution',distribution,'--package-path',work]
-    if signed:product+=['--sign',os.environ['FORKRAIL_APPLE_INSTALLER_IDENTITY']]
-    run([*product,pkg])
     if signed:
         notary=['--keychain-profile',os.environ['FORKRAIL_NOTARY_PROFILE']]
         if os.environ.get('FORKRAIL_NOTARY_KEYCHAIN'):notary+=['--keychain',os.environ['FORKRAIL_NOTARY_KEYCHAIN']]
-        run(['xcrun','notarytool','submit',pkg,*notary,'--wait'])
-        run(['xcrun','stapler','staple',pkg]);run(['xcrun','stapler','validate',pkg])
-        # The app ZIP also needs a ticket; notarizing the pkg alone is insufficient.
+        # Staple the app before copying it into either distribution container.
         upload=work/'notarize.zip';run(['ditto','-c','-k','--sequesterRsrc','--keepParent',app,upload])
         run(['xcrun','notarytool','submit',upload,*notary,'--wait'])
         run(['xcrun','stapler','staple',app]);run(['spctl','--assess','--type','execute','--verbose',app])
+    from create_dmg import create_dmg
+    dmg=output/(stem+'.dmg')
+    create_dmg(app,dmg,work,ROOT/'desktop/build/Forkrail.icns')
+    if signed:
+        run(['codesign','--force','--sign',os.environ['FORKRAIL_APPLE_APP_IDENTITY'],
+             '--timestamp','--identifier',release['bundle_id']+'.disk-image',dmg])
+        run(['codesign','--verify','--strict',dmg])
+        run(['xcrun','notarytool','submit',dmg,*notary,'--wait'])
+        run(['xcrun','stapler','staple',dmg]);run(['xcrun','stapler','validate',dmg])
+        run(['spctl','--assess','--type','open','--context','context:primary-signature','--verbose',dmg])
     archive=output/(stem+'.zip')
     run(['ditto','-c','-k','--sequesterRsrc','--keepParent',app,archive])
-    return [pkg,archive],app
+    return [dmg,archive],app
 
 
 def sign_windows(path):

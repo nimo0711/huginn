@@ -10,9 +10,11 @@ Claude·Codex의 병렬 작업에서 세션의 관계, 현재 작업, 진척과 
 
 | 환경 | 설치 파일 | 실행 |
 | --- | --- | --- |
-| Mac Apple Silicon | `Forkrail-<버전>-macos-arm64.pkg` | 응용 프로그램의 Forkrail |
-| Mac Intel | `Forkrail-<버전>-macos-x86_64.pkg` | 응용 프로그램의 Forkrail |
+| Mac Apple Silicon | `Forkrail-<버전>-macos-arm64.dmg` | 응용 프로그램의 Forkrail |
+| Mac Intel | `Forkrail-<버전>-macos-x86_64.dmg` | 응용 프로그램의 Forkrail |
 | Windows x64 | `Forkrail-<버전>-windows-x64-Setup.exe` | 시작 메뉴의 Forkrail |
+
+Mac에서는 DMG를 열고 **Forkrail 아이콘을 Applications 폴더로 드래그**합니다. 복사가 끝나면 응용 프로그램에서 Forkrail을 실행하고 설치 디스크를 추출합니다. 업데이트도 앱을 종료한 뒤 같은 방법으로 교체합니다.
 
 Windows에는 Microsoft WebView2 Runtime이 필요합니다. 없으면 설치 프로그램이 Microsoft 설치 페이지를 안내합니다. 각 OS의 ZIP도 제공하며, 안의 폴더 전체를 유지해야 합니다.
 
@@ -29,6 +31,8 @@ Windows에는 Microsoft WebView2 Runtime이 필요합니다. 없으면 설치 �
 - 설치된 스킬 선택, 요청 내용 입력, 실행
 - Claude·Codex 사용량과 도구 실행 결과
 - Jira·GitLab·로컬 Git 설정과 AI용 도움말
+
+첫 실행에는 **처음 연결** 안내가 표시됩니다. 사용할 Claude·Codex 연결을 직접 켜고, 필요한 작업 폴더·산출물 폴더와 Jira·GitLab 정보를 등록합니다. 연결 전에는 기존 세션을 수집하거나 AI 제목 요약을 실행하지 않습니다. 파일·계획을 보려면 산출물 최상위 폴더도 선택 연결로 등록합니다. Claude·Codex의 원본 대화와 로그인은 유지되며, 다른 기기의 작업 경로나 계정 설정을 가져오지 않습니다.
 
 Jira·GitLab은 설정에서 연결하며 `acli`·`glab`에 로그인한 계정을 사용합니다. 인증 토큰을 보드에 직접 입력하지 않습니다. CLI와 AI 도구는 선택 연동이므로 별도 설치가 필요합니다. 제목 요약을 켜면 Claude CLI 사용량이 발생할 수 있습니다.
 

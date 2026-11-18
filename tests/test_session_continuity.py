@@ -8,6 +8,7 @@ import unittest
 from unittest.mock import patch
 
 import scan
+from document_fixtures import document_connection
 
 
 class SessionContinuityTests(unittest.TestCase):
@@ -55,7 +56,7 @@ class SessionContinuityTests(unittest.TestCase):
         second = scan._new_task('상태만 알려 주세요.', 3)
         scan._note(second, 4, '검증이 남아 있습니다.')
         scan._close(second, 4)
-        with patch.object(scan, 'DOC_ROOT', str(self.root)):
+        with document_connection(self.root):
             tasks = scan._finish([first, second], False, 4)
         self.assertIsNotNone(tasks[0]['progress'])
         self.assertEqual(tasks[0]['progress']['items'][-1]['state'], 'pending')
@@ -86,7 +87,7 @@ class SessionContinuityTests(unittest.TestCase):
         plan = self.root / '기능/계획서/계획.md'
         plan.parent.mkdir(parents=True)
         plan.write_text('- [ ] 검증\n', encoding='utf-8')
-        with patch.object(scan, 'DOC_ROOT', str(self.root)):
+        with document_connection(self.root):
             info = scan._new_info()
             for i in range(45):
                 scan._open_task(info, '업무', i + 1)

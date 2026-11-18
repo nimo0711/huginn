@@ -1,6 +1,7 @@
 """Read explicit plan checklists; never estimate effort from tool counts."""
 from pathlib import Path
 import re
+import connections
 
 
 def checklist(text):
@@ -28,10 +29,11 @@ def checklist(text):
     return [item for indent, item in rows if indent == depth]
 
 
-def read_plan(path, root):
+def read_plan(path):
+    location=connections.STORE.document_location(path)
+    if not location:return None
     try:
-        file = Path(path).resolve()
-        relative = file.relative_to(Path(root).resolve())
+        file,relative=map(Path,location)
         if '계획서' not in relative.parts[:-1] or file.suffix.lower() != '.md':
             return None
         stat = file.stat()

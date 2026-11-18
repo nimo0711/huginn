@@ -83,6 +83,12 @@ class ReleasePackagingTests(unittest.TestCase):
         release_tools.validate_signing('macos-arm64',False,{})
         release_tools.validate_signing('windows-x64',False,{})
 
+    def test_dmg_signing_uses_application_identity_without_installer_certificate(self):
+        release_tools.validate_signing('macos-arm64',True,{
+            'FORKRAIL_APPLE_APP_IDENTITY':'Developer ID Application: test',
+            'FORKRAIL_NOTARY_PROFILE':'test-profile',
+        })
+
     def test_archive_includes_single_app_root_and_preserves_executable(self):
         app=self.root/'Forkrail.app';exe=app/'Contents/MacOS/Forkrail'
         exe.parent.mkdir(parents=True);exe.write_bytes(b'executable');exe.chmod(0o755)

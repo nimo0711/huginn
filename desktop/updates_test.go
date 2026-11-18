@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"crypto/tls"
+	"encoding/binary"
 	"encoding/json"
 	"fmt"
 	"net"
@@ -35,11 +36,30 @@ func fixtureUpdater(t *testing.T, client *http.Client) *AppUpdates {
 	t.Cleanup(u.shutdown)
 	return u
 }
+
+// This fixture exercises the UDIF envelope only; it is never mounted or opened.
+// 256 bytes of data and 256 bytes of plist precede the 512-byte trailer.
+func dmgFixture() []byte {
+	data := make([]byte, 1024)
+	copy(data[256:], "<?xml version=\"1.0\"?><plist/>")
+	footer := data[512:]
+	copy(footer, "koly")
+	binary.BigEndian.PutUint32(footer[4:], 4)
+	binary.BigEndian.PutUint32(footer[8:], 512)
+	binary.BigEndian.PutUint64(footer[32:], 256)
+	binary.BigEndian.PutUint32(footer[56:], 1)
+	binary.BigEndian.PutUint32(footer[60:], 1)
+	binary.BigEndian.PutUint64(footer[216:], 256)
+	binary.BigEndian.PutUint64(footer[224:], 256)
+	binary.BigEndian.PutUint64(footer[492:], 1)
+	return data
+}
+
 func releaseFixture(version string, draft, pre bool) map[string]any {
 	return map[string]any{"tag_name": "v" + version, "draft": draft, "prerelease": pre, "assets": []any{
 		map[string]any{"id": 1, "name": "macos-arm64-release-manifest.json", "size": 1},
 		map[string]any{"id": 2, "name": "macos-arm64-SHA256SUMS", "size": 1},
-		map[string]any{"id": 3, "name": "Forkrail-" + version + "-macos-arm64.pkg", "size": 8},
+		map[string]any{"id": 3, "name": "Forkrail-" + version + "-macos-arm64.dmg", "size": len(dmgFixture())},
 	}}
 }
 func TestUpdaterSelectsSemverAndRejectsDraftAndChannel(t *testing.T) {
@@ -81,22 +101,37 @@ func TestUpdaterDistinguishesInaccessibleRepositoryAndNoRelease(t *testing.T) {
 	}
 }
 func TestUpdaterDownloadVerifiesBeforeReadyAndInstall(t *testing.T) {
-	for _, bad := range []string{"", "hash", "version", "target", "name", "size", "unsigned-stable", "symlink"} {
+	for _, bad := range []string{"", "hash", "version", "target", "name", "size", "unsigned-stable", "symlink", "pkg-as-dmg", "truncated-dmg", "missing-footer", "invalid-header-size", "data-out-of-bounds", "xml-overflow"} {
 		t.Run(bad, func(t *testing.T) {
 			version := "1.2.0-rc.2"
 			if bad == "unsigned-stable" {
 				version = "1.2.0"
 			}
-			name := "Forkrail-" + version + "-macos-arm64.pkg"
-			payload := []byte("xar!test")
-			manifest := map[string]any{"version": version, "target": "macos-arm64", "signed": false, "source_commit": strings.Repeat("a", 40), "source_dirty": false, "artifacts": []string{name, strings.TrimSuffix(name, ".pkg") + ".zip"}}
+			name := "Forkrail-" + version + "-macos-arm64.dmg"
+			payload := dmgFixture()
+			switch bad {
+			case "pkg-as-dmg":
+				copy(payload, "xar!")
+				clear(payload[len(payload)-512:])
+			case "truncated-dmg":
+				payload = payload[:len(payload)-1]
+			case "missing-footer":
+				copy(payload[len(payload)-512:], "evil")
+			case "invalid-header-size":
+				binary.BigEndian.PutUint32(payload[len(payload)-512+8:], 511)
+			case "data-out-of-bounds":
+				binary.BigEndian.PutUint64(payload[len(payload)-512+32:], uint64(len(payload)))
+			case "xml-overflow":
+				binary.BigEndian.PutUint64(payload[len(payload)-512+216:], ^uint64(0))
+			}
+			manifest := map[string]any{"version": version, "target": "macos-arm64", "signed": false, "source_commit": strings.Repeat("a", 40), "source_dirty": false, "artifacts": []string{name, strings.TrimSuffix(name, ".dmg") + ".zip"}}
 			switch bad {
 			case "version":
 				manifest["version"] = "1.2.0-rc.1"
 			case "target":
 				manifest["target"] = "windows-x64"
 			case "name":
-				manifest["artifacts"] = []string{"../evil.pkg", name}
+				manifest["artifacts"] = []string{"../evil.dmg", name}
 			}
 			manifestBytes, _ := json.Marshal(manifest)
 			hash := fmt.Sprintf("%x", sha256.Sum256(payload))
@@ -108,6 +143,7 @@ func TestUpdaterDownloadVerifiesBeforeReadyAndInstall(t *testing.T) {
 			assets := release["assets"].([]any)
 			assets[0].(map[string]any)["size"] = len(manifestBytes)
 			assets[1].(map[string]any)["size"] = len(sums)
+			assets[2].(map[string]any)["size"] = len(payload)
 			if bad == "size" {
 				assets[2].(map[string]any)["size"] = 7
 			}
@@ -134,7 +170,7 @@ func TestUpdaterDownloadVerifiesBeforeReadyAndInstall(t *testing.T) {
 				}
 				return
 			}
-			if got.Status != "ready" || got.DownloadedBytes != 8 || got.Signed {
+			if got.Status != "ready" || got.DownloadedBytes != int64(len(payload)) || got.Signed {
 				t.Fatalf("not ready: %+v", got)
 			}
 			var launched atomic.Int32
@@ -153,7 +189,7 @@ func TestUpdaterDownloadVerifiesBeforeReadyAndInstall(t *testing.T) {
 			u.confirmInstall = func(UpdateState) (bool, error) { return true, nil }
 			if bad == "symlink" {
 				original := u.installerPath
-				replacement := filepath.Join(t.TempDir(), "external.pkg")
+				replacement := filepath.Join(t.TempDir(), "external.dmg")
 				os.WriteFile(replacement, payload, 0600)
 				os.Remove(original)
 				os.Symlink(replacement, original)
@@ -215,9 +251,9 @@ func TestUpdateVersionValidation(t *testing.T) {
 
 func validDownloadFixture(t *testing.T, stream func(http.ResponseWriter, *http.Request)) *AppUpdates {
 	t.Helper()
-	name := "Forkrail-1.2.0-rc.2-macos-arm64.pkg"
-	manifest := []byte(`{"version":"1.2.0-rc.2","target":"macos-arm64","signed":false,"source_commit":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","source_dirty":false,"artifacts":["Forkrail-1.2.0-rc.2-macos-arm64.pkg","Forkrail-1.2.0-rc.2-macos-arm64.zip"]}`)
-	sums := fmt.Sprintf("%x  macos-arm64-release-manifest.json\n%x  %s\n", sha256.Sum256(manifest), sha256.Sum256([]byte("xar!test")), name)
+	name := "Forkrail-1.2.0-rc.2-macos-arm64.dmg"
+	manifest := []byte(`{"version":"1.2.0-rc.2","target":"macos-arm64","signed":false,"source_commit":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","source_dirty":false,"artifacts":["Forkrail-1.2.0-rc.2-macos-arm64.dmg","Forkrail-1.2.0-rc.2-macos-arm64.zip"]}`)
+	sums := fmt.Sprintf("%x  macos-arm64-release-manifest.json\n%x  %s\n", sha256.Sum256(manifest), sha256.Sum256(dmgFixture()), name)
 	release := releaseFixture("1.2.0-rc.2", false, true)
 	assets := release["assets"].([]any)
 	assets[0].(map[string]any)["size"] = len(manifest)
@@ -276,7 +312,7 @@ func TestUpdateSerializesOperationsAndCleansCancelledDownload(t *testing.T) {
 	}
 }
 func TestUpdateInstallRechecksAfterConfirmationAndRetriesLaunch(t *testing.T) {
-	u := validDownloadFixture(t, func(w http.ResponseWriter, r *http.Request) { fmt.Fprint(w, "xar!test") })
+	u := validDownloadFixture(t, func(w http.ResponseWriter, r *http.Request) { w.Write(dmgFixture()) })
 	u.Check()
 	if got := u.Download(); got.Status != "ready" {
 		t.Fatal(got)
@@ -291,7 +327,9 @@ func TestUpdateInstallRechecksAfterConfirmationAndRetriesLaunch(t *testing.T) {
 	var launches atomic.Int32
 	u.launchInstaller = func(string) error { launches.Add(1); return nil }
 	u.confirmInstall = func(UpdateState) (bool, error) {
-		os.WriteFile(u.installerPath, []byte("xar!evil"), 0600)
+		tampered := dmgFixture()
+		tampered[0] ^= 0xff
+		os.WriteFile(u.installerPath, tampered, 0600)
 		return true, nil
 	}
 	if got := u.Install(); got.Status != "error" || launches.Load() != 0 {
@@ -358,7 +396,7 @@ func TestUpdateFallsBackToAnonymousForPublicRepositoryWithExpiredCredentials(t *
 }
 
 func TestUpdateCannotBecomeReadyWithoutOSDownloadOrigin(t *testing.T) {
-	u := validDownloadFixture(t, func(w http.ResponseWriter, r *http.Request) { fmt.Fprint(w, "xar!test") })
+	u := validDownloadFixture(t, func(w http.ResponseWriter, r *http.Request) { w.Write(dmgFixture()) })
 	u.markOrigin = func(string, string) error { return fmt.Errorf("filesystem cannot preserve origin") }
 	u.Check()
 	got := u.Download()
@@ -368,5 +406,40 @@ func TestUpdateCannotBecomeReadyWithoutOSDownloadOrigin(t *testing.T) {
 	files, err := os.ReadDir(u.config.tempRoot)
 	if err != nil || len(files) != 0 {
 		t.Fatalf("unsafe download retained: %v %v", files, err)
+	}
+}
+
+func TestUpdateQuitsOnlyAfterOSOpensImageAndKeepsImageAvailable(t *testing.T) {
+	u := validDownloadFixture(t, func(w http.ResponseWriter, r *http.Request) { w.Write(dmgFixture()) })
+	u.Check()
+	if got := u.Download(); got.Status != "ready" {
+		t.Fatal(got)
+	}
+	quit := make(chan struct{}, 1)
+	u.afterLaunch = func() { quit <- struct{}{} }
+	u.confirmInstall = func(UpdateState) (bool, error) { return true, nil }
+	u.verifySignature = func(context.Context, string, bool) (bool, error) { return false, nil }
+	u.launchInstaller = func(string) error { return fmt.Errorf("OS open rejected") }
+	if got := u.Install(); got.Status != "ready" {
+		t.Fatal(got)
+	}
+	select {
+	case <-quit:
+		t.Fatal("app quit after failed launch")
+	default:
+	}
+	path := u.installerPath
+	u.launchInstaller = func(string) error { return nil }
+	if got := u.Install(); got.Status != "installing" {
+		t.Fatal(got)
+	}
+	select {
+	case <-quit:
+	case <-time.After(time.Second):
+		t.Fatal("app did not quit after successful launch")
+	}
+	u.shutdown()
+	if _, err := os.Stat(path); err != nil {
+		t.Fatalf("image removed while OS may still be opening it: %v", err)
 	}
 }

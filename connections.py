@@ -29,13 +29,16 @@ SCHEMA = {
     'git': {'label':'로컬 Git','description':'등록한 폴더의 저장소·커밋 기록', 'defaults':{'enabled':False,'roots':[]},
             'fields':[{'key':'roots','label':'조회할 폴더','type':'paths','hint':'한 줄에 한 폴더. 폴더 자체와 두 단계 아래의 저장소를 읽습니다.'}],
             'help':'기존 로컬 폴더를 등록합니다. clone·fetch·checkout은 실행하지 않습니다.'},
-    'claude': {'label':'Claude','description':'로컬 세션·작업 기록 연결', 'defaults':{'enabled':True},'fields':[],
-               'help':'현재 사용자의 ~/.claude 세션을 읽습니다. 연결을 중지해도 실행 중인 Claude는 종료하지 않습니다.'},
-    'codex': {'label':'Codex','description':'로컬 세션·작업 기록 연결', 'defaults':{'enabled':True},'fields':[],
-              'help':'현재 사용자의 ~/.codex 세션을 읽습니다. 연결을 중지해도 실행 중인 Codex는 종료하지 않습니다.'},
-    'summary': {'label':'AI 제목 요약','description':'요청 내용을 짧은 작업 제목으로 요약', 'defaults':{'enabled':True,'model':'haiku'},
+    'documents': {'label':'산출물 폴더','description':'작업에서 작성한 계획서·산출물 열기', 'defaults':{'enabled':False,'root':''},
+                  'fields':[{'key':'root','label':'최상위 폴더','type':'path','hint':'계획서와 산출물을 보관하는 기존 폴더 하나를 지정하세요.'}],
+                  'help':'선택한 폴더 안에서 세션에 기록된 문서만 읽습니다. 계획서 폴더의 Markdown 체크리스트를 작업 진척에 표시합니다. 폴더 전체를 검색하거나 파일을 변경하지 않습니다.'},
+    'claude': {'label':'Claude','description':'로컬 세션·작업 기록 연결', 'defaults':{'enabled':False},'fields':[],
+               'help':'연결을 시작하면 현재 사용자의 ~/.claude 기록에서 최근 세션을 읽습니다. 원본 대화·설정·로그인은 변경하지 않습니다. 연결을 중지해도 실행 중인 Claude는 종료하지 않습니다.'},
+    'codex': {'label':'Codex','description':'로컬 세션·작업 기록 연결', 'defaults':{'enabled':False},'fields':[],
+              'help':'연결을 시작하면 현재 사용자의 ~/.codex 기록에서 최근 세션을 읽습니다. 원본 대화·설정·로그인은 변경하지 않습니다. 연결을 중지해도 실행 중인 Codex는 종료하지 않습니다.'},
+    'summary': {'label':'AI 제목 요약','description':'요청 내용을 짧은 작업 제목으로 요약', 'defaults':{'enabled':False,'model':'haiku'},
                 'fields':[{'key':'model','label':'Claude 모델','type':'text','hint':'설치된 Claude CLI에서 사용할 수 있는 모델 이름'}],
-                'help':'Claude CLI로 제목을 생성합니다. 연결 확인은 CLI 설치만 확인하며 요약을 실행하거나 사용량을 발생시키지 않습니다.'},
+                'help':'선택 기능입니다. 켜면 Claude CLI로 요청 내용을 요약하며 Claude 사용량이 발생합니다. 연결 확인은 CLI 설치만 확인하며 요약을 실행하거나 사용량을 발생시키지 않습니다.'},
 }
 
 
@@ -111,6 +114,23 @@ class Connections:
     def fingerprint(self):
         return hashlib.sha256(json.dumps(self.read(),sort_keys=True).encode()).hexdigest()
 
+    def source_paths(self,kind):
+        if kind=='claude':return [self.home/'.claude/projects']
+        if kind=='codex':return [self.home/'.codex/state_5.sqlite',self.home/'.codex/thread_history_1.sqlite']
+        return []
+
+    def document_root(self):
+        config=self.get('documents')
+        return str(Path(config['root']).resolve()) if config['enabled'] and config['root'] else ''
+
+    def document_location(self,path):
+        root=self.document_root()
+        if not root or not path:return None
+        try:
+            real=Path(path).expanduser().resolve();relative=real.relative_to(root)
+            return (str(real),relative.as_posix()) if relative.parts else None
+        except (OSError,ValueError,RuntimeError):return None
+
     def catalog(self):
         data=self.read();rows=[]
         try:checks=json.loads(self.check_path.read_text(encoding='utf-8'))
@@ -118,10 +138,12 @@ class Connections:
         if not isinstance(checks,dict):checks={}
         for kind,spec in SCHEMA.items():
             values=self.get(kind);fingerprint=values_hash(values);check=checks.get(kind)
+            saved=data.get(kind,{})
             if not isinstance(check,dict) or check.get('fingerprint')!=fingerprint:check=None
             rows.append({'kind':kind,'label':spec['label'],'description':spec['description'],
                          'help':spec['help'],'fields':spec['fields'],'values':values,'fingerprint':fingerprint,'check':check,
-                         'registered':data.get(kind,{}).get('registered',kind in data or kind in ('claude','codex','summary'))})
+                         'source_paths':[str(path) for path in self.source_paths(kind)],
+                         'registered':saved.get('registered',kind in data) if isinstance(saved,dict) else False})
         return rows
 
     def _write(self,kind,update):
@@ -156,7 +178,7 @@ class Connections:
             if key=='host' and value and not re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9.-]*(?::[0-9]{1,5})?',value):raise ValueError('호스트와 포트만 입력해 주세요.')
             if key=='group' and value and not re.fullmatch(r'[\w.-]+(?:/[\w.-]+)*',value):raise ValueError('그룹 경로를 확인해 주세요.')
             if key=='model' and not re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9._:-]{0,119}',value):raise ValueError('모델 이름을 확인해 주세요.')
-            if key=='cwd' and value:
+            if key in ('cwd','root') and value:
                 value=str(Path(value).expanduser().resolve())
                 if not Path(value).is_dir():raise ValueError('작업 폴더가 없습니다.')
             if key=='roots':
@@ -170,7 +192,7 @@ class Connections:
                 raise ValueError('다른 작업에서 같은 설정을 변경했습니다. 입력 내용을 확인한 뒤 설정을 다시 열어 주세요.')
             values={**current,**normalized}
             if values['enabled']:
-                required={'jira':('site','project'),'gitlab':('host','group','cwd'),'git':('roots',)}.get(kind,())
+                required={'jira':('site','project'),'gitlab':('host','group','cwd'),'git':('roots',),'documents':('root',)}.get(kind,())
                 if any(not values[k] for k in required):raise ValueError('연결에 필요한 설정을 모두 입력해 주세요.')
             return {**values,'registered':True}
         return self._write(kind,update)
@@ -217,9 +239,14 @@ class Connections:
         elif kind=='git':
             ok=bool(values['roots']) and all(Path(p).is_dir() for p in values['roots'])
             message='조회할 폴더를 확인했습니다.' if ok else '기존 로컬 폴더를 등록해 주세요.'
+        elif kind=='documents':
+            ok=bool(values['root']) and Path(values['root']).is_dir()
+            message='산출물 폴더를 확인했습니다.' if ok else '산출물 폴더가 없습니다. 설정에서 기존 폴더를 지정해 주세요.'
         elif kind in ('claude','codex'):
-            source=self.home/('.'+kind)/('projects' if kind=='claude' else 'state_5.sqlite')
-            ok=source.exists();message='로컬 세션 저장소를 확인했습니다.' if ok else '로컬 세션 저장소를 찾지 못했습니다. 해당 도구를 먼저 실행해 주세요.'
+            missing=[path for path in self.source_paths(kind) if not (path.is_dir() if kind=='claude' else path.is_file())]
+            ok=not missing
+            status='available' if ok else 'missing_source'
+            message='로컬 세션 저장소를 확인했습니다.' if ok else '로컬 세션 저장소를 찾지 못했습니다: '+', '.join(str(path) for path in missing)+'. 이 컴퓨터의 같은 사용자 계정으로 '+SCHEMA[kind]['label']+'를 실행해 대화를 만든 뒤 다시 확인해 주세요. 현재는 기본 저장 위치만 지원합니다.'
         elif kind=='summary':
             command=windows_agent_command('claude') if IS_WINDOWS else [cli('claude')]
             ok=bool(command) and run([*command,'--version'])[0]==0
@@ -236,7 +263,7 @@ class Connections:
                 'not_configured':'연결 설정을 먼저 저장해 주세요.',
                 'check_failed':'연결 확인에 실패했습니다. 로그인과 대상 설정을 확인한 뒤 다시 시도해 주세요.'
             }.get(status,'연결을 확인하지 못했습니다.')
-        elif kind not in ('jira','gitlab'):status='available' if ok else 'unavailable'
+        elif kind not in ('jira','gitlab','claude','codex'):status='available' if ok else 'unavailable'
         return self._save_check(kind,values,{'ok':ok,'status':status,'message':message})
 
     def _save_check(self,kind,values,result):

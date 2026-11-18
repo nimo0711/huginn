@@ -16,7 +16,7 @@ class ReleaseEvidenceTests(unittest.TestCase):
         self.temp=tempfile.TemporaryDirectory();self.addCleanup(self.temp.cleanup)
         self.root=Path(self.temp.name)
         self.version=config(Path(__file__).resolve().parents[1])['version']
-        names=[f'Forkrail-{self.version}-macos-arm64{suffix}' for suffix in ['.pkg','.zip']]
+        names=[f'Forkrail-{self.version}-macos-arm64{suffix}' for suffix in ['.dmg','.zip']]
         for name in names:(self.root/name).write_bytes(b'fixture package')
         self.manifest={'name':'Forkrail','version':self.version,'target':'macos-arm64','signed':False,'artifacts':names}
         (self.root/'release-manifest.json').write_text(json.dumps(self.manifest))
@@ -28,7 +28,7 @@ class ReleaseEvidenceTests(unittest.TestCase):
     def test_release_requires_real_service_and_ui_evidence(self):
         with self.assertRaises(ValueError):verify(self.root,require_smoke=True)
         evidence={'target':'macos-arm64','version':self.version,'user_data_preserved':True,
-                  'installer':'installed on disposable runner','app':{
+                  'installer':'DMG copied on disposable runner','disk_image':{'layout_verified':True,'copied':True},'app':{
                       'service':{'ok':True,'mode':'service','version':self.version},
                       'ui':{'ok':False,'mode':'ui','version':self.version}}}
         (self.root/'smoke-result.json').write_text(json.dumps(evidence))
@@ -38,9 +38,17 @@ class ReleaseEvidenceTests(unittest.TestCase):
         (self.root/'smoke-result.json').write_text(json.dumps(evidence))
         verify(self.root,require_smoke=True,expected_target='macos-arm64')
 
+    def test_mac_release_requires_drag_install_evidence(self):
+        passed={mode:{'ok':True,'mode':mode,'version':self.version} for mode in ['service','ui']}
+        evidence={'target':'macos-arm64','version':self.version,'user_data_preserved':True,
+                  'installer':'installed on disposable runner','app':passed,'portable':passed}
+        (self.root/'smoke-result.json').write_text(json.dumps(evidence))
+        with self.assertRaisesRegex(ValueError,'DMG'):
+            verify(self.root,require_smoke=True)
+
     def test_publication_checksums_use_downloadable_names_and_exact_source(self):
         evidence={'target':'macos-arm64','version':self.manifest['version'],'user_data_preserved':True,
-                  'installer':'installed on disposable runner','app':{
+                  'installer':'DMG copied on disposable runner','disk_image':{'layout_verified':True,'copied':True},'app':{
                       mode:{'ok':True,'mode':mode,'version':self.manifest['version']} for mode in ['service','ui']}}
         evidence['portable']=evidence['app']
         (self.root/'smoke-result.json').write_text(json.dumps(evidence))

@@ -2,7 +2,9 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"os"
 	"os/exec"
 	"strings"
 	"time"
@@ -24,24 +26,28 @@ func markInstallerOrigin(path, _ string) error {
 }
 
 func verifyInstallerSignature(ctx context.Context, path string, required bool) (bool, error) {
-	command := exec.CommandContext(ctx, "/usr/sbin/pkgutil", "--check-signature", path)
-	output, err := command.Output()
+	command := exec.CommandContext(ctx, "/usr/bin/codesign", "--verify", "--strict", path)
+	command.Env = append(os.Environ(), "LC_ALL=C", "LANG=C")
+	var output limitedUpdateOutput
+	command.Stdout = &output
+	command.Stderr = &output
+	err := command.Run()
 	if err != nil {
-		// Unsigned prereleases are supported only through normal Installer/Gatekeeper
-		// UI. Other signature errors must not be reinterpreted as unsigned packages.
-		if !required && strings.Contains(string(output), "Status: no signature") {
+		// Only codesign's explicit unsigned result is allowed for prereleases.
+		// Invalid signatures, failed commands and cancellation must remain errors.
+		var exitError *exec.ExitError
+		if !required && ctx.Err() == nil && errors.As(err, &exitError) && exitError.ExitCode() == 1 && strings.TrimSpace(output.String()) == path+": code object is not signed at all" {
 			return false, nil
 		}
 		return false, errUpdateInvalid
 	}
-	if !strings.Contains(string(output), "Status: signed by a certificate trusted by") {
-		return false, errUpdateInvalid
-	}
-	if err := exec.CommandContext(ctx, "/usr/sbin/spctl", "--assess", "--type", "install", path).Run(); err != nil {
+	// A signed image must also satisfy Gatekeeper's disk-image policy. Keeping
+	// quarantine and using normal open preserves OS checks for unsigned images.
+	if err := exec.CommandContext(ctx, "/usr/sbin/spctl", "--assess", "--type", "open", "--context", "context:primary-signature", path).Run(); err != nil {
 		return false, errUpdateInvalid
 	}
 	return true, nil
 }
 func launchUpdateInstaller(path string) error {
-	return exec.Command("/usr/bin/open", "-a", "Installer", path).Run()
+	return exec.Command("/usr/bin/open", path).Run()
 }

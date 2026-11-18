@@ -342,7 +342,8 @@ class Handler(BaseHTTPRequestHandler):
             with _scan_lock:
                 found = scan.all_sessions()
             local_runtime.attach(found)
-            self._json(200, {"now": time.time(), "sessions": found, "sprint": sprint.summary(), "usage": usage.summary()})
+            self._json(200, {"now": time.time(), "sessions": found, "sprint": sprint.summary(), "usage": usage.summary(),
+                             "connections": ACTIONS.connections.catalog()})
         elif url.path == "/api/actions":
             if self.headers.get('Host') not in {f'127.0.0.1:{PORT}',f'localhost:{PORT}'}:
                 self._json(403,{'error':'작업 보드 주소에서 열어 주세요.'});return
@@ -375,11 +376,12 @@ class Handler(BaseHTTPRequestHandler):
         if relative.anchor or IS_WINDOWS and any(":" in part for part in relative.parts):
             self._json(404, {"error": "없는 문서"})
             return
-        root = os.path.realpath(os.path.expanduser("~/vtm/문서"))
-        real = os.path.realpath(os.path.join(root, relative))
-        if not real.startswith(root + os.sep) or not os.path.isfile(real):
+        root = ACTIONS.connections.document_root()
+        location = ACTIONS.connections.document_location(str(Path(root) / relative)) if root else None
+        if not location or not os.path.isfile(location[0]):
             self._json(404, {"error": "없는 문서"})
             return
+        real = location[0]
         ctype = mimetypes.guess_type(real)[0] or "application/octet-stream"
         if ctype.startswith("text/") or real.endswith((".md", ".json", ".txt")):
             ctype = ("text/plain" if real.endswith(".md") else ctype) + "; charset=utf-8"
@@ -465,7 +467,9 @@ class Handler(BaseHTTPRequestHandler):
                 raise ValueError("세션을 찾을 수 없습니다. 새로 고침해 주세요.")
             cwd=session['cwd_path'] if session else str(ACTIONS.home)
             if action == 'connection_save':
-                result={'ok':True,'values':ACTIONS.connections.save(body.get('kind'),body.get('values'),expected=body.get('expected')),'message':'설정을 저장했습니다. 로그인 후 연결 확인을 눌러 주세요.'}
+                values=ACTIONS.connections.save(body.get('kind'),body.get('values'),expected=body.get('expected'))
+                message='설정을 저장했습니다. 연결 확인으로 기록 위치와 접근 여부를 확인해 주세요.' if values['enabled'] else '설정을 저장했습니다. 이 연결의 정보 수집은 중지되어 있습니다.'
+                result={'ok':True,'values':values,'message':message}
             elif action == 'connection_remove':
                 ACTIONS.connections.remove(body.get('kind'));result={'ok':True,'message':'보드 연결을 제거했습니다.'}
             elif action == 'connection_check':

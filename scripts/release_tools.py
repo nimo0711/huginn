@@ -91,7 +91,7 @@ def stage_sources(root, destination):
 def validate_signing(target, signed, env):
     if target not in TARGETS:raise ValueError('Unknown target')
     if not signed:return
-    required=(['FORKRAIL_APPLE_APP_IDENTITY','FORKRAIL_APPLE_INSTALLER_IDENTITY','FORKRAIL_NOTARY_PROFILE']
+    required=(['FORKRAIL_APPLE_APP_IDENTITY','FORKRAIL_NOTARY_PROFILE']
               if target.startswith('macos') else ['FORKRAIL_WINDOWS_CERT_FILE','FORKRAIL_WINDOWS_CERT_PASSWORD'])
     missing=[name for name in required if not env.get(name)]
     if missing:raise ValueError('Signed release requires: '+', '.join(missing))

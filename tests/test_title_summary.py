@@ -6,9 +6,16 @@ from pathlib import Path
 from unittest.mock import patch
 
 import title_summary
+import connections
 
 
 class TitleTests(unittest.TestCase):
+    def setUp(self):
+        temporary=tempfile.TemporaryDirectory();self.addCleanup(temporary.cleanup)
+        settings=connections.Connections(Path(temporary.name)/'state',Path(temporary.name))
+        settings.save('summary', {'enabled':True})
+        patcher=patch.object(connections,'STORE',settings);patcher.start();self.addCleanup(patcher.stop)
+
     def wait_for(self,cache,context,state='ready'):
         until=time.monotonic()+2
         while time.monotonic()<until:

@@ -19,7 +19,7 @@ def verify(directory, require_signed=False, *, expected_target=None, require_smo
     expected=manifest.get('artifacts',[])
     if len(expected)!=2 or names!=set(expected)|{'release-manifest.json'}:raise ValueError('Incomplete artifact set')
     prefix='Forkrail-'+release['version']+'-'+manifest['target']
-    suffixes=['.pkg','.zip'] if manifest['target'].startswith('macos') else ['-Setup.exe','.zip']
+    suffixes=['.dmg','.zip'] if manifest['target'].startswith('macos') else ['-Setup.exe','.zip']
     if sorted(expected)!=sorted(prefix+s for s in suffixes):raise ValueError('Unexpected artifact names')
     if require_smoke:
         path=directory/'smoke-result.json'
@@ -29,6 +29,10 @@ def verify(directory, require_signed=False, *, expected_target=None, require_smo
             raise ValueError('Smoke evidence version or platform mismatch')
         if evidence.get('user_data_preserved') is not True:raise ValueError('User data preservation was not verified')
         if 'disposable runner' not in evidence.get('installer',''):raise ValueError('The installer was not exercised on a disposable runner')
+        if manifest['target'].startswith('macos'):
+            disk=evidence.get('disk_image',{})
+            if disk.get('layout_verified') is not True or disk.get('copied') is not True:
+                raise ValueError('DMG layout and drag-copy installation were not verified')
         groups=['app','portable'] if manifest['target'].startswith('macos') else ['portable','installed']
         for group in groups:
             for mode in ['service','ui']:

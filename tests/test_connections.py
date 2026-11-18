@@ -1,9 +1,12 @@
 import contextlib
 import io
 import json
+import sqlite3
 import tempfile
 import unittest
 import threading
+import time
+from datetime import datetime, timezone
 from pathlib import Path
 from unittest.mock import patch
 import board_actions
@@ -14,6 +17,98 @@ class ConnectionsTests(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory();self.addCleanup(self.temp.cleanup)
         self.root = Path(self.temp.name);self.store = board_actions.ActionStore(self.root/'state', self.root)
+        self.addCleanup(self.store.delivery.close)
+
+    def test_fresh_install_does_not_collect_existing_history_or_generate_titles(self):
+        import connections, scan, title_summary, usage
+        with patch.object(connections, 'STORE', self.store.connections), \
+                patch.object(scan, 'BOARD_DB', self.root/'board.db'), \
+                patch.object(scan.glob, 'glob', side_effect=AssertionError('source history read before connection')), \
+                patch.object(scan, 'codex_sessions', side_effect=AssertionError('Codex opened before connection')):
+            self.assertEqual(scan.all_sessions(), [])
+            self.assertTrue(usage.summary()['disabled'])
+            usage._refresh()
+            cache=title_summary.TitleCache(self.root/'titles.json', lambda _: self.fail('summary ran before consent'))
+            self.assertEqual(cache.get({'requests':['existing work']}), {'state':'disabled','title':''})
+            self.assertIsNone(cache.worker)
+        self.assertTrue(all(not row['registered'] for row in self.store.connections.catalog()))
+        self.assertFalse(self.store.connections.path.exists())
+
+    def test_saving_claude_starts_collection_without_changing_source_files(self):
+        import connections, scan
+        home=self.root/'다른 사용자';project=home/'.claude/projects/project';project.mkdir(parents=True)
+        self.store.connections.home=home
+        source=project/'first-session.jsonl'
+        source.write_text(json.dumps({'type':'user','cwd':str(home/'내 작업'),'timestamp':datetime.now(timezone.utc).isoformat(),
+            'message':{'role':'user','content':'첫 연결 상태를 확인해 주세요.'}},ensure_ascii=False)+'\n')
+        auth=home/'.claude/settings.json';auth.write_text('{"userSetting":"keep"}')
+        snapshots={path:(path.read_bytes(),path.stat().st_mtime_ns) for path in (source,auth)}
+        with patch.object(connections, 'STORE', self.store.connections), \
+                patch.object(scan, 'BOARD_DB', self.root/'board.db'), \
+                patch.object(scan, 'CLAUDE_PROJECTS', str(home/'.claude/projects')), \
+                patch.object(scan, 'CLAUDE_SESSIONS', str(home/'.claude/sessions')), \
+                patch.object(scan, 'CODEX_STATE', str(home/'.codex/state_5.sqlite')):
+            self.assertEqual(scan.all_sessions(), [])
+            self.store.connections.save('claude', {'enabled':True})
+            rows=scan.all_sessions()
+            self.assertEqual([row['id'] for row in rows], ['first-session'])
+            self.assertEqual(rows[0]['cwd_path'], str(home/'내 작업'))
+            self.assertEqual(rows[0]['works'][0]['title'], '')
+        self.assertEqual({path:(path.read_bytes(),path.stat().st_mtime_ns) for path in snapshots}, snapshots)
+        self.assertEqual(self.store.connections.get('git')['roots'], [])
+        self.assertFalse(self.store.connections.get('summary')['enabled'])
+
+    def test_explicit_existing_connection_settings_survive_new_defaults(self):
+        original={'claude':{'enabled':True},'codex':{'enabled':False,'registered':True},
+                  'summary':{'enabled':True,'model':'sonnet'},'git':{'enabled':True,'roots':[str(self.root)]}}
+        self.store.connections.state.mkdir(parents=True)
+        self.store.connections.path.write_text(json.dumps(original))
+        before=self.store.connections.path.read_bytes()
+        rows={row['kind']:row for row in self.store.connections.catalog()}
+        self.assertTrue(rows['claude']['values']['enabled']);self.assertTrue(rows['claude']['registered'])
+        self.assertFalse(rows['codex']['values']['enabled']);self.assertTrue(rows['codex']['registered'])
+        self.assertEqual(rows['summary']['values'], {'enabled':True,'model':'sonnet'})
+        self.assertEqual(rows['git']['values']['roots'], [str(self.root)])
+        self.assertFalse(rows['jira']['registered'])
+        self.assertEqual(self.store.connections.path.read_bytes(), before)
+
+    def test_missing_source_check_names_required_location_without_creating_it(self):
+        for kind,expected in [('claude', self.root/'.claude/projects'), ('codex', self.root/'.codex/state_5.sqlite')]:
+            with self.subTest(kind=kind):
+                self.store.connections.save(kind, {'enabled':True})
+                result=self.store.connections.check(kind)
+                self.assertFalse(result['ok']);self.assertEqual(result['status'], 'missing_source')
+                self.assertIn(str(expected), result['message']);self.assertFalse(expected.exists())
+
+    def test_codex_connection_requires_both_session_and_history_databases(self):
+        source=self.root/'.codex';source.mkdir();(source/'state_5.sqlite').touch()
+        self.store.connections.save('codex', {'enabled':True})
+        result=self.store.connections.check('codex')
+        self.assertFalse(result['ok']);self.assertIn('thread_history_1.sqlite', result['message'])
+        (source/'thread_history_1.sqlite').touch()
+        self.assertTrue(self.store.connections.check('codex')['ok'])
+
+    def test_saving_codex_reads_existing_databases_without_changing_auth_or_history(self):
+        import connections, scan
+        source=self.root/'.codex';source.mkdir()
+        state=source/'state_5.sqlite';history=source/'thread_history_1.sqlite';now=time.time()
+        with contextlib.closing(sqlite3.connect(state)) as db, db:
+            db.execute('CREATE TABLE threads(id,updated_at,cwd,title,git_branch,source,created_at,archived)')
+            db.execute('INSERT INTO threads VALUES(?,?,?,?,?,?,?,?)',('existing-codex',now,str(self.root/'내 작업'),'기존 작업','','cli',now,0))
+        with contextlib.closing(sqlite3.connect(history)) as db, db:
+            db.execute('CREATE TABLE thread_turns(thread_id,turn_id,status,started_at,completed_at,rollout_ordinal)')
+            db.execute('CREATE TABLE thread_items(thread_id,turn_id,item_type,item_json,created_at_ms,rollout_ordinal)')
+            db.execute('INSERT INTO thread_turns VALUES(?,?,?,?,?,?)',('existing-codex','turn','completed',now,now,1))
+            db.execute('INSERT INTO thread_items VALUES(?,?,?,?,?,?)',('existing-codex','turn','userMessage',json.dumps({'content':[{'text':'기존 작업 요청'}]}),now*1000,1))
+        auth=source/'auth.json';auth.write_text('{"existing":"credential fixture"}')
+        snapshot={path:(path.read_bytes(),path.stat().st_mtime_ns) for path in (state,history,auth)}
+        for path in snapshot:path.chmod(0o400)
+        with patch.object(connections,'STORE',self.store.connections),patch.object(scan,'BOARD_DB',self.root/'board.db'), \
+                patch.object(scan,'CODEX_STATE',str(state)),patch.object(scan,'CODEX_HISTORY',str(history)):
+            self.assertEqual(scan.all_sessions(),[])
+            self.store.connections.save('codex',{'enabled':True})
+            self.assertEqual([row['id'] for row in scan.all_sessions()],['existing-codex'])
+        self.assertEqual({path:(path.read_bytes(),path.stat().st_mtime_ns) for path in snapshot},snapshot)
 
     def test_manual_and_cli_share_registered_connection(self):
         out = io.StringIO()
@@ -97,6 +192,7 @@ class ConnectionsTests(unittest.TestCase):
     def test_windows_sessions_do_not_require_posix_delegation_metadata(self):
         import connections, scan
 
+        self.store.connections.save('claude', {'enabled':True});self.store.connections.save('codex', {'enabled':True})
         claude = {'id': 'windows-claude', 'agent': 'claude', 'state': '작업 중', 'last_ts': 2}
         codex = {'id': 'windows-codex', 'agent': 'codex', 'state': '작업 중', 'last_ts': 1}
         with patch.object(connections, 'STORE', self.store.connections), \
