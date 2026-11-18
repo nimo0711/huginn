@@ -1,6 +1,7 @@
 """Read-only local process discovery; no session/port names are configured here."""
 from __future__ import annotations
 import concurrent.futures
+from contextlib import closing
 import http.client
 import os
 from pathlib import Path
@@ -200,7 +201,8 @@ def codex_open_threads(procs):
 def codex_thread_roots(ids):
     found={}
     try:
-        with sqlite3.connect((Path.home()/'.codex/state_5.sqlite').as_uri()+'?mode=ro',uri=True,timeout=1) as conn:
+        state_uri = (Path.home() / '.codex/state_5.sqlite').as_uri() + '?mode=ro'
+        with closing(sqlite3.connect(state_uri, uri=True, timeout=1)) as conn:
             for sid in ids:
                 current=sid;seen=set()
                 while current not in seen and len(seen)<40:

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from contextlib import ExitStack, closing
+
 import calendar
 import copy
 import glob
@@ -657,9 +659,8 @@ _load_jira()
 def _story_titles() -> dict:
     titles: dict = {}
     try:
-        con = sqlite3.connect(BOARD_DB, timeout=1)
-        rows = con.execute("SELECT story, title FROM events WHERE kind = 'story' AND title != '' ORDER BY ts").fetchall()
-        con.close()
+        with closing(sqlite3.connect(BOARD_DB, timeout=1)) as con:
+            rows = con.execute("SELECT story, title FROM events WHERE kind = 'story' AND title != '' ORDER BY ts").fetchall()
         titles = {k: re.sub(r"^(\s*\[[^\]]*\])+\s*", "", t) for k, t in rows}
     except sqlite3.Error:
         pass
@@ -949,74 +950,68 @@ def _codex_tasks(hist, tid, turns, branch, database_identity):
 def codex_sessions(now: float) -> list[dict]:
     if not os.path.exists(CODEX_STATE):
         return []
-    st = hist = None
-    try:
-        database_identity = (os.path.realpath(CODEX_HISTORY), os.stat(CODEX_HISTORY).st_ino)
-        st = sqlite3.connect(Path(CODEX_STATE).as_uri() + '?mode=ro', uri=True, timeout=1)
-        hist = sqlite3.connect(Path(CODEX_HISTORY).as_uri() + '?mode=ro', uri=True, timeout=1)
-        if database_identity != (os.path.realpath(CODEX_HISTORY), os.stat(CODEX_HISTORY).st_ino):
-            raise sqlite3.OperationalError('History database replaced while opening')
-        # The open handle retains this identity even if its path is replaced later.
-        rows = st.execute(
-            "SELECT id, updated_at, cwd, title, git_branch, source, created_at FROM threads "
-            "WHERE archived = 0 AND updated_at > ? ORDER BY updated_at DESC LIMIT 40",
-            (int(now - WINDOW_SEC),),
-        ).fetchall()
-    except (OSError, sqlite3.Error):
-        if hist is not None:
-            hist.close()
-        if st is not None:
-            st.close()
-        return []
-    live_ids = {row[0] for row in rows}
-    for cache in (_codex_past, _codex_recent):
-        for identity in list(cache):
-            if identity[2] not in live_ids:
-                cache.pop(identity, None)
-    out = []
-    for tid, updated, cwd, title, branch, source, created in rows:
-        if "subagent" in str(source or ""):
-            continue
+    with ExitStack() as databases:
         try:
-            turns = hist.execute(
-                "SELECT turn_id, status, started_at, completed_at, rollout_ordinal FROM thread_turns WHERE thread_id = ? "
-                "ORDER BY rollout_ordinal DESC LIMIT ?",
-                (tid, TASKS_KEPT),
+            database_identity = (os.path.realpath(CODEX_HISTORY), os.stat(CODEX_HISTORY).st_ino)
+            st = databases.enter_context(closing(sqlite3.connect(Path(CODEX_STATE).as_uri() + '?mode=ro', uri=True, timeout=1)))
+            hist = databases.enter_context(closing(sqlite3.connect(Path(CODEX_HISTORY).as_uri() + '?mode=ro', uri=True, timeout=1)))
+            if database_identity != (os.path.realpath(CODEX_HISTORY), os.stat(CODEX_HISTORY).st_ino):
+                raise sqlite3.OperationalError('History database replaced while opening')
+            # The open handle retains this identity even if its path is replaced later.
+            rows = st.execute(
+                "SELECT id, updated_at, cwd, title, git_branch, source, created_at FROM threads "
+                "WHERE archived = 0 AND updated_at > ? ORDER BY updated_at DESC LIMIT 40",
+                (int(now - WINDOW_SEC),),
             ).fetchall()
-            if not turns:
-                for cache in (_codex_past, _codex_recent):
-                    for identity in list(cache):
-                        if identity[2] == tid:
-                            cache.pop(identity, None)
+        except (OSError, sqlite3.Error):
+            return []
+        live_ids = {row[0] for row in rows}
+        for cache in (_codex_past, _codex_recent):
+            for identity in list(cache):
+                if identity[2] not in live_ids:
+                    cache.pop(identity, None)
+        out = []
+        for tid, updated, cwd, title, branch, source, created in rows:
+            if "subagent" in str(source or ""):
                 continue
-            tasks = _codex_tasks(hist, tid, turns, branch or '', database_identity)
-        except sqlite3.Error:
-            continue
-        tasks = [t for t in tasks if t.get('history') or t["prompt"] or t["notes"] or t["n_steps"] or t["n_checks"]]
-        if not tasks:
-            continue
-        if not tasks[0]["prompt"]:
-            tasks[0]["prompt"] = _clean(title or "", 400)
-        running = any(s == "inProgress" for _, s, _, _, _ in turns[:1])
-        done = _finish(tasks, running, now)
-        idle_state = "입력 대기" if done[-1].get("ask") else "쉬는 중"
-        out.append({
-            "agent": "codex",
-            "cwd_path": cwd or "",
-            "created_at": float(created or 0),
-            "role": "외부 평가" if re.search(r'검토|평가|\breview\b|\baudit\b', title or '', re.I) else "위임 작업",
-            "id": tid,
-            "name": "Claude가 부른 Codex" if source == "exec" else "",
-            "state": "작업 중" if running else (idle_state if now - updated < 1800 else "종료됨"),
-            "cwd": _short_dir(cwd or ""),
-            "branch": branch or "",
-            "tasks": done,
-            "works": _works(tasks, branch or "", TITLES),
-            "last_ts": float(updated),
-        })
-    st.close()
-    hist.close()
-    return out
+            try:
+                turns = hist.execute(
+                    "SELECT turn_id, status, started_at, completed_at, rollout_ordinal FROM thread_turns WHERE thread_id = ? "
+                    "ORDER BY rollout_ordinal DESC LIMIT ?",
+                    (tid, TASKS_KEPT),
+                ).fetchall()
+                if not turns:
+                    for cache in (_codex_past, _codex_recent):
+                        for identity in list(cache):
+                            if identity[2] == tid:
+                                cache.pop(identity, None)
+                    continue
+                tasks = _codex_tasks(hist, tid, turns, branch or '', database_identity)
+            except sqlite3.Error:
+                continue
+            tasks = [t for t in tasks if t.get('history') or t["prompt"] or t["notes"] or t["n_steps"] or t["n_checks"]]
+            if not tasks:
+                continue
+            if not tasks[0]["prompt"]:
+                tasks[0]["prompt"] = _clean(title or "", 400)
+            running = any(s == "inProgress" for _, s, _, _, _ in turns[:1])
+            done = _finish(tasks, running, now)
+            idle_state = "입력 대기" if done[-1].get("ask") else "쉬는 중"
+            out.append({
+                "agent": "codex",
+                "cwd_path": cwd or "",
+                "created_at": float(created or 0),
+                "role": "외부 평가" if re.search(r'검토|평가|\breview\b|\baudit\b', title or '', re.I) else "위임 작업",
+                "id": tid,
+                "name": "Claude가 부른 Codex" if source == "exec" else "",
+                "state": "작업 중" if running else (idle_state if now - updated < 1800 else "종료됨"),
+                "cwd": _short_dir(cwd or ""),
+                "branch": branch or "",
+                "tasks": done,
+                "works": _works(tasks, branch or "", TITLES),
+                "last_ts": float(updated),
+            })
+        return out
 
 
 TITLES: dict = {}
@@ -1025,9 +1020,8 @@ ALIASES: dict = {}
 
 def _aliases() -> dict:
     try:
-        con = sqlite3.connect(BOARD_DB, timeout=1)
-        rows = con.execute("SELECT src, dst FROM aliases").fetchall()
-        con.close()
+        with closing(sqlite3.connect(BOARD_DB, timeout=1)) as con:
+            rows = con.execute("SELECT src, dst FROM aliases").fetchall()
     except sqlite3.Error:
         return {}
     return dict(rows)

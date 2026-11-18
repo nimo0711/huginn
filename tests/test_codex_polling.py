@@ -27,7 +27,7 @@ class CodexPollingTests(unittest.TestCase):
         patch.object(scan, '_codex_past', {}).start()
         if hasattr(scan, '_codex_recent'):
             patch.object(scan, '_codex_recent', {}).start()
-        with sqlite3.connect(self.state) as db:
+        with closing(sqlite3.connect(self.state)) as db, db:
             db.execute('CREATE TABLE threads(id,updated_at,cwd,title,git_branch,source,created_at,archived)')
             db.execute('INSERT INTO threads VALUES(?,?,?,?,?,?,?,?)',
                        ('s', 100, str(self.root), '기능 수정', '', 'cli', 1, 0))
@@ -37,13 +37,13 @@ class CodexPollingTests(unittest.TestCase):
         self.add_item('agentMessage', {'text': '분석 중입니다.'}, 2)
 
     def make_history(self, path, revisions=True):
-        with sqlite3.connect(path) as db:
+        with closing(sqlite3.connect(path)) as db, db:
             db.execute('CREATE TABLE thread_turns(thread_id,turn_id,status,started_at,completed_at,rollout_ordinal)')
             db.execute('CREATE TABLE thread_items(thread_id,turn_id,item_type,item_json,created_at_ms,rollout_ordinal' +
                        (',updated_at_ordinal' if revisions else '') + ')')
 
     def write(self, sql, args=()):
-        with sqlite3.connect(self.history) as db:
+        with closing(sqlite3.connect(self.history)) as db, db:
             db.execute(sql, args)
 
     def add_item(self, kind, body, ordinal, turn='t'):
@@ -68,6 +68,26 @@ class CodexPollingTests(unittest.TestCase):
         self.assertEqual(result['tasks'][0]['now'], '분석 중입니다.')
         bodies = [q for q in queries if q.lstrip().upper().startswith('SELECT') and 'item_json' in q]
         self.assertEqual(bodies, [], 'An unchanged poll reread the entire turn body')
+
+    def test_failed_poll_releases_both_open_databases(self):
+        connect = sqlite3.connect
+        opened = []
+
+        def record_connection(*args, **kwargs):
+            db = connect(*args, **kwargs)
+            opened.append(db)
+            self.addCleanup(db.close)
+            return db
+
+        with patch.object(scan.sqlite3, 'connect', side_effect=record_connection), \
+                patch.object(scan, '_finish', side_effect=ValueError('invalid saved turn')):
+            with self.assertRaisesRegex(ValueError, 'invalid saved turn'):
+                self.poll()
+
+        self.assertEqual(len(opened), 2)
+        for db in opened:
+            with self.assertRaisesRegex(sqlite3.ProgrammingError, 'closed database'):
+                db.execute('SELECT 1')
 
     def test_in_place_update_and_completion_are_visible_on_next_poll(self):
         self.poll()
@@ -149,7 +169,7 @@ class CodexPollingTests(unittest.TestCase):
             self.add_item('agentMessage', {'text': '결과'}, ordinal + 2, turn)
             self.poll()
         self.assertEqual(sum(len(turns) for turns in scan._codex_recent.values()), scan.TASKS_KEPT)
-        with sqlite3.connect(self.state) as db:
+        with closing(sqlite3.connect(self.state)) as db, db:
             db.execute('UPDATE threads SET archived=1')
         self.assertEqual(scan.codex_sessions(101), [])
         self.assertEqual(scan._codex_recent, {})
@@ -168,7 +188,7 @@ class CodexPollingTests(unittest.TestCase):
     @unittest.skipIf(sys.platform == 'win32', 'requires replacing a database while SQLite holds it open')
     def test_replacement_after_connect_cannot_cache_old_rows_under_new_database(self):
         replacement = self.root / 'replacement.sqlite'
-        with sqlite3.connect(self.history) as old, sqlite3.connect(replacement) as new:
+        with closing(sqlite3.connect(self.history)) as old, closing(sqlite3.connect(replacement)) as new, new:
             old.backup(new)
             new.execute('UPDATE thread_items SET item_json=? WHERE item_type=?',
                         (json.dumps({'text': '교체된 결과'}), 'agentMessage'))

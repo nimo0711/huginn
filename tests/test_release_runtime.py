@@ -10,6 +10,7 @@ import sys
 import tempfile
 import time
 import unittest
+from unittest.mock import patch
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -30,6 +31,13 @@ class ReleaseRuntimeTests(unittest.TestCase):
     def service(self, *args):
         return subprocess.run([*SERVICE, *args], env=self.env, cwd=self.root,
                               capture_output=True, text=True, encoding='utf-8', timeout=15)
+
+    def test_loopback_service_starts_without_reverse_dns(self):
+        import server
+        with patch('socket.getfqdn', side_effect=AssertionError('Local service must not wait for DNS')):
+            with server.LoopbackServer(('127.0.0.1', 0), server.Handler) as httpd:
+                self.assertEqual(httpd.server_name, '127.0.0.1')
+                self.assertGreater(httpd.server_port, 0)
 
     def test_source_paths_and_explicit_overrides(self):
         self.env.update(FORKRAIL_DATA_DIR=str(self.root / '보드 자료'),
@@ -144,8 +152,14 @@ class ReleaseRuntimeTests(unittest.TestCase):
                 try:
                     with socket.create_connection(('127.0.0.1', port), timeout=.15):
                         pass
-                except ConnectionRefusedError:
-                    return
+                except (ConnectionRefusedError, TimeoutError):
+                    if sys.platform != 'win32':
+                        return
+                    # Windows can time out instead of immediately refusing a
+                    # closed loopback port. Require the actual child to exit.
+                    import psutil
+                    if not psutil.pid_exists(pid):
+                        return
                 time.sleep(.05)
             # The only child spawned by this test is still listening. Clean it
             # up before reporting the failure, including on Windows.

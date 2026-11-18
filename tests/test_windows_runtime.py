@@ -1,7 +1,8 @@
-import contextlib
 import http.server
 import json
 import os
+from contextlib import closing
+import sqlite3
 from pathlib import Path
 import subprocess
 import sys
@@ -95,9 +96,39 @@ class WindowsRuntimeTests(unittest.TestCase):
             self.assertTrue(scan._alive(os.getpid()))
             self.assertFalse(scan._alive(0))
             self.assertIn(os.getpid(), local_runtime.processes())
-            with contextlib.closing(http.server.HTTPServer(('127.0.0.1', 0), http.server.BaseHTTPRequestHandler)) as httpd:
+            with http.server.HTTPServer(('127.0.0.1', 0), http.server.BaseHTTPRequestHandler) as httpd:
                 self.assertIn({'pid': os.getpid(), 'port': httpd.server_port, 'host': '127.0.0.1'},
                               local_runtime.listeners())
+
+    def test_codex_process_attribution_releases_the_session_database(self):
+        with tempfile.TemporaryDirectory() as folder:
+            home = Path(folder)
+            path = home / '.codex/state_5.sqlite'
+            path.parent.mkdir()
+            with closing(sqlite3.connect(path)) as db, db:
+                db.execute('CREATE TABLE threads (id TEXT, source TEXT)')
+                db.execute('INSERT INTO threads VALUES (?, ?)', ('root', '{}'))
+                source = {'subagent': {'thread_spawn': {'parent_thread_id': 'root'}}}
+                db.execute('INSERT INTO threads VALUES (?, ?)', ('child', json.dumps(source)))
+
+            connect = sqlite3.connect
+            opened = []
+
+            def record_connection(*args, **kwargs):
+                db = connect(*args, **kwargs)
+                opened.append(db)
+                return db
+
+            try:
+                with patch.object(local_runtime.Path, 'home', return_value=home), \
+                        patch.object(local_runtime.sqlite3, 'connect', side_effect=record_connection):
+                    self.assertEqual(local_runtime.codex_thread_roots({'child'}), {'child': 'root'})
+                self.assertEqual(len(opened), 1)
+                with self.assertRaisesRegex(sqlite3.ProgrammingError, 'closed database'):
+                    opened[0].execute('SELECT 1')
+            finally:
+                for db in opened:
+                    db.close()
 
     def test_unsupported_direct_send_explains_reason_and_does_not_open_transport(self):
         with tempfile.TemporaryDirectory() as folder, patch('session_delivery.IS_WINDOWS', True, create=True):

@@ -8,7 +8,9 @@ import secrets
 import sqlite3
 import threading
 import time
+from contextlib import closing
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from socketserver import TCPServer
 from pathlib import Path
 from urllib.parse import parse_qs, unquote, urlparse
 
@@ -72,7 +74,7 @@ def connect() -> sqlite3.Connection:
 
 def init_db() -> None:
     Path(DB_PATH).parent.mkdir(parents=True, exist_ok=True, mode=0o700)
-    with connect() as conn:
+    with closing(connect()) as conn, conn:
         conn.executescript(SCHEMA)
 
 
@@ -98,7 +100,7 @@ def _event_row(payload: dict) -> tuple[dict, float]:
 
 def add_event(payload: dict) -> int:
     row, ts = _event_row(payload)
-    with _lock, connect() as conn:
+    with _lock, closing(connect()) as conn, conn:
         cur = conn.execute(
             f"INSERT INTO events (ts, {', '.join(FIELDS)}) VALUES (?, {', '.join('?' * len(FIELDS))})",
             [ts, *(row[name] for name in FIELDS)],
@@ -217,7 +219,7 @@ def sessions(conn: sqlite3.Connection) -> list[dict]:
 
 
 def state(story: str | None, limit: int) -> dict:
-    with connect() as conn:
+    with closing(connect()) as conn, conn:
         all_stories = stories(conn)
         chosen = story or (all_stories[0]["story"] if all_stories else "")
         return {
@@ -386,7 +388,7 @@ class Handler(BaseHTTPRequestHandler):
         if not src:
             self._json(400, {"error": "src 필요"})
             return
-        with _lock, connect() as conn:
+        with _lock, closing(connect()) as conn, conn:
             if dst:
                 conn.execute("INSERT INTO aliases (src, dst) VALUES (?, ?) ON CONFLICT(src) DO UPDATE SET dst = excluded.dst", (src, dst))
             else:
@@ -511,7 +513,10 @@ class LoopbackServer(ThreadingHTTPServer):
         if IS_WINDOWS:
             import socket
             self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_EXCLUSIVEADDRUSE, 1)
-        super().server_bind()
+        # This server is loopback-only. HTTPServer's reverse DNS lookup can
+        # stall startup on offline machines and hosted runners.
+        TCPServer.server_bind(self)
+        self.server_name, self.server_port = self.server_address[:2]
 
 
 def create_server():

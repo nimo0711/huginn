@@ -86,8 +86,26 @@ class ConnectionsTests(unittest.TestCase):
     def test_disabled_agent_is_not_scanned(self):
         import connections,scan
         self.store.connections.save('claude', {'enabled':False});self.store.connections.save('codex', {'enabled':True})
-        with patch.object(connections,'STORE',self.store.connections),patch.object(scan,'claude_sessions',return_value=[]) as claude,patch.object(scan,'codex_sessions',return_value=[]) as codex:
-            scan.all_sessions();claude.assert_not_called();codex.assert_called_once()
+        with patch.object(connections, 'STORE', self.store.connections), \
+                patch.object(scan, 'BOARD_DB', self.root / 'board.db'), \
+                patch.object(scan, 'claude_sessions', return_value=[]) as claude, \
+                patch.object(scan, 'codex_sessions', return_value=[]) as codex:
+            scan.all_sessions()
+            claude.assert_not_called()
+            codex.assert_called_once()
+
+    def test_windows_sessions_do_not_require_posix_delegation_metadata(self):
+        import connections, scan
+
+        claude = {'id': 'windows-claude', 'agent': 'claude', 'state': '작업 중', 'last_ts': 2}
+        codex = {'id': 'windows-codex', 'agent': 'codex', 'state': '작업 중', 'last_ts': 1}
+        with patch.object(connections, 'STORE', self.store.connections), \
+                patch.object(scan, 'BOARD_DB', self.root / 'board.db'), \
+                patch.object(scan.delegation, 'IS_WINDOWS', True), \
+                patch.object(scan, 'claude_sessions', return_value=[claude]), \
+                patch.object(scan, 'codex_sessions', return_value=[codex]), \
+                patch.object(scan.delegation.os, 'getuid', create=True, side_effect=AssertionError('POSIX uid is unavailable')):
+            self.assertEqual(scan.all_sessions(), [claude, codex])
 
     def test_queued_summary_is_cancelled_when_disabled_or_model_changed(self):
         import connections,title_summary
