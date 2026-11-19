@@ -3,17 +3,17 @@ Unicode True
 !include "x64.nsh"
 !include "FileFunc.nsh"
 !define FORKRAIL_UNINSTALL "Software\Microsoft\Windows\CurrentVersion\Uninstall\Forkrail"
-Name "Forkrail"
+Name "Huginn"
 OutFile "${OUTPUT}"
 InstallDir "$LOCALAPPDATA\Programs\Forkrail"
 InstallDirRegKey HKCU "${FORKRAIL_UNINSTALL}" "InstallLocation"
 RequestExecutionLevel user
 SetCompressor /SOLID lzma
 VIProductVersion "${VERSION}.0"
-VIAddVersionKey "ProductName" "Forkrail"
-VIAddVersionKey "FileDescription" "Forkrail Installer"
+VIAddVersionKey "ProductName" "Huginn"
+VIAddVersionKey "FileDescription" "Huginn Installer"
 VIAddVersionKey "FileVersion" "${RELEASE_VERSION}"
-VIAddVersionKey "LegalCopyright" "Forkrail contributors"
+VIAddVersionKey "LegalCopyright" "Huginn contributors"
 !define MUI_ICON "${SOURCE}\Forkrail.ico"
 !define MUI_UNICON "${SOURCE}\Forkrail.ico"
 !insertmacro MUI_PAGE_WELCOME
@@ -54,7 +54,7 @@ Function ${Prefix}CheckClosed
     Goto retry_check
   give_up:
     IfSilent +2
-    MessageBox MB_ICONSTOP "Close Forkrail and its service, then try again."
+    MessageBox MB_ICONSTOP "Close Huginn and its service, then try again."
     SetErrorLevel 3
     Quit
   closed:
@@ -73,7 +73,7 @@ Function ${Prefix}LockInstaller
   Return
   lock_failed:
     IfSilent +2
-    MessageBox MB_ICONSTOP "Another Forkrail install or uninstall is in progress."
+    MessageBox MB_ICONSTOP "Another Huginn install or uninstall is in progress."
     SetErrorLevel 4
     Quit
 FunctionEnd
@@ -84,7 +84,7 @@ FunctionEnd
 Function .onInit
   Call LockInstaller
   ${IfNot} ${RunningX64}
-    MessageBox MB_ICONSTOP "Forkrail requires 64-bit Windows."
+    MessageBox MB_ICONSTOP "Huginn requires 64-bit Windows."
     Abort
   ${EndIf}
   SetShellVarContext current
@@ -134,7 +134,7 @@ Function un.CheckServiceFile
     Push "StopLocate"
 FunctionEnd
 
-Section "Forkrail" SEC_MAIN
+Section "Huginn" SEC_MAIN
   ; Win32 resolves a new path too, whereas the NSIS path helper requires it to exist.
   System::Call 'kernel32::GetFullPathNameW(w "$INSTDIR", i ${NSIS_MAX_STRLEN}, w .r0, p 0) i .r1'
   IntCmp $1 0 invalid_directory
@@ -176,17 +176,19 @@ Section "Forkrail" SEC_MAIN
   IfErrors rollback
   ClearErrors
   SetOutPath "$INSTDIR"
-  CreateDirectory "$SMPROGRAMS\Forkrail"
-  CreateShortcut "$SMPROGRAMS\Forkrail\Forkrail.lnk" "$INSTDIR\Forkrail.exe" "" "$INSTDIR\Forkrail.ico"
-  WriteRegStr HKCU "${FORKRAIL_UNINSTALL}" "DisplayName" "Forkrail"
+  CreateDirectory "$SMPROGRAMS\Huginn"
+  CreateShortcut "$SMPROGRAMS\Huginn\Huginn.lnk" "$INSTDIR\Forkrail.exe" "" "$INSTDIR\Forkrail.ico"
+  WriteRegStr HKCU "${FORKRAIL_UNINSTALL}" "DisplayName" "Huginn"
   WriteRegStr HKCU "${FORKRAIL_UNINSTALL}" "DisplayVersion" "${RELEASE_VERSION}"
-  WriteRegStr HKCU "${FORKRAIL_UNINSTALL}" "Publisher" "Forkrail contributors"
+  WriteRegStr HKCU "${FORKRAIL_UNINSTALL}" "Publisher" "Huginn contributors"
   WriteRegStr HKCU "${FORKRAIL_UNINSTALL}" "InstallLocation" "$INSTDIR"
   WriteRegStr HKCU "${FORKRAIL_UNINSTALL}" "UninstallString" '$\"$INSTDIR\Uninstall.exe$\"'
   WriteRegStr HKCU "${FORKRAIL_UNINSTALL}" "DisplayIcon" "$INSTDIR\Forkrail.exe"
   WriteRegDWORD HKCU "${FORKRAIL_UNINSTALL}" "NoModify" 1
   WriteRegDWORD HKCU "${FORKRAIL_UNINSTALL}" "NoRepair" 1
   IfErrors registration_failed
+  Delete "$SMPROGRAMS\Forkrail\Forkrail.lnk"
+  RMDir "$SMPROGRAMS\Forkrail"
   StrCmp $Backup "" done
   ; Clean only application-owned paths; leave unrelated files in the backup.
   Delete "$Backup\Forkrail.exe"
@@ -208,14 +210,14 @@ Section "Forkrail" SEC_MAIN
     RMDir /r "$Stage"
   stage_message:
     IfSilent +2
-    MessageBox MB_ICONSTOP "Forkrail could not be installed. The previous version was preserved. Check file permissions and try again."
+    MessageBox MB_ICONSTOP "Huginn could not be installed. The previous version was preserved. Check file permissions and try again."
     SetErrorLevel 5
     Quit
   rollback_failed:
     RMDir /r "$Stage"
     DetailPrint "The previous installation is available at $Backup"
     IfSilent +2
-    MessageBox MB_ICONSTOP "Forkrail could not be installed. The previous installation is available at $Backup"
+    MessageBox MB_ICONSTOP "Huginn could not be installed. The previous installation is available at $Backup"
     SetErrorLevel 7
     Quit
   registration_failed:
@@ -225,7 +227,7 @@ Section "Forkrail" SEC_MAIN
     Quit
   invalid_directory:
     IfSilent +2
-    MessageBox MB_ICONSTOP "Choose an empty folder or an existing Forkrail installation. The Forkrail data directory cannot be used."
+    MessageBox MB_ICONSTOP "Choose an empty folder or an existing Huginn installation. The Huginn data directory cannot be used."
     SetErrorLevel 5
     Quit
   done:
@@ -265,6 +267,8 @@ Section "Uninstall"
   uninstall_cleanup_failed:
     StrCpy $1 "Remaining application files are available at $Stage."
   remove_registration:
+    Delete "$SMPROGRAMS\Huginn\Huginn.lnk"
+    RMDir "$SMPROGRAMS\Huginn"
     Delete "$SMPROGRAMS\Forkrail\Forkrail.lnk"
     RMDir "$SMPROGRAMS\Forkrail"
     ClearErrors
@@ -273,7 +277,7 @@ Section "Uninstall"
     StrCmp $1 "" uninstall_done
     Goto uninstall_incomplete
   uninstall_unregister_failed:
-    StrCpy $1 "Windows could not remove the Forkrail uninstall entry. $1"
+    StrCpy $1 "Windows could not remove the Huginn uninstall entry. $1"
   uninstall_incomplete:
     DetailPrint "$1"
     IfSilent +2
@@ -282,7 +286,7 @@ Section "Uninstall"
     Quit
   uninstall_failed:
     IfSilent +2
-    MessageBox MB_ICONSTOP "Forkrail could not be uninstalled. Close Forkrail and retry. Your installation and uninstall entry are preserved."
+    MessageBox MB_ICONSTOP "Huginn could not be uninstalled. Close Huginn and retry. Your installation and uninstall entry are preserved."
     SetErrorLevel 6
     Quit
   uninstall_done:

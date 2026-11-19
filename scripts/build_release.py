@@ -43,7 +43,7 @@ def freeze_service(work, signed):
          '--name','forkrail-service','--distpath',work/'frozen','--workpath',work/'pyinstaller',
          '--specpath',work,'--paths',source,'--collect-submodules','psutil']
     for item in ['index.html','stories.html','AGENT_GUIDE.md','release.json','app/brand.json',
-                 'app/assets/forkrail-icon.png','app/assets/forkrail-icon-web.png']:
+                 'app/assets/forkrail-icon.png','app/assets/forkrail-icon-web.png','desktop/theme.css']:
         parent=Path(item).parent.as_posix()
         cmd+=['--add-data',str(source/item)+':'+parent]
     if signed and sys.platform=='darwin':cmd+=['--codesign-identity',os.environ['FORKRAIL_APPLE_APP_IDENTITY']]
@@ -59,7 +59,7 @@ def desktop_build(release,target):
     settings_path=ROOT/'desktop/wails.json'
     settings=json.loads(settings_path.read_text(encoding='utf-8'))
     settings.setdefault('info',{})['productVersion']=release['package_version']
-    settings['info']['productName']=release['name']
+    settings['info']['productName']=release.get('display_name',release['name'])
     settings_path.write_text(json.dumps(settings,indent=2)+'\n',encoding='utf-8')
     goos,goarch=TARGETS[target]
     cmd=['go','run','github.com/wailsapp/wails/v2/cmd/wails@v2.16.0','build','-clean',
@@ -70,7 +70,7 @@ def desktop_build(release,target):
         env['CGO_CFLAGS']=env.get('CGO_CFLAGS','')+' -mmacosx-version-min=13.0'
         env['CGO_LDFLAGS']=env.get('CGO_LDFLAGS','')+' -mmacosx-version-min=13.0'
     run(cmd,cwd=ROOT/'desktop',env=env)
-    return ROOT/'desktop/build/bin'/('Forkrail.app' if goos=='darwin' else 'Forkrail.exe')
+    return ROOT/'desktop/build/bin'/('Huginn.app' if goos=='darwin' else 'Forkrail.exe')
 
 
 def sign_mac(app, signed):
@@ -87,17 +87,17 @@ def sign_mac(app, signed):
 
 
 def package_mac(release,target,work,service,built,signed,output):
-    app=work/'package/Applications/Forkrail.app';app.parent.mkdir(parents=True)
+    app=work/'package/Applications/Huginn.app';app.parent.mkdir(parents=True)
     shutil.copytree(built,app,symlinks=True)
     shutil.copytree(service,app/'Contents/Resources/service',symlinks=True)
     shutil.copy2(ROOT/'release.json',app/'Contents/Resources/release.json')
     shutil.copy2(ROOT/'desktop/build/Forkrail.icns',app/'Contents/Resources/AppIcon.icns')
     # Wails' XML plist begins with DOCTYPE, without an XML declaration.
     info=app/'Contents/Info.plist';data=plistlib.loads(info.read_bytes(),fmt=plistlib.FMT_XML)
-    data.update(CFBundleName=release['name'],CFBundleDisplayName=release['name'],
+    data.update(CFBundleName=release.get('display_name',release['name']),CFBundleDisplayName=release.get('display_name',release['name']),
                 CFBundleIdentifier=release['bundle_id'],CFBundleShortVersionString=release['package_version'],
                 CFBundleVersion=release['package_version'],CFBundleIconFile='AppIcon',LSMinimumSystemVersion='13.0',
-                NSHighResolutionCapable=True,NSHumanReadableCopyright='Forkrail contributors')
+                NSHighResolutionCapable=True,NSHumanReadableCopyright='Huginn contributors')
     info.write_bytes(plistlib.dumps(data));verify_macos_bundle(app,target);sign_mac(app,signed)
     run([app/'Contents/Resources/service/forkrail-service','self-test'],timeout=60)
     stem=release['name']+'-'+release['version']+'-'+target

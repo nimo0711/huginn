@@ -56,7 +56,7 @@ func mockBoard(t *testing.T, health, state string, icon []byte) (*httptest.Serve
 const legacyState = `{"now":1760000000.5,"stories":[],"story":"","items":[],"metrics":[],"timeline":[],"sessions":[]}`
 
 func TestLegacyServiceMustMatchIconAndState(t *testing.T) {
-	icon, err := os.ReadFile("../app/assets/forkrail-icon-web.png")
+	icon, err := os.ReadFile("../tests/fixtures/forkrail-legacy-icon.png")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -259,7 +259,7 @@ func runFixture(args []string) error {
 		io.WriteString(w, `{"sessions":[]}`)
 	})
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		io.WriteString(w, `<!doctype html><title>Forkrail</title><main id="main"></main>`)
+		io.WriteString(w, `<!doctype html><title>Huginn</title><main id="main"></main>`)
 	})
 	return http.ListenAndServe("127.0.0.1:"+values["--port"], mux)
 }

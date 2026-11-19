@@ -1,5 +1,12 @@
-Forkrail — Crossing / Signal
-Approved by user: 2026-11-18
-Method: built-in image_gen, color edit of the selected Crossing icon.
+Huginn — Twins / approved 2026-11-19
+The user selected proposal 02 Twins and requested the whole app to follow its tone.
+Canonical original: forkrail-icon.png (legacy filename retained for compatibility).
+Approved source: 문서/AI_Desk/작업_보드/디자인/Huginn_아이콘_시안_5종/02-twins.png
+Method: built-in image_gen, original design inspired by the user's Norse raven reference.
+Web derivative: forkrail-icon-web.png, 128px. Desktop, DMG and ICO formats derive from the same original. Preserve composition, artwork and alpha.
 
-Use case: precise-object-edit. Input image is the exact Crossing app icon selected by the user. This is strictly a COLORWAY EDIT, not a redesign. Preserve exactly the source silhouette, shape boundaries, size, centering, corner curves, orientation, right-angle turns, the central square negative space and the existing subtle overlap shadow. Do not draw a new logo. Keep every contour and its position unchanged. Change ONLY these three colors: rounded square tile to #102231; the currently cobalt blue upper-right path to #64D9F5; the currently ivory lower-left path to #FFD36B. Render these colors with only the same restrained shading of the original. Preserve transparent outside margins. Keep the tile clean with smooth edges. No new texture, glow, outline, decoration, letters or text. Return one square icon at the same framing as the input, no presentation board.
+Direction:
+TWIN RAVENS: warm ivory tile #ECE5D5, two imposing ink-black ravens facing one another, symmetric but naturally drawn. Their heads occupy upper corners of central emblem and wings sweep toward a central base. Between their breasts a tiny simple antique-brass woven knot made of three broad ribbons. One short graceful branch beneath their feet connects both birds. Composition is wide and stable, not tall and cramped. Keep feathers to 3 large carved cuts per wing. Original contemporary heraldic stamp, no frame.
+
+Shared direction:
+Premium Huginn app icon inspired by Norse raven heraldry. Recognizable corvid silhouette with engraved feather cuts, warm ivory, dark ink and antique brass. No lettering, watermark or surrounding UI. Transparent outer margin around one rounded tile. Reference served only as thematic inspiration; no tracing.

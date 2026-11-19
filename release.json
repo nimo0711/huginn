@@ -1,6 +1,6 @@
 {
   "name": "Forkrail",
-  "version": "1.2.0-rc.3",
+  "version": "1.2.0-rc.4",
   "package_version": "1.2.0",
   "bundle_id": "app.forkrail.desktop",
   "repository": "nimo0711/forkrail",
@@ -8,5 +8,6 @@
     "macos-arm64",
     "macos-x86_64",
     "windows-x64"
-  ]
+  ],
+  "display_name": "Huginn"
 }

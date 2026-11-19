@@ -322,6 +322,8 @@ class Handler(BaseHTTPRequestHandler):
             self._send(200, branding.icon_svg().encode(), "image/svg+xml; charset=utf-8")
         elif url.path == "/assets/brand.png":
             self._send(200, branding.icon_png(), "image/png")
+        elif url.path == "/assets/theme.css":
+            self._send(200, (HOME / "desktop/theme.css").read_bytes(), "text/css; charset=utf-8")
         elif url.path == "/api/state":
             try:
                 q = parse_qs(url.query, keep_blank_values=True, max_num_fields=100)

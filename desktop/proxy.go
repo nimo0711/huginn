@@ -35,18 +35,18 @@ func newBoardProxy(service *boardService, nativeOrigin string) http.Handler {
 			return prepareBoardPage(resp, target)
 		},
 		ErrorHandler: func(w http.ResponseWriter, _ *http.Request, _ error) {
-			http.Error(w, "Forkrail 서비스에 연결할 수 없습니다.", http.StatusBadGateway)
+			http.Error(w, "Huginn 서비스에 연결할 수 없습니다.", http.StatusBadGateway)
 		},
 	}
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		origins := r.Header.Values("Origin")
 		if len(origins) > 1 || len(origins) == 1 && origins[0] != nativeOrigin {
-			http.Error(w, "Forkrail 화면에서 요청해 주세요.", http.StatusForbidden)
+			http.Error(w, "Huginn 화면에서 요청해 주세요.", http.StatusForbidden)
 			return
 		}
 		if len(origins) == 0 && r.Method != http.MethodGet && r.Method != http.MethodHead {
 			if !trustedWebKitPost(r, nativeOrigin) {
-				http.Error(w, "Forkrail 화면에서 요청해 주세요.", http.StatusForbidden)
+				http.Error(w, "Huginn 화면에서 요청해 주세요.", http.StatusForbidden)
 				return
 			}
 			r = r.Clone(r.Context())
@@ -73,7 +73,7 @@ func newBoardProxy(service *boardService, nativeOrigin string) http.Handler {
 			return
 		}
 		if !service.available() {
-			http.Error(w, "Forkrail 서비스에 연결할 수 없습니다.", http.StatusBadGateway)
+			http.Error(w, "Huginn 서비스에 연결할 수 없습니다.", http.StatusBadGateway)
 			return
 		}
 		proxy.ServeHTTP(w, r)
@@ -84,7 +84,7 @@ func allowedBoardRoute(method, path string) bool {
 	switch method {
 	case http.MethodGet:
 		switch path {
-		case "/", "/stories", "/assets/brand.svg", "/assets/brand.png", "/_forkrail/links.js",
+		case "/", "/stories", "/assets/brand.svg", "/assets/brand.png", "/assets/theme.css", "/_forkrail/links.js",
 			"/api/health", "/api/state", "/api/sessions", "/api/actions":
 			return true
 		}

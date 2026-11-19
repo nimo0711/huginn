@@ -151,7 +151,7 @@ func nativeUpdateConfig(executable, version string) (updateConfig, error) {
 		BundleID                  string `json:"bundle_id"`
 		Platforms                 []string
 	}
-	if json.Unmarshal(data, &metadata) != nil || metadata.Name != appName || metadata.Version != version || metadata.BundleID != bundleID || !updateRepositoryPattern.MatchString(metadata.Repository) {
+	if json.Unmarshal(data, &metadata) != nil || metadata.Name != productID || metadata.Version != version || metadata.BundleID != bundleID || !updateRepositoryPattern.MatchString(metadata.Repository) {
 		return cfg, errUpdateInvalid
 	}
 	found := false
@@ -650,7 +650,7 @@ func (u *AppUpdates) Install() UpdateState {
 		s.Status = "installing"
 		s.Message = "OS 설치창을 열었습니다. 설치 후 다시 실행하면 적용된 버전을 확인할 수 있습니다."
 		if s.OS == "macos" {
-			s.Message = "DMG를 열었습니다. 이 앱이 종료되면 Forkrail을 Applications로 끌어다 놓고 기존 앱을 교체해 주세요."
+			s.Message = "DMG를 열었습니다. 앱이 종료되면 Huginn을 Applications로 끌어다 놓으세요. 기존 Forkrail 사용자는 Huginn 실행을 확인한 뒤 이전 앱과 Dock 아이콘을 제거해 주세요. 설정은 유지됩니다."
 		}
 	})
 	if u.afterLaunch != nil {

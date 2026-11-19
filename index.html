@@ -3,15 +3,10 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Forkrail</title>
+<title>Huginn</title>
 <link rel="icon" type="image/png" href="/assets/brand.png">
+<link rel="stylesheet" href="/assets/theme.css">
 <style>
-:root {
-  --bg: #111214; --side: #141517; --panel: #18191c; --panel2: #1e2023; --hover: #23252a; --line: rgba(236,236,238,.08); --line2: rgba(236,236,238,.14);
-  --ink: #f2f2f4; --sub: #c4c6cb; --dim: #989ba2;
-  --run: #f0b545; --wait: #e8866a; --stall: #d9645b; --off: #55585e; --done: #6fbf92;
-  --ease: cubic-bezier(.22,1,.36,1); --info: #6c8cff;
-}
 * { box-sizing: border-box; }
 [hidden] { display: none !important; }
 html, body { margin: 0; height: 100%; background: var(--bg); color: var(--ink); font: 15px/1.55 "Pretendard", -apple-system, "Apple SD Gothic Neo", sans-serif; -webkit-font-smoothing: antialiased; word-break: keep-all; overflow: hidden; }
@@ -78,7 +73,7 @@ aside { background: var(--side); border-right: 1px solid var(--line); display: f
 .top .stt.p-wait::before { background: var(--wait); }
 .top .stt.p-stall::before { background: var(--stall); }
 .top .stt.p-idle::before { background: var(--dim); }
-@keyframes live { 0% { box-shadow: 0 0 0 0 rgba(240,181,69,.45); } 70%, 100% { box-shadow: 0 0 0 6px rgba(240,181,69,0); } }
+@keyframes live { 0% { box-shadow: 0 0 0 0 var(--run-line); } 70%, 100% { box-shadow: 0 0 0 6px transparent; } }
 
 .askban { display: flex; gap: 12px; align-items: flex-start; border-radius: 12px; padding: 12px 16px; background: var(--panel); border: 1px solid var(--line); border-left: 3px solid var(--wait); }
 .use { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; padding: 0 16px 8px; }
@@ -138,11 +133,11 @@ aside { background: var(--side); border-right: 1px solid var(--line); display: f
 .ic svg { width: 22px; height: 22px; }
 .pn-h .ic { width: 32px; height: 32px; border-radius: 9px; }
 .pn-h .ic svg { width: 17px; height: 17px; }
-.ic-run { background: rgba(240,181,69,.14); color: var(--run); }
-.ic-info { background: rgba(108,140,255,.16); color: var(--info); }
-.ic-done { background: rgba(111,191,146,.14); color: var(--done); }
-.ic-wait { background: rgba(232,134,106,.14); color: var(--wait); }
-.ic-stall { background: rgba(217,100,91,.14); color: var(--stall); }
+.ic-run { background: var(--run-soft); color: var(--run); }
+.ic-info { background: var(--info-soft); color: var(--info); }
+.ic-done { background: var(--done-soft); color: var(--done); }
+.ic-wait { background: var(--wait-soft); color: var(--wait); }
+.ic-stall { background: var(--stall-soft); color: var(--stall); }
 .pn { background: var(--panel); border: 1px solid var(--line); border-radius: 16px; padding: 18px 20px; min-width: 0; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
 .pn.c7 { grid-column: span 7; } .pn.c5 { grid-column: span 5; } .pn.c4 { grid-column: span 4; } .pn.c3 { grid-column: span 3; }
 .pn-h { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; min-width: 0; }
@@ -156,16 +151,16 @@ aside { background: var(--side); border-right: 1px solid var(--line); display: f
 .bignum span { font-size: 13px; color: var(--sub); }
 .chart { flex: 1; min-height: 0; position: relative; }
 .chart svg { position: absolute; inset: 0; display: block; }
-.chart .gl { stroke: rgba(236,236,238,.06); stroke-dasharray: 3 4; }
-.chart .area { fill: rgba(240,181,69,.12); }
+.chart .gl { stroke: var(--track); stroke-dasharray: 3 4; }
+.chart .area { fill: var(--run-soft); }
 .chart .ln { fill: none; stroke: var(--run); stroke-width: 2.2; stroke-linejoin: round; }
-.chart .pk { stroke: rgba(240,181,69,.35); stroke-dasharray: 2 3; }
+.chart .pk { stroke: var(--run-line); stroke-dasharray: 2 3; }
 .chart .pkt { font-size: 12px; fill: var(--run); }
 .chart .now { fill: var(--run); stroke: var(--panel); stroke-width: 2; }
-.chart .now2 { fill: none; stroke: rgba(240,181,69,.35); stroke-width: 1.5; }
+.chart .now2 { fill: none; stroke: var(--run-line); stroke-width: 1.5; }
 .chart .tk { font-size: 12px; fill: var(--sub); } .chart .tk.t { fill: var(--info); font-weight: 600; }
 .chart .tk2 { font-size: 11px; fill: var(--dim); }
-.chart .pb { fill: rgba(236,236,238,.07); } .chart .pb.t { fill: rgba(108,140,255,.2); }
+.chart .pb { fill: var(--track); } .chart .pb.t { fill: var(--info-soft); }
 .chart .ln2 { fill: none; stroke: var(--info); stroke-width: 2.2; }
 .chart .pt { fill: var(--panel); stroke: var(--info); stroke-width: 2; } .chart .pt.t { fill: var(--info); }
 .chart .vl { font-size: 12px; fill: var(--sub); font-variant-numeric: tabular-nums; } .chart .vl.t { fill: var(--ink); font-weight: 600; }
@@ -180,7 +175,7 @@ aside { background: var(--side); border-right: 1px solid var(--line); display: f
 .tlist { display: flex; flex-direction: column; justify-content: space-around; flex: 1; gap: 8px; }
 .tr2 { display: grid; grid-template-columns: minmax(0, 1fr) auto 48px; gap: 6px 8px; align-items: center; font-size: 14px; }
 .tr2 > span:first-child { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.tbar2 { grid-column: 1 / -1; height: 6px; border-radius: 3px; background: rgba(236,236,238,.06); overflow: hidden; }
+.tbar2 { grid-column: 1 / -1; height: 6px; border-radius: 3px; background: var(--track); overflow: hidden; }
 .tbar2 i { display: block; height: 100%; border-radius: 3px; background: var(--sub); min-width: 2px; }
 .tbar2 i.bad { background: var(--stall); }
 .tr2 small { font-size: 12px; color: var(--sub); text-align: right; font-variant-numeric: tabular-nums; }
@@ -207,17 +202,17 @@ aside { background: var(--side); border-right: 1px solid var(--line); display: f
 .tab.p-off.sc-tab::before { opacity: .4; }
 .av.ag-claude svg { width: 72%; height: 72%; }
 .av.ag-codex svg { width: 60%; height: 60%; }
-.av.nav-dash { color: var(--info); background: rgba(108,140,255,.16); }
-.av.nav-sp { color: var(--done); background: rgba(111,191,146,.14); font-weight: 600; }
+.av.nav-dash { color: var(--info); background: var(--info-soft); }
+.av.nav-sp { color: var(--done); background: var(--done-soft); font-weight: 600; }
 .av.sm { width: 34px; height: 34px; font-size: 12px; border-radius: 10px; }
 .si-m { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 .si-n { display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 500; white-space: nowrap; }
 .si-w { font-size: 12px; color: var(--sub); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .chip { font-style: normal; font-size: 11px; font-weight: 500; padding: 1px 8px; border-radius: 50px; }
-.chip.c-run { color: var(--run); background: rgba(240,181,69,.14); } .chip.c-wait { color: var(--wait); background: rgba(232,134,106,.16); } .chip.c-stall { color: var(--stall); background: rgba(217,100,91,.16); }
-.chip.c-idle, .chip.c-off { color: var(--sub); background: rgba(236,236,238,.07); }
+.chip.c-run { color: var(--run); background: var(--run-soft); } .chip.c-wait { color: var(--wait); background: var(--wait-soft); } .chip.c-stall { color: var(--stall); background: var(--stall-soft); }
+.chip.c-idle, .chip.c-off { color: var(--sub); background: var(--track); }
 .si-c { display: flex; flex-direction: column; gap: 4px; }
-.meter { height: 5px; border-radius: 3px; background: rgba(236,236,238,.07); overflow: hidden; }
+.meter { height: 5px; border-radius: 3px; background: var(--track); overflow: hidden; }
 .meter i { display: block; height: 100%; background: var(--info); border-radius: 3px; }
 .meter i.ctx-run { background: var(--run); } .meter i.ctx-stall { background: var(--stall); }
 .ctx-run, .stats .ctx-run b { color: var(--run); } .ctx-stall, .stats .ctx-stall b { color: var(--stall); }
@@ -238,7 +233,7 @@ aside { background: var(--side); border-right: 1px solid var(--line); display: f
 .pc { display: grid; grid-template-columns: 120px minmax(0, 1fr) 48px; gap: 12px; align-items: center; font-size: 14px; }
 .pc > span { color: var(--sub); }
 .pc > b { font-size: 18px; font-weight: 700; text-align: right; font-variant-numeric: tabular-nums; }
-.pbar { position: relative; height: 10px; border-radius: 5px; background: rgba(236,236,238,.07); }
+.pbar { position: relative; height: 10px; border-radius: 5px; background: var(--track); }
 .pbar i { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 5px; }
 .pbar i.t { background: var(--info); } .pbar i.w { background: var(--done); }
 .pbar s { position: absolute; top: -4px; bottom: -4px; width: 2px; background: var(--ink); border-radius: 1px; }
@@ -249,7 +244,7 @@ aside { background: var(--side); border-right: 1px solid var(--line); display: f
 .tm-n { white-space: nowrap; }
 .stack { display: flex; height: 12px; border-radius: 6px; overflow: hidden; gap: 2px; min-width: 6px; }
 .stack i { display: block; min-width: 0; }
-.stack .d, .lg .d { background: var(--done); } .stack .i, .lg .i { background: var(--run); } .stack .n, .lg .n { background: #5a5d64; }
+.stack .d, .lg .d { background: var(--done); } .stack .i, .lg .i { background: var(--run); } .stack .n, .lg .n { background: var(--off); }
 .tm-v { font-size: 13px; color: var(--sub); white-space: nowrap; font-variant-numeric: tabular-nums; }
 .tm-v b { font-size: 15px; color: var(--ink); margin-right: 6px; }
 .lg { display: flex; gap: 16px; font-size: 12px; color: var(--sub); margin-top: 2px; }
@@ -268,7 +263,7 @@ aside { background: var(--side); border-right: 1px solid var(--line); display: f
 .ir-tags { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
 .ir-tags .tag { margin: 0; }
 .ir-st { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; }
-.chip.c-done { color: var(--done); background: rgba(111,191,146,.14); }
+.chip.c-done { color: var(--done); background: var(--done-soft); }
 .due { font-size: 12px; color: var(--sub); white-space: nowrap; } .due em { font-style: normal; color: var(--dim); margin-left: 6px; }
 .due.near { color: var(--run); } .due.over { color: var(--stall); }
 .ir-p { display: grid; grid-template-columns: 1fr; gap: 4px; }
@@ -379,9 +374,9 @@ aside { background: var(--side); border-right: 1px solid var(--line); display: f
 .wt { font-size: 15px; font-weight: 400; color: var(--sub); margin-left: 4px; }
 .req .ttl .meta { margin-left: auto; flex: none; color: var(--dim); font-size: 13px; white-space: nowrap; font-variant-numeric: tabular-nums; }
 .life { flex: none; font-size: 13px; font-weight: 500; line-height: 20px; border-radius: 6px; padding: 0 8px; border: 1px solid var(--line2); color: var(--sub); }
-.l-완료 { color: var(--done); border-color: rgba(111,191,146,.35); }
+.l-완료 { color: var(--done); border-color: var(--done-line); }
 .l-머지됨 { color: var(--ink); }
-.l-리뷰\ 대기, .l-후속\ 작업\ 중 { color: var(--run); border-color: rgba(240,181,69,.35); }
+.l-리뷰\ 대기, .l-후속\ 작업\ 중 { color: var(--run); border-color: var(--run-line); }
 .wmenu { position: relative; flex: none; }
 .wmenu summary { list-style: none; cursor: pointer; font-size: 13px; color: var(--dim); border: 1px solid var(--line); border-radius: 6px; padding: 0 8px; line-height: 22px; white-space: nowrap; }
 .wmenu summary::-webkit-details-marker { display: none; }
@@ -409,7 +404,7 @@ aside { background: var(--side); border-right: 1px solid var(--line); display: f
 .ch .l { font-size: 16px; font-weight: 500; }
 .col.done .ch, .col.now .ch, .col.wait .ch, .col.cut .ch { color: var(--ink); }
 .col.done .ch::before { content: "✓"; border-color: var(--done); color: var(--done); }
-.col.now .ch::before { border-color: var(--run); background: var(--run); color: #1b1408; }
+.col.now .ch::before { border-color: var(--run); background: var(--run); color: var(--on-primary); }
 .col.wait .ch::before { border-color: var(--wait); color: var(--wait); }
 .col.cut .ch::before { content: "!"; border-color: var(--stall); color: var(--stall); }
 .ch .tm { margin-left: auto; font-size: 13px; color: var(--dim); font-variant-numeric: tabular-nums; }
@@ -459,8 +454,8 @@ aside { background: var(--side); border-right: 1px solid var(--line); display: f
 .sn { flex: none; display: flex; align-items: center; gap: 8px; }
 .sn b { flex: none; width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center; font-size: 13px; font-weight: 500; border: 1px solid var(--done); color: var(--done); font-variant-numeric: tabular-nums; }
 .sn span { font-size: 13px; color: var(--dim); font-variant-numeric: tabular-nums; }
-.s-now { border-color: rgba(240,181,69,.4); }
-.s-now .sn b { border-color: var(--run); background: var(--run); color: #1b1408; }
+.s-now { border-color: var(--run-line); }
+.s-now .sn b { border-color: var(--run); background: var(--run); color: var(--on-primary); }
 .s-now .sn span { color: var(--run); }
 .s-cut .sn b { border-color: var(--stall); color: var(--stall); }
 .st { flex: none; font-size: 15px; font-weight: 500; line-height: 1.5; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
@@ -553,11 +548,10 @@ aside { background: var(--side); border-right: 1px solid var(--line); display: f
   .sh { flex-wrap: wrap; padding: 12px 16px; }
   .sb { padding: 4px 16px 24px; }
 }
-/* Workspace hierarchy. Colors follow the shared withvtm design system. */
-:root { --bg:#0c0e16; --side:#14171d; --panel:#14171d; --panel2:#1d222b; --hover:#171c2e; --line:#2c2c2c; --line2:#2c2c2c; --ink:#eeeeee; --sub:#b8b8b8; --dim:#a7a7a7; --run:#f6b72f; --wait:#e7526c; --stall:#e7526c; --done:#83dea9; --info:#308cf8; --primary:#4c6df1; }
+/* Workspace hierarchy. Color tokens come from the shared Huginn theme. */
 html,body { font-size:14px; }
 button,a,summary,select { -webkit-tap-highlight-color:transparent; }
-button:focus-visible,a:focus-visible,summary:focus-visible,select:focus-visible,input:focus-visible,textarea:focus-visible,[role="button"]:focus-visible { outline:2px solid var(--info); outline-offset:3px; }
+button:focus-visible,a:focus-visible,summary:focus-visible,select:focus-visible,input:focus-visible,textarea:focus-visible,[role="button"]:focus-visible { outline:2px solid var(--primary); outline-offset:3px; }
 button,a[href],summary,select,label:has(input[type="checkbox"]),input[type="checkbox"],[role="button"] { cursor:pointer; }
 button:disabled,select:disabled,input:disabled,textarea:disabled { cursor:not-allowed; }
 button:active:not(:disabled),summary:active { box-shadow:inset 0 0 0 1px currentColor; }
@@ -682,7 +676,7 @@ h1,h2,h3,p { margin-top:0; }
 .history-button { display:flex; align-items:center; justify-content:space-between; gap:12px; width:100%; border:1px solid var(--line); border-radius:12px; background:none; color:var(--sub); padding:16px; font-size:14px; }
 .history-button:hover { background:var(--panel); }
 .history-button span { display:flex; align-items:center; gap:8px; }
-.sheet-bg { position:fixed; inset:0; background:rgba(12,14,22,.6); z-index:4; }
+.sheet-bg { position:fixed; inset:0; background:var(--overlay); z-index:4; }
 .sheet { width:min(760px,85vw); box-shadow:none; }
 .sh button { display:inline-flex; align-items:center; gap:8px; flex:none; }
 .sh > b { flex-shrink:0; }
@@ -912,7 +906,7 @@ h1,h2,h3,p { margin-top:0; }
 .settings-switch > span { width:40px; height:24px; border:1px solid var(--dim); background:var(--panel2); border-radius:12px; }
 .settings-switch > span::after { content:""; display:block; width:14px; height:14px; margin:4px; background:var(--sub); border-radius:50%; }
 .settings-switch input:checked + span { border-color:var(--primary); background:var(--primary); }
-.settings-switch input:checked + span::after { transform:translateX(16px); background:var(--ink); }
+.settings-switch input:checked + span::after { transform:translateX(16px); background:var(--on-primary); }
 .settings-switch input:focus-visible + span { outline:2px solid var(--ink); outline-offset:3px; }
 .settings-switch:hover > span { border-color:var(--ink); }
 .settings-switch input:disabled + span { opacity:.5; }
@@ -1143,6 +1137,12 @@ h1,h2,h3,p { margin-top:0; }
  .progress-children summary { padding:8px 0; }
 }
 @media (max-width:580px) {
+ .bignum b { font-size:32px; }
+ .usage-charts .chart { height:220px; min-height:220px; }
+ .context-row { gap:16px; }
+ .context-now>p,.compact-changes .change-points li,.row-goal { display:block; -webkit-line-clamp:unset; }
+}
+
 
 .delegation-panel { padding:20px; }
 .delegation-heading,.delegated-row > summary { display:flex; align-items:center; justify-content:space-between; gap:12px; cursor:pointer; list-style:none; }
@@ -1168,19 +1168,13 @@ h1,h2,h3,p { margin-top:0; }
 .handoff-panel summary { cursor:pointer; color:var(--dim); font-size:12px; padding-bottom:8px; }
 @media(max-width:720px) { .delegation-pair { grid-template-columns:1fr; } .delegation-heading { flex-wrap:wrap; } .delegation-heading .quiet { margin-left:0; } }
 
- .bignum b { font-size:32px; }
- .usage-charts .chart { height:220px; min-height:220px; }
- .context-row { gap:16px; }
- .context-now>p,.compact-changes .change-points li,.row-goal { display:block; -webkit-line-clamp:unset; }
-}
-
 </style>
 </head>
 <body>
 <a class="skip-link" href="#main">본문으로</a>
 <div class="app">
   <aside aria-label="세션 탐색">
-    <div class="brand"><span class="brand-icon"><img src="/assets/brand.png" width="32" height="32" alt=""></span><div><strong>Forkrail</strong><small>AI 작업을 한눈에</small></div><button class="mobile-settings" data-open-settings aria-label="설정"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M7 1L9 1L9.5 3L10.5 3.5L12.5 2.5L13.5 3.5L12.5 5.5L13 6.5L15 7L15 9L13 9.5L12.5 10.5L13.5 12.5L12.5 13.5L10.5 12.5L9.5 13L9 15L7 15L6.5 13L5.5 12.5L3.5 13.5L2.5 12.5L3.5 10.5L3 9.5L1 9L1 7L3 6.5L3.5 5.5L2.5 3.5L3.5 2.5L5.5 3.5L6.5 3Z"/><circle cx="8" cy="8" r="2"/></svg></button><button class="mobile-menu" aria-expanded="false">메뉴</button></div>
+    <div class="brand"><span class="brand-icon"><img src="/assets/brand.png" width="32" height="32" alt=""></span><div><strong>Huginn</strong><small>AI 작업을 한눈에</small></div><button class="mobile-settings" data-open-settings aria-label="설정"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M7 1L9 1L9.5 3L10.5 3.5L12.5 2.5L13.5 3.5L12.5 5.5L13 6.5L15 7L15 9L13 9.5L12.5 10.5L13.5 12.5L12.5 13.5L10.5 12.5L9.5 13L9 15L7 15L6.5 13L5.5 12.5L3.5 13.5L2.5 12.5L3.5 10.5L3 9.5L1 9L1 7L3 6.5L3.5 5.5L2.5 3.5L3.5 2.5L5.5 3.5L6.5 3Z"/><circle cx="8" cy="8" r="2"/></svg></button><button class="mobile-menu" aria-expanded="false">메뉴</button></div>
     <div class="sum">
       <div class="w"><b id="n-wait">0</b><span>나를 기다림</span></div>
       <div class="r"><b id="n-run">0</b><span>작업 중</span></div>
@@ -1236,10 +1230,10 @@ const LOGO = {
   claude: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 2v20M2 12h20M5 5l14 14M5 19 19 5M8 3l8 18M3 8l18 8M3 16l18-8M8 21 16 3"/></svg>',
   codex: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"><path d="M7 18.5h10.2a4.3 4.3 0 00.6-8.6 6 6 0 00-11.5 1.4A3.6 3.6 0 007 18.5z"/><path d="M9.2 12.6l2 1.6-2 1.6M12.8 15.8h2.4"/></svg>',
 };
-const PAL = ["#d97757", "#6c8cff", "#b58cf0", "#4fc3c7", "#e48fb5", "#c9b458", "#7fc76a"];
+const PAL = ["var(--primary)", "var(--sub)", "var(--ink)"];
 let colorMap = null;
 function colorOf(s) {
-  if (phase(s) === "off") return "#7a7d84";
+  if (phase(s) === "off") return "var(--off)";
   if (!colorMap) { try { colorMap = JSON.parse(store.get("wb.colors") || "{}"); } catch (e) { colorMap = {}; } }
   if (!PAL.includes(colorMap[s.id])) {
     const used = new Set(data.sessions.filter(x => x.id !== s.id && phase(x) !== "off").map(x => colorMap[x.id]));
@@ -1735,7 +1729,7 @@ function panel(icon, tone, title, sub, body, cls, right = "") {
 function gauge(pct, big, small, tone) {
   const p = Math.max(0, Math.min(100, pct || 0));
   const R = 70, sweep = 270, C = 2 * Math.PI * R, arc = C * sweep / 360;
-  return `<div class="gauge"><svg viewBox="0 0 180 160"><g transform="rotate(135 90 90)"><circle cx="90" cy="90" r="${R}" fill="none" stroke="rgba(236,236,238,.07)" stroke-width="14" stroke-linecap="round" stroke-dasharray="${arc} ${C}"/><circle cx="90" cy="90" r="${R}" fill="none" stroke="var(--${tone})" stroke-width="14" stroke-linecap="round" stroke-dasharray="${Math.max(.01, arc * p / 100)} ${C}"/></g>
+  return `<div class="gauge"><svg viewBox="0 0 180 160"><g transform="rotate(135 90 90)"><circle cx="90" cy="90" r="${R}" fill="none" stroke="var(--track)" stroke-width="14" stroke-linecap="round" stroke-dasharray="${arc} ${C}"/><circle cx="90" cy="90" r="${R}" fill="none" stroke="var(--${tone})" stroke-width="14" stroke-linecap="round" stroke-dasharray="${Math.max(.01, arc * p / 100)} ${C}"/></g>
     <text x="90" y="92" text-anchor="middle" class="g-big">${big}</text><text x="90" y="116" text-anchor="middle" class="g-sm">${small}</text></svg></div>`;
 }
 const chartValue = n => n >= 1e9 ? (n / 1e9).toFixed(1).replace(/\.0$/, '')+'B' : n >= 1e6 ? (n / 1e6).toFixed(1).replace(/\.0$/, '')+'M' : n >= 1e3 ? (n / 1e3).toFixed(1).replace(/\.0$/, '')+'k' : num(n);
@@ -2030,6 +2024,12 @@ function rootSessions(list) {
 }
 function delegatedSessions(s) { return data.sessions.filter(c=>c.parent_id===s.id); }
 function displayPhase(s) {
+  const own=phase(s);
+  if(["run","wait","stall"].includes(own))return own;
+  const children=delegatedSessions(s).map(phase);
+  return ["wait","run","stall"].find(p=>children.includes(p)) || own;
+}
+function activeDelegates(W) { return delegatedSessions(W.s).filter(c=>(c.parent_work?c.parent_work===W.w.key:W.current) && ["run","wait","stall"].includes(phase(c))); }
 function nativePending(W) {
   const items=W.s.agents?.items;
   if(!items)return Boolean(W.current && W.s.agents?.running?.length);
@@ -2080,12 +2080,6 @@ function delegationBody(r) {
   return `<div class="delegation-content"><div class="delegation-meta"><span>${elapsed?`${terminal?'소요':'경과'} ${elapsed}`:'시작 시각 미확인'}</span>${r.last_ts?`<span>최근 기록 ${hm(r.last_ts)}</span>`:''}${child?.works?.length?`<button class="text-button" data-open-session="${esc(child.id)}" data-work="${child.works.length-1}">작업 열기 ${ARROW}</button>`:''}</div>${waiting}
     <div class="delegation-pair"><div><h3>위임한 지시</h3><pre>${esc(r.prompt || '지시문을 확인할 수 없습니다.')}</pre></div><div><h3>${r.result?'결과':'최근 활동'}</h3><pre>${esc(r.result || r.activity || (terminal?'결과 본문이 기록되지 않았습니다.':'아직 결과가 기록되지 않았습니다.'))}</pre></div></div></div>`;
 }
-  const own=phase(s);
-  if(["run","wait","stall"].includes(own))return own;
-  const children=delegatedSessions(s).map(phase);
-  return ["wait","run","stall"].find(p=>children.includes(p)) || own;
-}
-function activeDelegates(W) { return delegatedSessions(W.s).filter(c=>(c.parent_work?c.parent_work===W.w.key:W.current) && ["run","wait","stall"].includes(phase(c))); }
 function delegatedMarkup(W) {
   const rows=delegationRows(W);
   if(!rows.length)return '';
@@ -2096,13 +2090,13 @@ function delegatedMarkup(W) {
   }).join('')}</div></details>`;
 }
 function handoffMarkup(W) {
-
   const s=W.s;if(!s.parent_id)return '';
   const parent=data.sessions.find(p=>p.id===s.parent_id);
   const wi=parent?.works?.findIndex(w=>w.key===s.parent_work) ?? -1;
   const link=parent?`<button class="text-button" data-open-session="${esc(parent.id)}" data-work="${wi>=0?wi:Math.max(0,(parent.works?.length || 1)-1)}">부모 ${parent.agent==='codex'?'Codex':'Claude'} 작업으로 ${ARROW}</button>`:'<span class="quiet">부모 세션의 기록을 현재 확인할 수 없습니다.</span>';
   return `<div class="handoff-panel">${link}<details data-key="handoff-${esc(s.id)}"><summary>넘겨받은 지시 보기</summary><pre>${esc(s.handoff?.prompt || '원본 지시문을 확인할 수 없습니다.')}</pre></details></div>`;
 }
+
 function postCompletion(W) {
   const completed=Date.parse(W.info.resolved_at || "") / 1000;
   return Number.isFinite(completed) ? W.last.ts > completed : null;
@@ -2346,10 +2340,10 @@ function updatesView() {
     unpublished:['아직 게시된 릴리즈가 없습니다','배포 페이지에서 게시 여부를 확인한 뒤 다시 확인해 주세요.'],
     auth_required:['릴리즈 접근 권한이 필요합니다','이 컴퓨터의 GitHub CLI에서 접근 가능한 계정으로 로그인한 뒤 다시 확인해 주세요. 배포 페이지에서도 권한을 확인할 수 있습니다.'],
     downloading:['업데이트를 다운로드하고 있습니다','다운로드가 끝나면 파일 검증 후 설치 버튼이 표시됩니다.'],
-    ready:['업데이트를 설치할 준비가 됐습니다',macos?'DMG를 연 뒤 Forkrail을 종료하고, Forkrail.app을 Applications로 드래그해 교체하세요.':'설치를 누르면 확인 창과 운영체제 설치창이 열립니다.'],
-    installing:[macos?'DMG에서 앱을 교체해 주세요':'설치창에서 진행해 주세요',macos?'Forkrail을 종료하고 DMG의 Forkrail.app을 Applications로 드래그하세요. 교체 후 Applications에서 Forkrail을 다시 열면 현재 버전으로 확인할 수 있습니다.':'설치 완료 여부는 Forkrail을 다음 실행할 때 현재 버전으로 확인합니다. 설치를 취소했다면 다시 확인할 수 있습니다.'],
+    ready:['업데이트를 설치할 준비가 됐습니다',macos?'DMG를 연 뒤 Huginn을 종료하고, Huginn.app을 Applications로 드래그해 교체하세요.':'설치를 누르면 확인 창과 운영체제 설치창이 열립니다.'],
+    installing:[macos?'DMG에서 앱을 교체해 주세요':'설치창에서 진행해 주세요',macos?'Huginn을 종료하고 DMG의 Huginn.app을 Applications로 드래그하세요. 기존 Forkrail에서 이전했다면 Huginn 실행을 확인한 뒤 이전 앱과 Dock 아이콘을 제거하세요. 설정은 유지됩니다.':'설치 완료 여부는 Huginn을 다음 실행할 때 현재 버전으로 확인합니다. 설치를 취소했다면 다시 확인할 수 있습니다.'],
     error:['업데이트를 진행하지 못했습니다','연결이나 설치 파일 확인에 문제가 생겼습니다. 다시 확인해 주세요. 계속되면 배포 페이지에서 설치 파일을 확인할 수 있습니다.'],
-    unsupported:['Forkrail 설치본이 필요합니다','이 실행 환경에서는 앱 안에서 업데이트할 수 없습니다. 배포 페이지에서 이 컴퓨터에 맞는 설치본을 받아 주세요.']
+    unsupported:['Huginn 설치본이 필요합니다','이 실행 환경에서는 앱 안에서 업데이트할 수 없습니다. 배포 페이지에서 이 컴퓨터에 맞는 설치본을 받아 주세요.']
   };
   const [title,defaultDetail]=messages[status] || messages.error;
   // These native messages are intentionally fixed. Never show thrown errors or
@@ -2503,7 +2497,7 @@ async function boardAction(action,fields,sid=ui.sid===SETTINGS?(ui.actionContext
   ui.actionBusy=true;setActionMessage(sid,action==='launch'?'새 터미널 창을 여는 중입니다.':action==='deliver'?'스킬 실행을 요청하는 중입니다.':action==='connection_check'?'연결과 조회 권한을 확인하고 있습니다.':action==='connection_login'?'로그인 창을 여는 중입니다.':'');render();
   try {
     const catalog=await loadActionCatalog(sid);
-    if(!catalog?.token)throw new Error('Forkrail에 연결하지 못했습니다. 새로 고친 뒤 다시 시도해 주세요.');
+    if(!catalog?.token)throw new Error('Huginn에 연결하지 못했습니다. 새로 고친 뒤 다시 시도해 주세요.');
     const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),60000);
     let r,result;
     try {r=await fetch('/api/actions',{method:'POST',headers:{'Content-Type':'application/json','X-Work-Board-Token':catalog.token},body:JSON.stringify({action,sid,...fields}),signal:controller.signal});result=await r.json();}
@@ -2536,13 +2530,13 @@ function mainView(s) {
     <nav class="breadcrumbs" aria-label="현재 위치"><button data-home="1">작업 현황</button><span>/</span><span>${esc(label(s))}</span><button class="text-button diagnostic" data-info="1" aria-expanded="${ui.infoOpen}" aria-controls="session-inline">세션 정보</button></nav>
     <header class="task-heading"><div class="task-kicker">${badge(st)}<span class="quiet">${W.w.story ? esc(W.w.story) : esc(s.agent === "codex" ? "Codex" : "Claude")}</span></div><h1>${esc(workTitle(W))}</h1>${workGoal(W) !== workTitle(W) ? `<p class="task-goal">${esc(workGoal(W))}</p>` : ""}<div class="task-meta"><span class="card-owner">${agentAv(s)}${esc(label(s))}</span><span>세션 · ${PH[p]} · 최근 활동 ${span(now() - s.last_ts)} 전</span>${W.w.story && !s.parent_id ? `<span>Jira · ${esc(W.info.status || "상태 미확인")}</span>` : ""}${mergeControl(s,W)}</div></header>
     ${handoffMarkup(W)}
-      ${delegatedMarkup(W)}
     ${ui.infoOpen ? sessionInline(s) : ""}
     ${s.works.length > 1 ? `<div class="work-switch" role="group" aria-label="이 세션의 작업">${s.works.map((w,j) => `<button class="wchip${j===wi ? " sel" : ""}" data-wi="${j}" aria-pressed="${j===wi}">${esc(workName(w))}</button>`).reverse().join("")}</div>` : ""}
     ${actionToolbar(W)}
     <div class="task-layout"><div class="task-primary">
       <section class="focus-panel tone-${st.tone}"><div class="section-heading"><h2><span class="section-dot tone-${st.tone}"></span>${focus}</h2>${W.current && p === "wait" && waitOf(s) ? `<span>${esc(WAIT_KIND[waitOf(s).kind] || "응답 요청")}</span>` : ""}</div><p>${esc(workSummary(W))}</p>${W.current && p === "wait" ? `<div class="focus-help">${s.agent === "codex" ? "Codex" : "Claude"} 세션에서 응답해 주세요.</div>` : ""}<button class="text-button" data-stage="2">작업 상세 ${ARROW}</button></section>
       ${progressMarkup(W)}
+      ${delegatedMarkup(W)}
       ${plan ? `<section class="plan-panel"><div class="section-heading"><h2>${plan.previous ? "이전 요청에서 세운 계획" : "작업 계획"}</h2><button class="text-button" data-stage="0">계획 ${plan.items.length}개 보기</button></div><ol class="plan-list">${plan.items.slice(0,3).map((item,i) => `<li class="plan-${esc(plan.states?.[i] || 'pending')}"><span>${plan.states?.[i]==='done'?CHECK:i+1}</span><p>${esc(item)}</p></li>`).join("")}</ol>${plan.items.length > 3 ? `<p class="quiet plan-more">외 ${plan.items.length-3}개 항목</p>` : ""}</section>` : ''}
     </div><div class="task-secondary">
       <div class="task-changes">${changesMarkup(W)}</div>
@@ -2668,7 +2662,7 @@ function contextRow(entry) {
 }
 function overview() {
   const sources=connectionRows();
-  if(!data.sessions.length && sources.length && !sources.some(row=>['claude','codex'].includes(row.kind) && row.values.enabled))return `<div class="workspace-page settings-page" data-key="connection-onboarding"><header class="task-heading"><h1>Forkrail에 작업 연결하기</h1><p>Claude와 Codex의 작업을 한눈에 확인하세요. 가져올 기록은 직접 선택합니다.</p></header>${connectionSetup()}</div>`;
+  if(!data.sessions.length && sources.length && !sources.some(row=>['claude','codex'].includes(row.kind) && row.values.enabled))return `<div class="workspace-page settings-page" data-key="connection-onboarding"><header class="task-heading"><h1>Huginn에 작업 연결하기</h1><p>Claude와 Codex의 작업을 한눈에 확인하세요. 가져올 기록은 직접 선택합니다.</p></header>${connectionSetup()}</div>`;
   const entries=boardEntries(), active=entries.filter(e=>e.kind!=="off"), attention=active.filter(e=>["wait","stall"].includes(e.kind)), running=active.filter(e=>e.kind==="run");
   const visible=ui.filter==="attention"?attention:ui.filter==="run"?running:active;
   const recent=entries.filter(e=>e.kind==="off" && (e.W.last.outcome==="완료" || e.W.life==="완료" || e.W.mrs.length || e.W.commits.length || e.W.files.length)).sort((a,b)=>b.W.endTs-a.W.endTs);
@@ -2718,7 +2712,7 @@ function render(force=false) {
   const list = data.sessions;
   const cnt = p => rootSessions(list).filter(s => !isHidden(s) && displayPhase(s) === p).length;
   document.getElementById("n-wait").textContent = cnt("wait");
-  document.title = cnt("wait") ? `(${cnt("wait")}) Forkrail` : "Forkrail";
+  document.title = cnt("wait") ? `(${cnt("wait")}) Huginn` : "Huginn";
   document.getElementById("n-run").textContent = cnt("run");
   document.getElementById("n-stall").textContent = cnt("stall");
   if (ui.sid !== BOARD && ui.sid !== SPRINT && ui.sid !== DASH && ui.sid !== SETTINGS && !list.some(s => s.id === ui.sid)) {
@@ -2956,7 +2950,7 @@ async function refresh() {
     lastKey = "";
     for (const id of ["n-wait", "n-run", "n-stall"]) document.getElementById(id).textContent = "–";
     document.getElementById("tabs").innerHTML = "";
-    document.getElementById("main").innerHTML = `<div class="empty" role="alert"><h1>Forkrail에 연결할 수 없습니다</h1><p>3초마다 다시 연결합니다. 계속 표시되면 Forkrail 서비스가 실행 중인지 확인해 주세요.</p><button class="text-button" data-retry>지금 다시 연결</button></div>`;
+    document.getElementById("main").innerHTML = `<div class="empty" role="alert"><h1>Huginn에 연결할 수 없습니다</h1><p>3초마다 다시 연결합니다. 계속 표시되면 Huginn 서비스가 실행 중인지 확인해 주세요.</p><button class="text-button" data-retry>지금 다시 연결</button></div>`;
   }
 }
 

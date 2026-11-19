@@ -128,6 +128,30 @@ func TestProxyRejectsUnknownAndAlternateRoutes(t *testing.T) {
 	}
 }
 
+func TestProxyServesSharedTheme(t *testing.T) {
+	const stylesheet = ":root { --bg: #171714; --primary: #c6a766; }"
+	backend := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/assets/theme.css" {
+			t.Errorf("unexpected stylesheet path: %s", r.URL.Path)
+		}
+		w.Header().Set("Content-Type", "text/css; charset=utf-8")
+		io.WriteString(w, stylesheet)
+	}))
+	defer backend.Close()
+	target, _ := url.Parse(backend.URL)
+	for _, origin := range []string{"wails://wails", "http://wails.localhost"} {
+		t.Run(origin, func(t *testing.T) {
+			proxy := fixtureProxy(t, target, origin)
+			result := httptest.NewRecorder()
+			proxy.ServeHTTP(result, httptest.NewRequest(http.MethodGet, "/assets/theme.css", nil))
+			if result.Code != http.StatusOK || result.Body.String() != stylesheet ||
+				!strings.HasPrefix(result.Header().Get("Content-Type"), "text/css") {
+				t.Fatalf("shared theme unavailable: status=%d type=%q body=%q", result.Code, result.Header().Get("Content-Type"), result.Body)
+			}
+		})
+	}
+}
+
 func fixtureProxy(t *testing.T, target *url.URL, origin string) http.Handler {
 	t.Helper()
 	port, err := strconv.Atoi(target.Port())

@@ -1,11 +1,17 @@
-(async (version) => {
+(async (version, appName) => {
   const record = window.go?.main?.UISmoke?.Report;
   if (!record) return;
 
   try {
-    if (document.title !== "Forkrail" || !document.querySelector("#main")) {
+    if (document.title !== appName || !document.querySelector("#main")) {
       const error = document.querySelector("#forkrail-start-error")?.textContent?.trim();
-      throw new Error(error || "Forkrail board DOM is missing");
+      throw new Error(error || appName + " board DOM is missing");
+    }
+
+    const themeResponse = await fetch("/assets/theme.css", { cache: "no-store" });
+    if (!themeResponse.ok || !themeResponse.headers.get("content-type")?.includes("text/css") ||
+        !getComputedStyle(document.documentElement).getPropertyValue("--primary").trim()) {
+      throw new Error("Bundled shared theme is missing or not applied");
     }
 
     const healthResponse = await fetch("/api/health", { cache: "no-store" });

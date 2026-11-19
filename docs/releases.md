@@ -1,12 +1,12 @@
-# Forkrail 릴리즈 가이드
+# Huginn 릴리즈 가이드
 
-설치 후보를 만든 뒤 실제 동작을 검증하고, 서명·공증을 거쳐 GitHub에 배포하는 절차입니다. 버전·지원 대상·GitHub 배포 저장소는 `release.json`에서 관리합니다. HyperWarp 설치본에서 확인한 Wails·OS WebView 구조를 참고했으며, 아래 빌드 시스템은 Forkrail용으로 구성했습니다.
+설치 후보를 만든 뒤 실제 동작을 검증하고, 서명·공증을 거쳐 GitHub에 배포하는 절차입니다. 버전·지원 대상·GitHub 배포 저장소는 `release.json`에서 관리합니다. HyperWarp 설치본에서 확인한 Wails·OS WebView 구조를 참고했으며, 아래 빌드 시스템은 Huginn용으로 구성했습니다.
 
 ## 앱에서 업데이트
 
 설정의 **앱 업데이트**에서 현재 설치 버전을 확인하고 **새 버전 확인 → 업데이트 다운로드 → 업데이트 설치** 순서로 진행합니다. 설치 파일은 현재 OS·CPU에 맞춰 선택하며, 내려받은 배포 정보와 SHA-256이 일치해야 설치할 수 있습니다. 정식 설치본은 정식 릴리즈만, 시험 버전은 시험 릴리즈도 확인합니다. draft는 업데이트 목록에 포함하지 않습니다.
 
-설치 직전 앱의 확인창에서 취소하면 현재 앱을 계속 사용할 수 있습니다. Mac에서 확인하면 DMG를 열고 앱을 종료합니다. Forkrail 아이콘을 Applications로 드래그해 기존 앱을 교체합니다. Windows에서는 설치 프로그램을 열고 앱을 종료합니다. 두 경우 모두 앱이 시작한 서비스만 종료합니다. 설치 화면을 열었다고 설치 완료로 표시하지 않으며, 다음 실행의 현재 버전으로 결과를 확인합니다. 별도로 실행한 서비스가 Windows 설치 폴더의 파일을 사용 중이면 해당 서비스를 종료한 뒤 다시 설치해야 합니다. 설치 파일의 서명 여부는 배포 정보이며, 실제 OS 서명·보안 확인을 생략하지 않습니다.
+설치 직전 앱의 확인창에서 취소하면 현재 앱을 계속 사용할 수 있습니다. Mac에서 확인하면 DMG를 열고 앱을 종료합니다. Huginn 아이콘을 Applications로 드래그해 기존 앱을 교체합니다. Windows에서는 설치 프로그램을 열고 앱을 종료합니다. 두 경우 모두 앱이 시작한 서비스만 종료합니다. 설치 화면을 열었다고 설치 완료로 표시하지 않으며, 다음 실행의 현재 버전으로 결과를 확인합니다. 별도로 실행한 서비스가 Windows 설치 폴더의 파일을 사용 중이면 해당 서비스를 종료한 뒤 다시 설치해야 합니다. 설치 파일의 서명 여부는 배포 정보이며, 실제 OS 서명·보안 확인을 생략하지 않습니다.
 
 현재 비공개 저장소는 해당 저장소에 접근할 수 있는 GitHub CLI 로그인이 필요합니다. 기존 `gh` 로그인을 사용하며 앱에 토큰을 별도로 저장하지 않습니다. 공개 저장소는 로그인 없이 확인할 수 있습니다. 릴리즈가 아직 없거나 접근할 수 없으면 그 이유를 설정에 표시합니다. GitHub Actions의 설치 후보는 게시된 릴리즈가 아니므로 앱 업데이트 대상으로 표시되지 않습니다.
 
@@ -38,7 +38,7 @@ python -m venv .release-venv
 # .release-venv\Scripts\python.exe scripts/build_release.py
 ```
 
-현재 OS·CPU에 맞는 패키지가 `dist/<대상>/`에 생성됩니다. 빌드는 이 대상의 이전 생성물을 교체하므로, 보관할 후보는 다른 폴더로 복사하세요. 실행 중인 기존 Forkrail 앱·서버를 설치하거나 교체하지 않습니다.
+현재 OS·CPU에 맞는 패키지가 `dist/<대상>/`에 생성됩니다. 빌드는 이 대상의 이전 생성물을 교체하므로, 보관할 후보는 다른 폴더로 복사하세요. 실행 중인 기존 Huginn 앱·서버를 설치하거나 교체하지 않습니다.
 
 검증 예:
 
@@ -96,9 +96,9 @@ Windows는 `WINDOWS_CERTIFICATE_BASE64`, `WINDOWS_CERTIFICATE_PASSWORD` secrets�
 
 ## Mac 설치 창
 
-`packaging/macos`의 배경과 `scripts/create_dmg.py`의 Finder 배치로 설치 화면을 재현합니다. 원본 Signal 아이콘을 유지하고, Forkrail.app과 Applications 연결을 표시합니다. 배포 이미지는 압축된 읽기 전용 DMG이며 개인 작업 폴더·연결 설정·대화·계정 정보는 포함하지 않습니다.
+`packaging/macos`의 배경과 `scripts/create_dmg.py`의 Finder 배치로 설치 화면을 재현합니다. 새 까마귀 원본 아이콘을 사용하고, Huginn.app과 Applications 연결을 표시합니다. 배포 이미지는 압축된 읽기 전용 DMG이며 개인 작업 폴더·연결 설정·대화·계정 정보는 포함하지 않습니다.
 
-새 설치에서는 연결을 직접 선택합니다. 기존 Forkrail 설정을 이전하지 않는 한 작업 폴더·산출물 폴더·Jira·GitLab은 비어 있고 AI 기록 연결과 요약도 꺼져 있습니다. Claude·Codex 자체를 초기화할 필요가 없습니다.
+새 설치에서는 연결을 직접 선택합니다. 기존 Huginn 설정을 이전하지 않는 한 작업 폴더·산출물 폴더·Jira·GitLab은 비어 있고 AI 기록 연결과 요약도 꺼져 있습니다. Claude·Codex 자체를 초기화할 필요가 없습니다.
 
 ## 기존 소스 실행에서 설치본으로 이전
 
@@ -109,7 +109,7 @@ Windows는 `WINDOWS_CERTIFICATE_BASE64`, `WINDOWS_CERTIFICATE_PASSWORD` secrets�
 Mac:
 
 ```sh
-'/Applications/Forkrail.app/Contents/Resources/service/forkrail-service' migrate \
+'/Applications/Huginn.app/Contents/Resources/service/forkrail-service' migrate \
   --from '<기존 보드 폴더>' \
   --data-dir "$HOME/Library/Application Support/Forkrail"
 ```
@@ -133,3 +133,7 @@ SQLite의 backup 기능으로 DB를 복사하고 연결·바로가기·앱 설�
 마지막 실행의 실제 통과 여부는 Actions 결과와 `smoke-result.json`을 확인합니다. 구성 파일이 존재한다는 이유만으로 Windows 설치 검증·서명·공증이 끝났다고 보지 않습니다.
 
 참고: [Apple 배포 패키징](https://developer.apple.com/documentation/xcode/packaging-mac-software-for-distribution) · [DMG 서명 검증](https://developer.apple.com/library/archive/technotes/tn2206/) · [Wails 설치 환경](https://v2.wails.io/docs/gettingstarted/installation/) · [PyInstaller의 OS별 빌드](https://www.pyinstaller.org/en/stable/) · [Microsoft WebView2 배포](https://learn.microsoft.com/microsoft-edge/webview2/concepts/distribution) · [GitHub 러너](https://docs.github.com/en/actions/reference/runners/github-hosted-runners)
+
+## Huginn 이름 변경
+
+1.2.0-rc.4부터 앱과 설치 화면에는 Huginn을 표시합니다. 기존 설치본에서 업데이트를 찾을 수 있도록 배포 파일의 Forkrail- 접두사, 내부 실행 파일 이름, 서비스 API 식별자, 앱 bundle ID, 데이터 경로와 GitHub 저장소 주소는 유지합니다. `release.json`의 `name`은 호환 식별자이고 `display_name`이 제품 표시 이름입니다. macOS 설치 파일에는 Huginn.app이 들어 있습니다. 이전 Forkrail.app은 자동 삭제하지 않으며, Huginn 실행을 확인한 뒤 사용자가 이전 앱 파일만 제거할 수 있습니다. 사용자 설정과 대화는 별도 데이터 경로를 계속 사용합니다.

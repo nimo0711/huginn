@@ -24,7 +24,8 @@ import (
 	wailsruntime "github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
-const appName = "Forkrail"
+const appName = "Huginn"
+const productID = "Forkrail"
 const bundleID = "app.forkrail.desktop"
 
 // scripts/build_release.py supplies the full version from release.json.
@@ -33,7 +34,10 @@ var releaseVersion = "1.2.0-rc.1"
 //go:embed failure.html
 var failureHTML string
 
-var serviceFailurePage = template.Must(template.New("service failure").Parse(failureHTML))
+//go:embed theme.css
+var themeCSS string
+
+var serviceFailurePage = template.Must(template.Must(template.New("service failure").Parse(failureHTML)).New("theme").Parse(themeCSS))
 
 type desktopApp struct {
 	config     serviceConfig
@@ -145,15 +149,15 @@ func defaultDataDir() (string, error) {
 	}
 	switch goruntime.GOOS {
 	case "darwin":
-		return filepath.Join(home, "Library", "Application Support", appName), nil
+		return filepath.Join(home, "Library", "Application Support", productID), nil
 	case "windows":
 		local := os.Getenv("LOCALAPPDATA")
 		if local == "" {
 			local = filepath.Join(home, "AppData", "Local")
 		}
-		return filepath.Join(local, appName), nil
+		return filepath.Join(local, productID), nil
 	default:
-		return filepath.Join(home, ".local", "share", appName), nil
+		return filepath.Join(home, ".local", "share", productID), nil
 	}
 }
 
@@ -169,7 +173,7 @@ func runDesktop(config serviceConfig, smoke *UISmoke, smokeRoot string) error {
 
 	opts := &options.App{
 		Title: appName, Width: 1180, Height: 860, MinWidth: 420, MinHeight: 400,
-		BackgroundColour: options.NewRGB(0x0c, 0x0e, 0x16),
+		BackgroundColour: options.NewRGB(0x17, 0x17, 0x14), // Matches --bg in theme.css.
 		AssetServer:      &assetserver.Options{Handler: app},
 		Menu:             app.menu(),
 		Mac:              &mac.Options{Appearance: mac.NSAppearanceNameDarkAqua},
@@ -232,10 +236,10 @@ func (app *desktopApp) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		w.Header().Set("Cache-Control", "no-store")
 		w.Header().Set("Content-Security-Policy", "frame-ancestors 'none'; object-src 'none'; base-uri 'none'")
-		_ = serviceFailurePage.Execute(w, app.startErr.Error())
+		_ = serviceFailurePage.ExecuteTemplate(w, "service failure", app.startErr.Error())
 		return
 	}
-	http.Error(w, "Forkrail 서비스를 시작할 수 없습니다.", http.StatusServiceUnavailable)
+	http.Error(w, "Huginn 서비스를 시작할 수 없습니다.", http.StatusServiceUnavailable)
 }
 
 func (app *desktopApp) close() {
@@ -261,16 +265,16 @@ func (app *desktopApp) confirmUpdateInstall(state UpdateState) (bool, error) {
 		signature = "운영체제에서 설치 파일의 서명을 확인했습니다."
 	}
 	button := "설치창 열기"
-	message := "Forkrail " + state.LatestVersion + " 설치창을 여시겠습니까?\n\n" + signature +
+	message := "Huginn " + state.LatestVersion + " 설치창을 여시겠습니까?\n\n" + signature +
 		"\n\n설치창을 열면 이 앱을 종료합니다. 별도로 실행한 서비스는 종료하지 않습니다. 설치 후 앱을 다시 실행해 주세요."
 	if state.OS == "macos" {
 		button = "DMG 열기"
-		message = "Forkrail " + state.LatestVersion + " DMG를 여시겠습니까?\n\n" + signature +
-			"\n\nDMG를 열면 이 앱을 종료합니다. 종료된 뒤 Forkrail을 Applications로 끌어다 놓고 기존 앱을 교체해 주세요. Applications에서 Forkrail을 다시 실행하면 업데이트가 적용됩니다. 별도로 실행한 서비스는 종료하지 않습니다."
+		message = "Huginn " + state.LatestVersion + " DMG를 여시겠습니까?\n\n" + signature +
+			"\n\nDMG를 열면 이 앱을 종료합니다. 종료된 뒤 Huginn을 Applications로 끌어다 놓고 기존 앱을 교체해 주세요. Applications에서 Huginn을 다시 실행하면 업데이트가 적용됩니다. 기존 Forkrail에서 이전했다면 Huginn 실행을 확인한 뒤 이전 앱과 Dock 아이콘을 제거하세요. 설정은 유지됩니다. 별도로 실행한 서비스는 종료하지 않습니다."
 	}
 	answer, err := wailsruntime.MessageDialog(ctx, wailsruntime.MessageDialogOptions{
 		Type:    wailsruntime.QuestionDialog,
-		Title:   "Forkrail 업데이트 설치",
+		Title:   "Huginn 업데이트 설치",
 		Message: message,
 		Buttons: []string{button, "취소"}, DefaultButton: "취소", CancelButton: "취소",
 	})
@@ -310,7 +314,7 @@ func (app *desktopApp) menu() *menu.Menu {
 		result.Append(menu.EditMenu())
 	} else {
 		file := result.AddSubmenu("파일")
-		file.AddText("Forkrail 종료", keys.CmdOrCtrl("q"), func(*menu.CallbackData) {
+		file.AddText("Huginn 종료", keys.CmdOrCtrl("q"), func(*menu.CallbackData) {
 			app.withRuntime(wailsruntime.Quit)
 		})
 	}

@@ -18,6 +18,7 @@ SOURCE_FILES = (
     'blocks.py', 'progress.py', 'delegation.py', 'title_summary.py',
     'wbcore.py', 'actions_cli.py', 'claude_hook.py', 'install_claude_hooks.py', 'wb',
     'index.html', 'stories.html', 'AGENT_GUIDE.md', 'release.json',
+    'desktop/theme.css',
     'app/brand.json', 'app/assets/forkrail-icon.png', 'app/assets/forkrail-icon-web.png',
 )
 TARGETS = {'macos-arm64': ('darwin','arm64'), 'macos-x86_64': ('darwin','amd64'),

@@ -3,7 +3,7 @@ import WebKit
 import UserNotifications
 
 let boardURL = URL(string: "http://127.0.0.1:8790/")!
-let appName = Bundle.main.object(forInfoDictionaryKey: "CFBundleDisplayName") as? String ?? "Forkrail"
+let appName = Bundle.main.object(forInfoDictionaryKey: "CFBundleDisplayName") as? String ?? "Huginn"
 
 final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKUIDelegate, UNUserNotificationCenterDelegate {
     var window: NSWindow!
@@ -26,6 +26,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
             styleMask: [.titled, .closable, .miniaturizable, .resizable],
             backing: .buffered, defer: false)
         window.title = appName
+        window.backgroundColor = NSColor(srgbRed: 23/255, green: 23/255, blue: 20/255, alpha: 1)
         window.isReleasedWhenClosed = false
         window.minSize = NSSize(width: 420, height: 400)
         window.contentView = web
@@ -45,7 +46,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
     func scheduleRetry() {
         retry?.invalidate()
         let html = """
-        <html><body style="font:16px -apple-system;color:#888;display:flex;align-items:center;justify-content:center;height:100vh;margin:0">
+        <html><body style="font:16px -apple-system;color:#c4bcad;background:#171714;display:flex;align-items:center;justify-content:center;height:100vh;margin:0">
         \(appName) 서비스에 연결하는 중…</body></html>
         """
         web.loadHTMLString(html, baseURL: nil)

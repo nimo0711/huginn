@@ -2,7 +2,7 @@
 
 소스에서 실행할 때는 저장소의 `wb` 명령을 사용합니다. 설치 앱에는 Python 없이 동작하는 같은 명령이 포함됩니다.
 
-- macOS 설치 앱: `"/Applications/Forkrail.app/Contents/Resources/service/forkrail-service" wb`
+- macOS 설치 앱: `"/Applications/Huginn.app/Contents/Resources/service/forkrail-service" wb`
 - Windows 설치 앱(PowerShell): `& "$env:LOCALAPPDATA\Programs\Forkrail\service\forkrail-service.exe" wb`
 - ZIP을 다른 폴더에 풀었거나 설치 위치를 바꾸었다면 해당 폴더의 `service` 실행 파일 경로를 사용합니다.
 

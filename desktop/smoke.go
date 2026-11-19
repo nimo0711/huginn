@@ -89,7 +89,8 @@ func (s *UISmoke) startWatchdog(ctx context.Context) {
 func (s *UISmoke) renderProbe(ctx context.Context, version string) {
 	s.probe.Do(func() {
 		serialized, _ := json.Marshal(version)
-		wailsruntime.WindowExecJS(ctx, smokeScript+"("+string(serialized)+");")
+		name, _ := json.Marshal(appName)
+		wailsruntime.WindowExecJS(ctx, smokeScript+"("+string(serialized)+","+string(name)+");")
 	})
 }
 

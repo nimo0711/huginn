@@ -78,13 +78,13 @@ def mounted_disk_image(image, folder):
 
 def smoke_mac_disk_image(image, bundle_id, env, folder):
     from create_dmg import verify_layout
-    installed=folder/'Applications/Forkrail.app'
+    installed=folder/'Applications/Huginn.app'
     installed.parent.mkdir()
     with mounted_disk_image(image,folder) as mount:
         layout=verify_layout(mount)
-        source=mount/'Forkrail.app'
+        source=mount/'Huginn.app'
         if source.is_symlink() or not source.is_dir():
-            raise ValueError('DMG must contain the actual Forkrail.app')
+            raise ValueError('DMG must contain the actual Huginn.app')
         # Finder drag installation copies the whole app bundle. Use the same
         # metadata-preserving copy without touching the developer's Applications.
         run(['/usr/bin/ditto',source,installed])
@@ -250,7 +250,7 @@ def main():
         portable = folder / 'portable'
         if args.target.startswith('macos'):
             run(['/usr/bin/ditto', '-x', '-k', archive, portable])
-            result['portable'] = smoke_mac_app(portable / 'Forkrail.app', release['bundle_id'], env, folder)
+            result['portable'] = smoke_mac_app(portable / 'Huginn.app', release['bundle_id'], env, folder)
 
             image=output/(name+'.dmg')
             result['app'],result['disk_image']=smoke_mac_disk_image(image,release['bundle_id'],env,folder)
