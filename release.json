@@ -1,6 +1,6 @@
 {
   "name": "Huginn",
-  "version": "1.2.0-rc.5",
+  "version": "1.2.0-rc.6",
   "package_version": "1.2.0",
   "bundle_id": "app.huginn.desktop",
   "repository": "nimo0711/huginn",
