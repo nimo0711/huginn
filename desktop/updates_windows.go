@@ -7,6 +7,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"syscall"
 )
 
 func markInstallerOrigin(path, source string) error {
@@ -44,16 +45,13 @@ func verifyInstallerSignature(ctx context.Context, path string, required bool) (
 	}
 	return false, errUpdateInvalid
 }
-func launchUpdateInstaller(path string) error {
-	verb, err := windows.UTF16PtrFromString("open")
-	if err != nil {
+func launchUpdateInstaller(path, _ string) error {
+	command := exec.Command(path, "/S", "/RELAUNCH")
+	command.SysProcAttr = &syscall.SysProcAttr{CreationFlags: windows.DETACHED_PROCESS | windows.CREATE_NEW_PROCESS_GROUP}
+	if err := command.Start(); err != nil {
 		return err
 	}
-	file, err := windows.UTF16PtrFromString(path)
-	if err != nil {
-		return err
-	}
-	// ShellExecute invokes the installer's normal UAC/SmartScreen path. No silent
-	// parameters, elevation bypass, temporary script or process tree termination.
-	return windows.ShellExecute(0, verb, file, nil, nil, windows.SW_SHOWNORMAL)
+	return command.Process.Release()
 }
+
+func applyStagedUpdate(string, string, int) error { return errUpdateInvalid }

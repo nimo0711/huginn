@@ -2348,8 +2348,8 @@ function updatesView() {
     unpublished:['아직 게시된 릴리즈가 없습니다','배포 페이지에서 게시 여부를 확인한 뒤 다시 확인해 주세요.'],
     auth_required:['릴리즈 접근 권한이 필요합니다','이 컴퓨터의 GitHub CLI에서 접근 가능한 계정으로 로그인한 뒤 다시 확인해 주세요. 배포 페이지에서도 권한을 확인할 수 있습니다.'],
     downloading:['업데이트를 다운로드하고 있습니다','다운로드가 끝나면 파일 검증 후 설치 버튼이 표시됩니다.'],
-    ready:['업데이트를 설치할 준비가 됐습니다',macos?'DMG를 연 뒤 Huginn을 종료하고, Huginn.app을 Applications로 드래그해 교체하세요.':'설치를 누르면 확인 창과 운영체제 설치창이 열립니다.'],
-    installing:[macos?'DMG에서 앱을 교체해 주세요':'설치창에서 진행해 주세요',macos?'Huginn을 종료하고 DMG의 Huginn.app을 Applications로 드래그하세요. 기존 Forkrail에서 이전했다면 Huginn 실행을 확인한 뒤 이전 앱과 Dock 아이콘을 제거하세요. 설정은 유지됩니다.':'설치 완료 여부는 Huginn을 다음 실행할 때 현재 버전으로 확인합니다. 설치를 취소했다면 다시 확인할 수 있습니다.'],
+    ready:['업데이트를 설치할 준비가 됐습니다','설치를 누르면 Huginn을 종료하고 새 버전으로 바꾼 뒤 다시 시작합니다.'],
+    installing:['새 버전으로 바꾸고 있습니다','잠시 후 Huginn이 새 버전으로 다시 시작합니다. 설정과 기록은 유지됩니다.'],
     error:['업데이트를 진행하지 못했습니다','연결이나 설치 파일 확인에 문제가 생겼습니다. 다시 확인해 주세요. 계속되면 배포 페이지에서 설치 파일을 확인할 수 있습니다.'],
     unsupported:['Huginn 설치본이 필요합니다','이 실행 환경에서는 앱 안에서 업데이트할 수 없습니다. 배포 페이지에서 이 컴퓨터에 맞는 설치본을 받아 주세요.']
   };
@@ -2361,8 +2361,7 @@ function updatesView() {
     '업데이트를 처리하지 못했습니다. 네트워크 연결을 확인한 뒤 다시 시도해 주세요.',
     '업데이트 작업이 취소되었습니다.',
     '설치를 취소했습니다. 다운로드한 파일은 다시 설치할 수 있습니다.',
-    'OS 설치창을 열지 못했거나 실행을 취소했습니다. 다시 시도해 주세요.',
-    'DMG를 열지 못했거나 실행을 취소했습니다. 다시 시도해 주세요.'
+    '업데이트 설치를 시작하지 못했습니다. 다시 시도해 주세요.'
   ];
   const detail=['error','ready'].includes(status) && safeDetails.includes(state.message)?state.message:defaultDetail;
   const bytes=Number(state.downloaded_bytes),total=Number(state.total_bytes),known=Number.isFinite(total) && total>0;
@@ -2372,11 +2371,11 @@ function updatesView() {
   return `<section class="result-panel" data-key="app-updates"><div class="section-heading"><div><h2>앱 업데이트</h2><p class="quiet">현재 버전 ${esc(version)} · ${esc(os)}${cpu?` · ${esc(cpu)}`:''}</p></div></div>
   <div class="settings-form-section"><div><h3>${esc(title)}</h3>${state.latest_version?`<p>배포 버전 ${esc(state.latest_version)}</p>`:''}</div><div><p role="status" aria-live="polite">${esc(detail)}</p>
   ${status==='downloading'?`<progress class="update-progress" aria-label="업데이트 다운로드 진행률" max="100"${known?` value="${percent}"`:''}></progress><p class="quiet">${known?`${percent}%`:'다운로드 크기 확인 중'}</p>`:''}
-  ${status==='ready'?`<p class="quiet">${state.signed?'배포 정보에 서명된 파일로 표시돼 있습니다. 설치 시 운영체제에서 확인합니다.':'서명되지 않은 배포 파일입니다. 설치 시 운영체제의 보안 확인이 필요할 수 있습니다.'}</p>`:''}</div></div>
+  ${status==='ready'?`<p class="quiet">${state.signed?'배포 정보에 서명된 파일로 표시돼 있습니다. 설치 시 운영체제에서 확인합니다.':'서명되지 않은 배포 파일입니다. 체크섬과 배포 정보를 확인한 파일만 설치합니다.'}</p>`:''}</div></div>
   <div class="settings-form-footer"><div class="action-buttons">
   ${available?`<button class="soft-button ${['available','ready'].includes(status)?'settings-secondary':'settings-primary'}" data-update-action="Check"${disabled}>${checkLabel}</button>`:''}
   ${available && status==='available'?`<button class="soft-button settings-primary" data-update-action="Download"${disabled}>업데이트 다운로드</button>`:''}
-  ${available && status==='ready'?`<button class="soft-button settings-primary" data-update-action="Install"${disabled}>${macos?'DMG 열기':'업데이트 설치'}</button>`:''}
+  ${available && status==='ready'?`<button class="soft-button settings-primary" data-update-action="Install"${disabled}>업데이트 설치</button>`:''}
   <a class="soft-button settings-secondary" href="${esc(releaseURL)}" target="_blank" rel="noopener noreferrer">배포 페이지 ${ARROW}</a></div></div></section>`;
 }
 function environmentValues(form,trim=false) {

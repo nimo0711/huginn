@@ -14,7 +14,7 @@ Claude·Codex의 병렬 작업에서 세션의 관계, 현재 작업, 진척과 
 | Mac Intel | `Huginn-<버전>-macos-x86_64.dmg` | 응용 프로그램의 Huginn |
 | Windows x64 | `Huginn-<버전>-windows-x64-Setup.exe` | 시작 메뉴의 Huginn |
 
-Mac에서는 DMG를 열고 **Huginn 아이콘을 Applications 폴더로 드래그**합니다. 복사가 끝나면 응용 프로그램에서 Huginn을 실행하고 설치 디스크를 추출합니다. 업데이트도 앱을 종료한 뒤 같은 방법으로 교체합니다.
+Mac에서는 DMG를 열고 **Huginn 아이콘을 Applications 폴더로 드래그**합니다. 복사가 끝나면 응용 프로그램에서 Huginn을 실행하고 설치 디스크를 추출합니다. 이후 업데이트는 설정의 앱 업데이트에서 버튼 한 번으로 진행되며, 앱이 스스로 새 버전으로 바꾼 뒤 다시 시작합니다.
 
 Windows에는 Microsoft WebView2 Runtime이 필요합니다. 없으면 설치 프로그램이 Microsoft 설치 페이지를 안내합니다. 각 OS의 ZIP도 제공하며, 안의 폴더 전체를 유지해야 합니다.
 

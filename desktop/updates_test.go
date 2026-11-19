@@ -234,7 +234,7 @@ func TestUpdaterDownloadVerifiesBeforeReadyAndInstall(t *testing.T) {
 			var launched atomic.Int32
 			u.verifySignature = func(context.Context, string, bool) (bool, error) { return false, nil }
 			u.confirmInstall = func(UpdateState) (bool, error) { return false, nil }
-			u.launchInstaller = func(path string) error {
+			u.launchInstaller = func(path, _ string) error {
 				if filepath.Base(path) != name {
 					t.Errorf("wrong path %s", path)
 				}
@@ -377,13 +377,13 @@ func TestUpdateInstallRechecksAfterConfirmationAndRetriesLaunch(t *testing.T) {
 	}
 	u.verifySignature = func(context.Context, string, bool) (bool, error) { return false, nil }
 	u.confirmInstall = func(UpdateState) (bool, error) { return true, nil }
-	u.launchInstaller = func(string) error { return fmt.Errorf("secret /Users/person/path") }
+	u.launchInstaller = func(string, string) error { return fmt.Errorf("secret /Users/person/path") }
 	got := u.Install()
 	if got.Status != "ready" || strings.Contains(got.Message, "secret") {
 		t.Fatal(got)
 	}
 	var launches atomic.Int32
-	u.launchInstaller = func(string) error { launches.Add(1); return nil }
+	u.launchInstaller = func(string, string) error { launches.Add(1); return nil }
 	u.confirmInstall = func(UpdateState) (bool, error) {
 		tampered := dmgFixture()
 		tampered[0] ^= 0xff
@@ -477,7 +477,7 @@ func TestUpdateQuitsOnlyAfterOSOpensImageAndKeepsImageAvailable(t *testing.T) {
 	u.afterLaunch = func() { quit <- struct{}{} }
 	u.confirmInstall = func(UpdateState) (bool, error) { return true, nil }
 	u.verifySignature = func(context.Context, string, bool) (bool, error) { return false, nil }
-	u.launchInstaller = func(string) error { return fmt.Errorf("OS open rejected") }
+	u.launchInstaller = func(string, string) error { return fmt.Errorf("OS open rejected") }
 	if got := u.Install(); got.Status != "ready" {
 		t.Fatal(got)
 	}
@@ -487,7 +487,7 @@ func TestUpdateQuitsOnlyAfterOSOpensImageAndKeepsImageAvailable(t *testing.T) {
 	default:
 	}
 	path := u.installerPath
-	u.launchInstaller = func(string) error { return nil }
+	u.launchInstaller = func(string, string) error { return nil }
 	if got := u.Install(); got.Status != "installing" {
 		t.Fatal(got)
 	}

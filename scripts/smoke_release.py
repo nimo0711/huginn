@@ -93,19 +93,36 @@ def smoke_mac_disk_image(image, bundle_id, env, folder):
     return results,{'layout_verified':True,'copied':True,'layout':layout}
 
 
-def nsis_command(executable, path_option=None, directory=None):
+def nsis_command(executable, path_option=None, directory=None, flags=()):
     """NSIS treats the final path option as raw text, including any spaces."""
-    command = subprocess.list2cmdline([str(executable), '/S'])
+    command = subprocess.list2cmdline([str(executable), '/S', *flags])
     if path_option is not None:
         command += f' {path_option}={directory}'
     return command
 
 
-def run_nsis(executable, env, path_option=None, directory=None, expected=0):
-    command = nsis_command(executable, path_option, directory)
+def run_nsis(executable, env, path_option=None, directory=None, expected=0, flags=()):
+    command = nsis_command(executable, path_option, directory, flags)
     result = subprocess.run(command, executable=str(executable), env=env, timeout=120)
     if result.returncode != expected:
         raise ValueError(f'{executable.name} returned {result.returncode}; expected {expected}')
+
+
+def windows_process(executable):
+    script = "Get-Process -Name Huginn -ErrorAction SilentlyContinue | Where-Object { $_.Path -eq $env:HUGINN_SMOKE_EXE } | Select-Object -First 1 -ExpandProperty Id"
+    result = subprocess.run(['powershell', '-NoProfile', '-NonInteractive', '-Command', script],
+                            env={**os.environ, 'HUGINN_SMOKE_EXE': str(executable)}, capture_output=True, text=True, timeout=30)
+    value = result.stdout.strip()
+    return int(value) if value.isdigit() else None
+
+
+def wait_for_windows_process(executable, seconds, running=True):
+    deadline = time.monotonic() + seconds
+    while True:
+        pid = windows_process(executable)
+        if (pid is not None) == running or time.monotonic() > deadline:
+            return pid
+        time.sleep(0.5)
 
 
 def windows_known_local_app_data():
@@ -247,6 +264,15 @@ def smoke_windows_installer(installer, installed, env, folder, marker, version):
         require_preserved_markers(marker, default_marker)
         result = smoke(installed / 'Huginn.exe', env, folder)
 
+        run_nsis(installer, env, flags=('/RELAUNCH',))
+        relaunched = wait_for_windows_process(installed / 'Huginn.exe', 30)
+        if relaunched is None:
+            raise ValueError('In-app update did not restart Huginn after installing')
+        subprocess.run(['taskkill', '/PID', str(relaunched), '/T', '/F'], capture_output=True, timeout=30)
+        if wait_for_windows_process(installed / 'Huginn.exe', 30, running=False) is not None:
+            raise ValueError('Restarted Huginn did not stop')
+        require_preserved_markers(marker, default_marker)
+
         # The copied uninstaller runs synchronously, so the test observes the
         # actual uninstall exit code and can lock a nested application file.
         uninstaller = folder / 'Uninstall QA.exe'
@@ -303,7 +329,7 @@ def main():
                     installer, installed, env, folder, marker, release['version'],
                 )
                 result['installer'] = (
-                    'legacy Forkrail install replaced after close, locked upgrade refused, closing app upgrade retried, '
+                    'legacy Forkrail install replaced after close, locked upgrade refused, closing app upgrade retried, silent update restarted app, '
                     'upgraded, locked uninstall refused, '
                     'and uninstalled on disposable runner'
                 )

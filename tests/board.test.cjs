@@ -605,13 +605,12 @@ test('agent setup exposes read locations before saving and missing sources after
  assert.ok(view.includes('기록 위치 확인'));assert.ok(view.includes('저장소를 찾지 못했습니다'));
 });
 
-test('macOS updates open a DMG with drag instructions while Windows keeps its installer',()=>{
+test('macOS and Windows updates replace the app and restart without manual drag steps',()=>{
  const b=board();b.run('data={sessions:[]};ui.updates={status:"ready",available:true,os:"macos"}');
- let view=b.run('updatesView()');
- assert.ok(view.includes('Applications'));assert.ok(view.includes('드래그'));
- assert.ok(view.includes('DMG 열기'));
- b.run('ui.updates.os="windows"');view=b.run('updatesView()');
- assert.ok(view.includes('업데이트 설치'));assert.ok(!view.includes('Applications'));
+ for(const os of ['macos','windows']) {
+  b.run(`ui.updates.os="${os}"`);const view=b.run('updatesView()');
+  assert.ok(view.includes('업데이트 설치'));assert.ok(view.includes('다시 시작'));assert.ok(!view.includes('드래그'));assert.ok(!view.includes('DMG 열기'));
+ }
 });
 
 test('current-session skills match the connected agent and disconnected delivery stays disabled',()=>{
@@ -644,7 +643,7 @@ test('browser update settings link to official releases and distinguish installa
 });
 test('update settings show bounded progress, recoverable states and safe links without raw errors',()=>{
  const b=board();b.run('data={sessions:[]};ui.settingsTab="updates"');
- for(const [status,match] of [['available','업데이트 다운로드'],['ready','DMG 열기'],['auth_required','접근 권한'],['unpublished','게시된 릴리즈'],['current','최신 버전'],['error','다시 확인'],['installing','Applications']]) {
+ for(const [status,match] of [['available','업데이트 다운로드'],['ready','업데이트 설치'],['auth_required','접근 권한'],['unpublished','게시된 릴리즈'],['current','최신 버전'],['error','다시 확인'],['installing','다시 시작']]) {
   b.set({status,available:true,current_version:'1.2.0',latest_version:'1.2.1',os:'macos',signed:false,message:'secret technical /tmp/token',release_url:'javascript:alert(1)'});b.run('ui.updates=input');
   const view=b.run('settingsView()');assert.ok(view.includes(match),status);assert.ok(!view.includes('secret technical'));assert.ok(!view.includes('javascript:'));assert.ok(!view.includes('설치가 완료'));
  }
@@ -722,7 +721,7 @@ test('known native failure and cancellation messages remain actionable without e
   ['error','업데이트를 처리하지 못했습니다. 네트워크 연결을 확인한 뒤 다시 시도해 주세요.'],
   ['error','업데이트 작업이 취소되었습니다.'],
   ['ready','설치를 취소했습니다. 다운로드한 파일은 다시 설치할 수 있습니다.'],
-  ['ready','OS 설치창을 열지 못했거나 실행을 취소했습니다. 다시 시도해 주세요.']]) {
+  ['ready','업데이트 설치를 시작하지 못했습니다. 다시 시도해 주세요.']]) {
   b.set({status,message,available:true});b.run('ui.updates=input');assert.ok(b.run('settingsView()').includes(message));
  }
  b.run('ui.updates.message="GET https://private.test?token=secret failed"');assert.ok(!b.run('settingsView()').includes('token=secret'));

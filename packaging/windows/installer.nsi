@@ -86,6 +86,16 @@ FunctionEnd
 !insertmacro INSTALL_LOCK ""
 !insertmacro INSTALL_LOCK "un."
 
+Function RelaunchIfRequested
+  ${GetParameters} $R0
+  ClearErrors
+  ${GetOptions} $R0 "/RELAUNCH" $R1
+  IfErrors relaunch_done
+  IfFileExists "$INSTDIR\Huginn.exe" 0 relaunch_done
+  Exec '"$INSTDIR\Huginn.exe"'
+  relaunch_done:
+FunctionEnd
+
 Function .onInit
   Call LockInstaller
   ${IfNot} ${RunningX64}
@@ -239,6 +249,7 @@ Section "Huginn" SEC_MAIN
   stage_message:
     IfSilent +2
     MessageBox MB_ICONSTOP "Huginn could not be installed. The previous version was preserved. Check file permissions and try again."
+    Call RelaunchIfRequested
     SetErrorLevel 5
     Quit
   rollback_failed:
@@ -246,19 +257,23 @@ Section "Huginn" SEC_MAIN
     DetailPrint "The previous installation is available at $Backup"
     IfSilent +2
     MessageBox MB_ICONSTOP "Huginn could not be installed. The previous installation is available at $Backup"
+    Call RelaunchIfRequested
     SetErrorLevel 7
     Quit
   registration_failed:
     IfSilent +2
     MessageBox MB_ICONSTOP "The application was copied to $INSTDIR but Windows registration could not be completed."
+    Call RelaunchIfRequested
     SetErrorLevel 7
     Quit
   invalid_directory:
     IfSilent +2
     MessageBox MB_ICONSTOP "Choose an empty folder or an existing Huginn installation. The Huginn data directory cannot be used."
+    Call RelaunchIfRequested
     SetErrorLevel 5
     Quit
   done:
+  Call RelaunchIfRequested
 SectionEnd
 
 Section "Uninstall"

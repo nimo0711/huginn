@@ -73,6 +73,13 @@ func mainRun(args []string) error {
 	if mode != "" {
 		return runSmokeMode(mode)
 	}
+	if len(args) == 4 && args[0] == applyUpdateFlag {
+		pid, err := strconv.Atoi(args[3])
+		if err != nil {
+			return errUpdateInvalid
+		}
+		return applyStagedUpdate(args[1], args[2], pid)
+	}
 	cfg, err := desktopConfig("")
 	if err != nil {
 		return err
@@ -260,18 +267,13 @@ func (app *desktopApp) confirmUpdateInstall(state UpdateState) (bool, error) {
 	if ctx == nil {
 		return false, errors.New("native dialog unavailable")
 	}
-	signature := "서명되지 않은 시험 배포입니다. OS 보안 정책에 따라 설치가 차단될 수 있습니다."
+	signature := "서명되지 않은 시험 배포입니다. 내려받은 파일의 체크섬과 배포 정보를 확인했습니다."
 	if state.Signed {
 		signature = "운영체제에서 설치 파일의 서명을 확인했습니다."
 	}
-	button := "설치창 열기"
-	message := "Huginn " + state.LatestVersion + " 설치창을 여시겠습니까?\n\n" + signature +
-		"\n\n설치창을 열면 이 앱을 종료합니다. 별도로 실행한 서비스는 종료하지 않습니다. 설치 후 앱을 다시 실행해 주세요."
-	if state.OS == "macos" {
-		button = "DMG 열기"
-		message = "Huginn " + state.LatestVersion + " DMG를 여시겠습니까?\n\n" + signature +
-			"\n\nDMG를 열면 이 앱을 종료합니다. 종료된 뒤 Huginn을 Applications로 끌어다 놓고 기존 앱을 교체해 주세요. Applications에서 Huginn을 다시 실행하면 업데이트가 적용됩니다. 기존 Forkrail에서 이전했다면 Huginn 실행을 확인한 뒤 이전 앱과 Dock 아이콘을 제거하세요. 설정은 유지됩니다. 별도로 실행한 서비스는 종료하지 않습니다."
-	}
+	button := "업데이트 후 다시 시작"
+	message := "Huginn " + state.LatestVersion + "(으)로 업데이트할까요?\n\n" + signature +
+		"\n\n앱을 종료하고 새 버전으로 바꾼 뒤 다시 시작합니다. 설정과 기록은 유지됩니다. 별도로 실행한 서비스는 종료하지 않습니다."
 	answer, err := wailsruntime.MessageDialog(ctx, wailsruntime.MessageDialogOptions{
 		Type:    wailsruntime.QuestionDialog,
 		Title:   "Huginn 업데이트 설치",
