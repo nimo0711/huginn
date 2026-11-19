@@ -20,7 +20,7 @@ class UpdateEnvironmentApiTests(unittest.TestCase):
         actions.guide.return_value = ''
         actions.delivery.describe.return_value = actions.delivery.lookup.return_value = None
         with patch.object(server, 'ACTIONS', actions), patch.object(server.scan, 'all_sessions', return_value=[]), \
-                patch('sys.platform', platform), patch.object(server, 'RELEASE', release or {'version': '1.2.0-rc.1', 'repository': 'nimo0711/forkrail'}):
+                patch('sys.platform', platform), patch.object(server, 'RELEASE', release or {'version': '1.2.0-rc.1', 'repository': 'nimo0711/huginn'}):
             handler.do_GET()
         self.assertEqual(handler.result[0], 200)
         return handler.result[1]
@@ -36,7 +36,7 @@ class UpdateEnvironmentApiTests(unittest.TestCase):
 
     def test_release_link_comes_from_packaged_repository_not_request_input(self):
         result = self.catalog('darwin')
-        self.assertEqual(result.get('app'), {'version': '1.2.0-rc.1', 'release_url': 'https://github.com/nimo0711/forkrail/releases'})
+        self.assertEqual(result.get('app'), {'version': '1.2.0-rc.1', 'release_url': 'https://github.com/nimo0711/huginn/releases'})
         for repository in ['https://evil.test/repo', 'owner/repo?redirect=evil', '../repo', 'owner/repo/../../evil']:
             with self.subTest(repository=repository):
                 app = self.catalog('darwin', {'version': '1.2.0', 'repository': repository}).get('app', {})

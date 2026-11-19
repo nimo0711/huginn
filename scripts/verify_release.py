@@ -3,7 +3,7 @@ import argparse
 import json
 from pathlib import Path
 import sys
-from release_tools import config, verify_checksums
+from release_tools import artifact_stem, config, verify_checksums
 
 
 def verify(directory, require_signed=False, *, expected_target=None, require_smoke=False, expected_commit=None):
@@ -18,7 +18,7 @@ def verify(directory, require_signed=False, *, expected_target=None, require_smo
     if require_signed and manifest.get('signed') is not True:raise ValueError('Signed artifacts required')
     expected=manifest.get('artifacts',[])
     if len(expected)!=2 or names!=set(expected)|{'release-manifest.json'}:raise ValueError('Incomplete artifact set')
-    prefix='Forkrail-'+release['version']+'-'+manifest['target']
+    prefix=artifact_stem(release,manifest['target'])
     suffixes=['.dmg','.zip'] if manifest['target'].startswith('macos') else ['-Setup.exe','.zip']
     if sorted(expected)!=sorted(prefix+s for s in suffixes):raise ValueError('Unexpected artifact names')
     if require_smoke:

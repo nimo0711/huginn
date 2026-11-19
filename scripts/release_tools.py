@@ -18,7 +18,8 @@ SOURCE_FILES = (
     'blocks.py', 'progress.py', 'delegation.py', 'title_summary.py',
     'wbcore.py', 'actions_cli.py', 'claude_hook.py', 'install_claude_hooks.py', 'wb',
     'index.html', 'stories.html', 'AGENT_GUIDE.md', 'release.json',
-    'app/brand.json', 'app/assets/forkrail-icon.png', 'app/assets/forkrail-icon-web.png',
+    'desktop/theme.css',
+    'app/brand.json', 'app/assets/huginn-icon.png', 'app/assets/huginn-icon-web.png',
 )
 TARGETS = {'macos-arm64': ('darwin','arm64'), 'macos-x86_64': ('darwin','amd64'),
            'windows-x64': ('windows','amd64')}
@@ -52,7 +53,9 @@ def verify_macos_bundle(app, target, minimum=(13,0)):
 
 def validate_config(value, tag=None):
     if not isinstance(value,dict):raise ValueError('release.json must be an object')
-    if value.get('name') != 'Forkrail':raise ValueError('Invalid product name')
+    if value.get('name') != 'Huginn':raise ValueError('Invalid product name')
+    if not re.fullmatch(r'[A-Za-z][A-Za-z0-9-]{0,63}',value.get('display_name',value['name'])):
+        raise ValueError('Invalid display name')
     if not re.fullmatch(r'\d+\.\d+\.\d+(?:-(?:rc|beta|alpha)\.\d+)?',value.get('version','')):
         raise ValueError('Invalid release version')
     if not re.fullmatch(r'\d+\.\d+\.\d+',value.get('package_version','')):
@@ -74,6 +77,12 @@ def config(root, tag=None):
     return validate_config(json.loads((Path(root)/'release.json').read_text(encoding='utf-8')),tag)
 
 
+def artifact_stem(release, target):
+    validate_config(release)
+    if target not in TARGETS:raise ValueError('Unknown release target')
+    return release.get('display_name',release['name'])+'-'+release['version']+'-'+target
+
+
 def stage_sources(root, destination):
     root=Path(root).resolve();destination=Path(destination)
     # Validate the complete input before copying anything.
@@ -91,8 +100,8 @@ def stage_sources(root, destination):
 def validate_signing(target, signed, env):
     if target not in TARGETS:raise ValueError('Unknown target')
     if not signed:return
-    required=(['FORKRAIL_APPLE_APP_IDENTITY','FORKRAIL_NOTARY_PROFILE']
-              if target.startswith('macos') else ['FORKRAIL_WINDOWS_CERT_FILE','FORKRAIL_WINDOWS_CERT_PASSWORD'])
+    required=(['HUGINN_APPLE_APP_IDENTITY','HUGINN_NOTARY_PROFILE']
+              if target.startswith('macos') else ['HUGINN_WINDOWS_CERT_FILE','HUGINN_WINDOWS_CERT_PASSWORD'])
     missing=[name for name in required if not env.get(name)]
     if missing:raise ValueError('Signed release requires: '+', '.join(missing))
 

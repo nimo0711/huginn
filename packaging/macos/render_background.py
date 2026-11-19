@@ -11,7 +11,7 @@ def render_background(output: Path) -> Path:
 
     output.mkdir(parents=True, exist_ok=True)
     for scale in (1, 2):
-        canvas = Image.new('RGB', (720 * scale, 440 * scale), '#f4f4f0')
+        canvas = Image.new('RGB', (720 * scale, 440 * scale), '#ece5d5')
         draw = ImageDraw.Draw(canvas)
 
         def text(label, top, size, color, *, korean=False, weight='Regular'):
@@ -21,15 +21,15 @@ def render_background(output: Path) -> Path:
                 font.set_variation_by_name(weight)
             draw.text((360 * scale, top * scale), label, font=font, fill=color, anchor='mt')
 
-        draw.line([(328 * scale, 40 * scale), (356 * scale, 40 * scale)], fill='#64d9f5', width=4 * scale)
-        draw.line([(364 * scale, 40 * scale), (392 * scale, 40 * scale)], fill='#ffd36b', width=4 * scale)
-        text('Forkrail', 60, 32, '#102231', weight='Semibold')
-        text('Drag to Applications to install.', 112, 16, '#102231')
-        text('Forkrail을 응용 프로그램 폴더로 드래그하세요.', 140, 14, '#52616b', korean=True)
-        draw.line([(332 * scale, 244 * scale), (388 * scale, 244 * scale)], fill='#102231', width=3 * scale)
+        draw.line([(328 * scale, 40 * scale), (356 * scale, 40 * scale)], fill='#24221d', width=4 * scale)
+        draw.line([(364 * scale, 40 * scale), (392 * scale, 40 * scale)], fill='#a88b4f', width=4 * scale)
+        text('Huginn', 60, 32, '#24221d', weight='Semibold')
+        text('Drag to Applications to install.', 112, 16, '#24221d')
+        text('Huginn을 응용 프로그램 폴더로 드래그하세요.', 140, 14, '#625b4e', korean=True)
+        draw.line([(332 * scale, 244 * scale), (388 * scale, 244 * scale)], fill='#24221d', width=3 * scale)
         draw.line([(376 * scale, 232 * scale), (388 * scale, 244 * scale), (376 * scale, 256 * scale)],
-                  fill='#102231', width=3 * scale, joint='curve')
-        text('복사가 끝나면 응용 프로그램에서 Forkrail을 실행하세요.', 388, 12, '#52616b', korean=True)
+                  fill='#24221d', width=3 * scale, joint='curve')
+        text('복사가 끝나면 응용 프로그램에서 Huginn을 실행하세요.', 388, 12, '#625b4e', korean=True)
         canvas.save(output / f'background@{scale}x.png', dpi=(72 * scale, 72 * scale))
     target = output / 'background.tiff'
     subprocess.run(['tiffutil', '-cathidpicheck', str(output / 'background@1x.png'),

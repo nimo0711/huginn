@@ -24,8 +24,9 @@ import (
 	wailsruntime "github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
-const appName = "Forkrail"
-const bundleID = "app.forkrail.desktop"
+const appName = "Huginn"
+const legacyAppName = "Forkrail"
+const bundleID = "app.huginn.desktop"
 
 // scripts/build_release.py supplies the full version from release.json.
 var releaseVersion = "1.2.0-rc.1"
@@ -33,7 +34,10 @@ var releaseVersion = "1.2.0-rc.1"
 //go:embed failure.html
 var failureHTML string
 
-var serviceFailurePage = template.Must(template.New("service failure").Parse(failureHTML))
+//go:embed theme.css
+var themeCSS string
+
+var serviceFailurePage = template.Must(template.Must(template.New("service failure").Parse(failureHTML)).New("theme").Parse(themeCSS))
 
 type desktopApp struct {
 	config     serviceConfig
@@ -69,6 +73,13 @@ func mainRun(args []string) error {
 	if mode != "" {
 		return runSmokeMode(mode)
 	}
+	if len(args) == 4 && args[0] == applyUpdateFlag {
+		pid, err := strconv.Atoi(args[3])
+		if err != nil {
+			return errUpdateInvalid
+		}
+		return applyStagedUpdate(args[1], args[2], pid)
+	}
 	cfg, err := desktopConfig("")
 	if err != nil {
 		return err
@@ -82,12 +93,12 @@ func desktopConfig(smokeRoot string) (serviceConfig, error) {
 		return serviceConfig{}, err
 	}
 	parent := filepath.Dir(executable)
-	servicePath := filepath.Join(parent, "service", "forkrail-service.exe")
+	servicePath := filepath.Join(parent, "service", "huginn-service.exe")
 	if goruntime.GOOS == "darwin" {
-		servicePath = filepath.Join(parent, "..", "Resources", "service", "forkrail-service")
+		servicePath = filepath.Join(parent, "..", "Resources", "service", "huginn-service")
 	}
 	if goruntime.GOOS != "darwin" && goruntime.GOOS != "windows" {
-		servicePath = filepath.Join(parent, "service", "forkrail-service")
+		servicePath = filepath.Join(parent, "service", "huginn-service")
 	}
 
 	port := 8790
@@ -103,7 +114,7 @@ func desktopConfig(smokeRoot string) (serviceConfig, error) {
 		}
 	}
 
-	dataDir := os.Getenv("FORKRAIL_DATA_DIR")
+	dataDir := os.Getenv("HUGINN_DATA_DIR")
 	explicitState := dataDir != "" || os.Getenv("WORK_BOARD_DB") != "" || os.Getenv("WORK_BOARD_SPOOL") != ""
 	if smokeRoot != "" && dataDir == "" {
 		dataDir = filepath.Join(smokeRoot, "data")
@@ -169,7 +180,7 @@ func runDesktop(config serviceConfig, smoke *UISmoke, smokeRoot string) error {
 
 	opts := &options.App{
 		Title: appName, Width: 1180, Height: 860, MinWidth: 420, MinHeight: 400,
-		BackgroundColour: options.NewRGB(0x0c, 0x0e, 0x16),
+		BackgroundColour: options.NewRGB(0x17, 0x17, 0x14), // Matches --bg in theme.css.
 		AssetServer:      &assetserver.Options{Handler: app},
 		Menu:             app.menu(),
 		Mac:              &mac.Options{Appearance: mac.NSAppearanceNameDarkAqua},
@@ -232,10 +243,10 @@ func (app *desktopApp) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		w.Header().Set("Cache-Control", "no-store")
 		w.Header().Set("Content-Security-Policy", "frame-ancestors 'none'; object-src 'none'; base-uri 'none'")
-		_ = serviceFailurePage.Execute(w, app.startErr.Error())
+		_ = serviceFailurePage.ExecuteTemplate(w, "service failure", app.startErr.Error())
 		return
 	}
-	http.Error(w, "Forkrail 서비스를 시작할 수 없습니다.", http.StatusServiceUnavailable)
+	http.Error(w, "Huginn 서비스를 시작할 수 없습니다.", http.StatusServiceUnavailable)
 }
 
 func (app *desktopApp) close() {
@@ -256,21 +267,16 @@ func (app *desktopApp) confirmUpdateInstall(state UpdateState) (bool, error) {
 	if ctx == nil {
 		return false, errors.New("native dialog unavailable")
 	}
-	signature := "서명되지 않은 시험 배포입니다. OS 보안 정책에 따라 설치가 차단될 수 있습니다."
+	signature := "서명되지 않은 시험 배포입니다. 내려받은 파일의 체크섬과 배포 정보를 확인했습니다."
 	if state.Signed {
 		signature = "운영체제에서 설치 파일의 서명을 확인했습니다."
 	}
-	button := "설치창 열기"
-	message := "Forkrail " + state.LatestVersion + " 설치창을 여시겠습니까?\n\n" + signature +
-		"\n\n설치창을 열면 이 앱을 종료합니다. 별도로 실행한 서비스는 종료하지 않습니다. 설치 후 앱을 다시 실행해 주세요."
-	if state.OS == "macos" {
-		button = "DMG 열기"
-		message = "Forkrail " + state.LatestVersion + " DMG를 여시겠습니까?\n\n" + signature +
-			"\n\nDMG를 열면 이 앱을 종료합니다. 종료된 뒤 Forkrail을 Applications로 끌어다 놓고 기존 앱을 교체해 주세요. Applications에서 Forkrail을 다시 실행하면 업데이트가 적용됩니다. 별도로 실행한 서비스는 종료하지 않습니다."
-	}
+	button := "업데이트 후 다시 시작"
+	message := "Huginn " + state.LatestVersion + "(으)로 업데이트할까요?\n\n" + signature +
+		"\n\n앱을 종료하고 새 버전으로 바꾼 뒤 다시 시작합니다. 설정과 기록은 유지됩니다. 별도로 실행한 서비스는 종료하지 않습니다."
 	answer, err := wailsruntime.MessageDialog(ctx, wailsruntime.MessageDialogOptions{
 		Type:    wailsruntime.QuestionDialog,
-		Title:   "Forkrail 업데이트 설치",
+		Title:   "Huginn 업데이트 설치",
 		Message: message,
 		Buttons: []string{button, "취소"}, DefaultButton: "취소", CancelButton: "취소",
 	})
@@ -310,7 +316,7 @@ func (app *desktopApp) menu() *menu.Menu {
 		result.Append(menu.EditMenu())
 	} else {
 		file := result.AddSubmenu("파일")
-		file.AddText("Forkrail 종료", keys.CmdOrCtrl("q"), func(*menu.CallbackData) {
+		file.AddText("Huginn 종료", keys.CmdOrCtrl("q"), func(*menu.CallbackData) {
 			app.withRuntime(wailsruntime.Quit)
 		})
 	}

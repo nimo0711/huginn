@@ -1,0 +1,73 @@
+/* Huginn Twins palette. Shared by the web UI and native fallback. */
+:root {
+  color-scheme: dark;
+  --bg: #171714;
+  --side: #1d1c18;
+  --panel: #24221d;
+  --panel2: #302d26;
+  --hover: #3a362c;
+  --line: #4c463b;
+  --line2: #7a6f5a;
+  --ink: #ece5d5;
+  --sub: #c9c1b2;
+  --dim: #aea694;
+  --primary: #d3b066;
+  --on-primary: #211f19;
+  --run: #dcb85c;
+  --wait: #ee9a5b;
+  --stall: #f0806c;
+  --done: #a3c88f;
+  --info: #a3b8c2;
+  --off: #8f8a7e;
+  --track: rgba(236,229,213,.08);
+  --run-soft: rgba(220,184,92,.15);
+  --run-line: rgba(220,184,92,.45);
+  --info-soft: rgba(163,184,194,.16);
+  --done-soft: rgba(163,200,143,.15);
+  --done-line: rgba(163,200,143,.4);
+  --wait-soft: rgba(238,154,91,.16);
+  --stall-soft: rgba(240,128,108,.16);
+  --overlay: rgba(23,23,20,.7);
+  --ease: cubic-bezier(.22,1,.36,1);
+  /* Names used by the work-history page. */
+  --text: var(--ink);
+  --faint: var(--dim);
+  --accent: var(--primary);
+  --good: var(--done);
+  --goodbg: var(--done-soft);
+  --warn: var(--run);
+  --warnbg: var(--run-soft);
+  --hold: var(--dim);
+  --holdbg: var(--panel2);
+}
+
+:root[data-theme="light"] {
+  color-scheme: light;
+  --bg: #f3eee3;
+  --side: #ebe4d5;
+  --panel: #fbf8f1;
+  --panel2: #f0eadd;
+  --hover: #e7dfcd;
+  --line: #d8cdb7;
+  --line2: #a2947a;
+  --ink: #24221d;
+  --sub: #4d473c;
+  --dim: #625a4b;
+  --primary: #765714;
+  --on-primary: #fbf8f1;
+  --run: #7a5a10;
+  --wait: #9c4712;
+  --stall: #ad3626;
+  --done: #3e6934;
+  --info: #395d6e;
+  --off: #686255;
+  --track: rgba(36,34,29,.08);
+  --run-soft: rgba(122,90,16,.12);
+  --run-line: rgba(122,90,16,.4);
+  --info-soft: rgba(57,93,110,.12);
+  --done-soft: rgba(62,105,52,.12);
+  --done-line: rgba(62,105,52,.38);
+  --wait-soft: rgba(156,71,18,.12);
+  --stall-soft: rgba(173,54,38,.12);
+  --overlay: rgba(36,34,29,.35);
+}

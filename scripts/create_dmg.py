@@ -13,7 +13,7 @@ import tempfile
 ROOT = Path(__file__).resolve().parents[1]
 BACKGROUND = '.background/background.tiff'
 WINDOW_BOUNDS = '{{160, 160}, {720, 440}}'
-ICON_LOCATIONS = {'Forkrail.app': (196, 244), 'Applications': (524, 244)}
+ICON_LOCATIONS = {'Huginn.app': (196, 244), 'Applications': (524, 244)}
 
 
 def write_finder_layout(mount: Path) -> None:
@@ -67,8 +67,8 @@ def verify_layout(mount: Path) -> dict:
     from PIL import Image
 
     mount = Path(mount)
-    if not (mount / 'Forkrail.app/Contents/Info.plist').is_file():
-        raise ValueError('DMG is missing Forkrail.app')
+    if not (mount / 'Huginn.app/Contents/Info.plist').is_file():
+        raise ValueError('DMG is missing Huginn.app')
     applications = mount / 'Applications'
     if not applications.is_symlink() or os.readlink(applications) != '/Applications':
         raise ValueError('DMG Applications must be a symlink to /Applications')
@@ -99,10 +99,10 @@ def verify_layout(mount: Path) -> dict:
             if store[name]['Iloc'] != position:
                 raise ValueError('DMG Finder icon position is incorrect: ' + name)
         alias = Alias.from_bytes(view['backgroundImageAlias'])
-        if alias.volume.name != 'Forkrail' or alias.target.posix_path.lstrip('/') != BACKGROUND:
-            raise ValueError('DMG background alias must point inside the Forkrail volume')
+        if alias.volume.name != 'Huginn' or alias.target.posix_path.lstrip('/') != BACKGROUND:
+            raise ValueError('DMG background alias must point inside the Huginn volume')
     visible = sorted(path.name for path in mount.iterdir() if not path.name.startswith('.'))
-    if visible != ['Applications', 'Forkrail.app']:
+    if visible != ['Applications', 'Huginn.app']:
         raise ValueError('DMG contains unexpected visible files')
     return {'window_size': [720, 440], 'icon_size': 128,
             'icon_locations': {name: list(position) for name, position in ICON_LOCATIONS.items()},
@@ -137,7 +137,7 @@ def create_dmg(app: Path, output: Path, work: Path, volume_icon: Path) -> None:
     try:
         stage = scratch / 'stage'
         stage.mkdir()
-        run('ditto', '--rsrc', '--extattr', app, stage / 'Forkrail.app')
+        run('ditto', '--rsrc', '--extattr', app, stage / 'Huginn.app')
         (stage / 'Applications').symlink_to('/Applications')
         shutil.copy2(volume_icon, stage / '.VolumeIcon.icns')
         run(sys.executable, ROOT / 'packaging/macos/render_background.py', '--output', scratch / 'artwork')
@@ -149,7 +149,7 @@ def create_dmg(app: Path, output: Path, work: Path, volume_icon: Path) -> None:
         size_mb = max(64, (size * 12 // 10) // (1024 * 1024) + 32)
         writable = scratch / 'writable.dmg'
         run('hdiutil', 'create', '-quiet', '-size', f'{size_mb}m', '-fs', 'HFS+',
-            '-volname', 'Forkrail', '-srcfolder', stage, '-format', 'UDRW', writable)
+            '-volname', 'Huginn', '-srcfolder', stage, '-format', 'UDRW', writable)
         mount.mkdir()
         run('hdiutil', 'attach', '-quiet', '-nobrowse', '-noautoopen', '-mountpoint', mount, writable)
         attached = True

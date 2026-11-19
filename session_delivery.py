@@ -36,7 +36,7 @@ def prompt_hash(prompt):
 
 def skill_request_text(skill,prompt,current=True):
     prefix='현재 작업의 맥락에서 ' if current else ''
-    text=f"작업 보드에서 사용자가 요청했습니다. {prefix}{skill['name']} 스킬 지침을 읽고 실행해 주세요. 스킬 파일: {skill['path']}"
+    text=f"Huginn에서 사용자가 요청했습니다. {prefix}{skill['name']} 스킬 지침을 읽고 실행해 주세요. 스킬 파일: {skill['path']}"
     if prompt:text+='\n\n다음 요청 내용을 스킬의 인자로 사용해 주세요.\n\n'+prompt
     return text
 
@@ -284,7 +284,7 @@ class SessionDelivery:
             meta,token=self.claude_target(session);target=meta['messagingSocketPath'];reply=self.reply_socket(target)
             text=re.sub(r'<(?=/?cross-session-message(?:\s|>))',lambda m:'<\\',text)
             frame={'msgV':1,'msg_id':row['id'],'type':'user','session_id':session['id'],'from':'uds:'+reply,'priority':'next',
-                   'message':{'role':'user','content':f'<cross-session-message from="uds:{reply}" from-name="작업 보드" from-mode="prompting">\n{text}\n</cross-session-message>'}}
+                   'message':{'role':'user','content':f'<cross-session-message from="uds:{reply}" from-name="Huginn" from-mode="prompting">\n{text}\n</cross-session-message>'}}
             with socket.socket(socket.AF_UNIX,socket.SOCK_STREAM) as conn:
                 conn.settimeout(3);conn.connect(target)
                 if peer_pid(conn) not in (None,meta['pid']):raise ValueError('Claude 연결 대상이 변경되었습니다.')

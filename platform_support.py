@@ -161,7 +161,7 @@ def write_powershell_launcher(path, args, cwd, *, env=None, label='', remove_age
 _POWERSHELL_LAUNCHER = r"""
 $ErrorActionPreference = 'Stop'
 try {
-    $path = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('__FORKRAIL_PATH__'))
+    $path = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('__HUGINN_PATH__'))
     $job = Get-Content -LiteralPath $path -Raw -Encoding UTF8 | ConvertFrom-Json
     Set-Location -LiteralPath $job.cwd
     $start = New-Object System.Diagnostics.ProcessStartInfo
@@ -181,17 +181,17 @@ try {
     } finally { $process.Dispose() }
     $global:LASTEXITCODE = $code
 } catch {
-    Write-Error -ErrorAction Continue 'Forkrail could not open the selected command.'
+    Write-Error -ErrorAction Continue 'Huginn could not open the selected command.'
     $global:LASTEXITCODE = 1
 }
-__FORKRAIL_EXIT__
+__HUGINN_EXIT__
 """
 
 
 def powershell_command(path, *, stay_open=True):
     windows = Path(os.environ.get('SystemRoot') or r'C:\Windows')
     powershell = windows / 'System32/WindowsPowerShell/v1.0/powershell.exe'
-    script = _POWERSHELL_LAUNCHER.replace('__FORKRAIL_PATH__', base64.b64encode(str(path).encode('utf-8')).decode('ascii'))
-    script = script.replace('__FORKRAIL_EXIT__', '' if stay_open else 'exit $global:LASTEXITCODE')
+    script = _POWERSHELL_LAUNCHER.replace('__HUGINN_PATH__', base64.b64encode(str(path).encode('utf-8')).decode('ascii'))
+    script = script.replace('__HUGINN_EXIT__', '' if stay_open else 'exit $global:LASTEXITCODE')
     options = ['-NoLogo', '-NoProfile', *(['-NoExit'] if stay_open else ['-NonInteractive'])]
     return [str(powershell), *options, '-EncodedCommand', base64.b64encode(script.encode('utf-16-le')).decode('ascii')]

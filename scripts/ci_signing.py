@@ -32,17 +32,17 @@ def setup(folder):
         run(['security','set-key-partition-list','-S','apple-tool:,apple:,codesign:','-s','-k',password,keychain])
         # This changes only the disposable runner's search list, never a user's Mac.
         run(['security','list-keychains','-d','user','-s',keychain])
-        run(['xcrun','notarytool','store-credentials','forkrail-ci','--keychain',keychain,
+        run(['xcrun','notarytool','store-credentials','huginn-ci','--keychain',keychain,
              '--apple-id',required('APPLE_ID'),'--team-id',required('APPLE_TEAM_ID'),'--password',required('APPLE_APP_PASSWORD')])
-        values={'FORKRAIL_APPLE_APP_IDENTITY':required('APPLE_APP_IDENTITY'),
-                'FORKRAIL_NOTARY_PROFILE':'forkrail-ci','FORKRAIL_NOTARY_KEYCHAIN':str(keychain)}
+        values={'HUGINN_APPLE_APP_IDENTITY':required('APPLE_APP_IDENTITY'),
+                'HUGINN_NOTARY_PROFILE':'huginn-ci','HUGINN_NOTARY_KEYCHAIN':str(keychain)}
     elif sys.platform=='win32':
         cert=certificate('WINDOWS_CERTIFICATE_BASE64','windows.pfx')
         roots=Path(os.environ['ProgramFiles(x86)'])/'Windows Kits/10/bin'
         tools=sorted(roots.glob('*/x64/signtool.exe'),reverse=True)
         if not tools:raise ValueError('Windows SDK signtool.exe is unavailable')
-        values={'FORKRAIL_WINDOWS_CERT_FILE':str(cert),
-                'FORKRAIL_SIGNTOOL':str(tools[0])}
+        values={'HUGINN_WINDOWS_CERT_FILE':str(cert),
+                'HUGINN_SIGNTOOL':str(tools[0])}
     else:raise ValueError('Signing is supported only on Windows/macOS')
     with Path(os.environ['GITHUB_ENV']).open('a',encoding='utf-8') as dest:
         for key,value in values.items():
@@ -53,7 +53,7 @@ def setup(folder):
 def main():
     if os.environ.get('GITHUB_ACTIONS')!='true' or os.environ.get('RUNNER_ENVIRONMENT')!='github-hosted':
         raise ValueError('Use only on a disposable GitHub-hosted runner; configure local identities yourself')
-    folder=Path(os.environ['RUNNER_TEMP'])/'forkrail-signing'
+    folder=Path(os.environ['RUNNER_TEMP'])/'huginn-signing'
     if sys.argv[1]=='setup':setup(folder)
     elif sys.argv[1]=='cleanup':
         keychain=folder/'signing.keychain-db'

@@ -7,6 +7,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"syscall"
 )
 
 func markInstallerOrigin(path, source string) error {
@@ -26,10 +27,10 @@ func markInstallerOrigin(path, source string) error {
 func verifyInstallerSignature(ctx context.Context, path string, required bool) (bool, error) {
 	// The path is environment data, never PowerShell source or a command argument
 	// interpolated into source. The output is a small status enum, never shown.
-	script := `$ErrorActionPreference='Stop'; $s=Get-AuthenticodeSignature -LiteralPath $env:FORKRAIL_UPDATE_INSTALLER; [Console]::Write($s.Status.ToString())`
+	script := `$ErrorActionPreference='Stop'; $s=Get-AuthenticodeSignature -LiteralPath $env:HUGINN_UPDATE_INSTALLER; [Console]::Write($s.Status.ToString())`
 	command := exec.CommandContext(ctx, filepath.Join(os.Getenv("SystemRoot"), "System32", "WindowsPowerShell", "v1.0", "powershell.exe"), "-NoProfile", "-NonInteractive", "-Command", script)
 	configureChild(command)
-	command.Env = append(os.Environ(), "FORKRAIL_UPDATE_INSTALLER="+path)
+	command.Env = append(os.Environ(), "HUGINN_UPDATE_INSTALLER="+path)
 	output, err := command.Output()
 	if err != nil {
 		return false, errUpdateInvalid
@@ -44,16 +45,13 @@ func verifyInstallerSignature(ctx context.Context, path string, required bool) (
 	}
 	return false, errUpdateInvalid
 }
-func launchUpdateInstaller(path string) error {
-	verb, err := windows.UTF16PtrFromString("open")
-	if err != nil {
+func launchUpdateInstaller(path, _ string) error {
+	command := exec.Command(path, "/S", "/RELAUNCH")
+	command.SysProcAttr = &syscall.SysProcAttr{CreationFlags: windows.DETACHED_PROCESS | windows.CREATE_NEW_PROCESS_GROUP}
+	if err := command.Start(); err != nil {
 		return err
 	}
-	file, err := windows.UTF16PtrFromString(path)
-	if err != nil {
-		return err
-	}
-	// ShellExecute invokes the installer's normal UAC/SmartScreen path. No silent
-	// parameters, elevation bypass, temporary script or process tree termination.
-	return windows.ShellExecute(0, verb, file, nil, nil, windows.SW_SHOWNORMAL)
+	return command.Process.Release()
 }
+
+func applyStagedUpdate(string, string, int) error { return errUpdateInvalid }

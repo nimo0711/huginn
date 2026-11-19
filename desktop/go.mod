@@ -1,4 +1,4 @@
-module forkrail/desktop
+module huginn/desktop
 
 go 1.27.4
 

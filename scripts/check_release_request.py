@@ -19,7 +19,7 @@ def main():
     release=config(Path(__file__).resolve().parents[1],tag)
     if os.environ.get('PUBLISH_DRAFT')=='1':
         if not tag:raise ValueError('A pre-existing version tag is required for a draft')
-        if '-' not in release['version'] and os.environ.get('FORKRAIL_SIGNED')!='1':
+        if '-' not in release['version'] and os.environ.get('HUGINN_SIGNED')!='1':
             raise ValueError('Stable release drafts require signed installers')
         verify_tag_commit(tag)
     print(release['version'])

@@ -36,5 +36,15 @@ class DelegationTests(unittest.TestCase):
             delegation.attach([child],d)
             self.assertNotIn('parent_id',child)
 
+    def test_cycle_members_stay_top_level_without_detaching_their_real_children(self):
+        with tempfile.TemporaryDirectory() as d:
+            node=lambda i,p:{'id':i,'agent':'codex','source_parent':p,'tasks':[],'works':[]}
+            a,b,c,own,r,m,l=node('a','b'),node('b','a'),node('c','a'),node('own','own'),node('r',''),node('m','r'),node('l','m')
+            delegation.attach([a,b,c,own,r,m,l],d)
+            for session in (a,b,own,r):
+                self.assertNotIn('parent_id',session)
+            self.assertEqual(c.get('parent_id'),'a')
+            self.assertEqual((m.get('parent_id'),l.get('parent_id')),('r','m'))
+
 
 if __name__=='__main__':unittest.main()

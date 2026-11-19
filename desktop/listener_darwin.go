@@ -5,7 +5,7 @@ package main
 #include <stdint.h>
 #include <sys/proc.h>
 
-static uint64_t forkrail_process_started(int pid, unsigned int uid) {
+static uint64_t huginn_process_started(int pid, unsigned int uid) {
     struct proc_bsdinfo info;
     if (proc_pidinfo(pid, PROC_PIDTBSDINFO, 0, &info, sizeof(info)) != sizeof(info) ||
         info.pbi_uid != uid || info.pbi_status == SZOMB) {
@@ -38,7 +38,7 @@ func currentUserProcess(pid int) processIdentity {
 	if pid <= 0 {
 		return processIdentity{}
 	}
-	started := uint64(C.forkrail_process_started(C.int(pid), C.uint(os.Geteuid())))
+	started := uint64(C.huginn_process_started(C.int(pid), C.uint(os.Geteuid())))
 	if started == 0 {
 		return processIdentity{}
 	}

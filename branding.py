@@ -1,4 +1,4 @@
-"""Serve the same Forkrail artwork used to package the native app icon."""
+"""Serve the same Huginn artwork used to package the native app icon."""
 import base64
 import json
 from runtime_paths import RESOURCE_ROOT

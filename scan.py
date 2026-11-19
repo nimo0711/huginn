@@ -152,7 +152,7 @@ def _request_excerpt(text: str) -> str:
 
 def _new_task(prompt: str, ts: float) -> dict:
     return {
-        "prompt": _clean(prompt, 400), "request": _request_excerpt(prompt), "extra": [], "docs": [], "plan_refs": [], "servers": [], "ts": ts, "start_ts": 0.0, "last_ts": ts, "end_ts": 0.0,
+        "instruction": delegation.text(prompt), "prompt": _clean(prompt, 400), "request": _request_excerpt(prompt), "extra": [], "docs": [], "plan_refs": [], "servers": [], "ts": ts, "start_ts": 0.0, "last_ts": ts, "end_ts": 0.0,
         "outcome": "", "notes": [], "checks": [], "steps": [], "files": [], "first_change": "",
         "n_checks": 0, "n_steps": 0, "areas": {}, "branch": "", "ask": "", "options": [],
     }
@@ -304,11 +304,13 @@ def _archive_task(history, task, branch=''):
     key, _, _ = _work_key(task, branch, previous)
     row = next((t for t in history if t.get('history_key') == key), None)
     if row is None:
-        row = _new_task(task.get('request') or task['prompt'], task['ts'])
+        row = _new_task(task.get('instruction') or task.get('request') or task['prompt'], task['ts'])
         row.update(history_key=key, branch=task.get('branch') or branch,
                    history={'total': 0, 'done': 0, 'plans': {}})
         history.append(row)
     count = 1 + len(task.get('extra', []))
+    row.setdefault("delegations", []).extend(copy.deepcopy(task.get("delegations", [])))
+    del row["delegations"][:-delegation.MAX_ITEMS]
     row['history']['total'] += count
     row['n_steps'] += task['n_steps']
     row['n_checks'] += task['n_checks']
@@ -375,6 +377,7 @@ def _feed(info: dict, line: str) -> None:
                 if not isinstance(b, dict) or b.get("type") != "tool_result":
                     continue
                 tid = b.get("tool_use_id") or ""
+                delegation.record_result(tasks, tid, b.get("content"), ts, bool(b.get("is_error")), e.get("toolUseResult"))
                 server_start=info.setdefault('pending_servers',{}).pop(tid,None)
                 if server_start and not b.get('is_error'):
                     local_runtime.remember_start(server_start[0],blocks.result_text(b.get('content')),server_start[1],ts)
@@ -432,6 +435,7 @@ def _feed(info: dict, line: str) -> None:
         if not isinstance(b, dict):
             continue
         if b.get("type") == "tool_use":
+            delegation.record_call(current, b, ts)
             if b.get("name") == "AskUserQuestion":
                 qs = (b.get("input") or {}).get("questions") or []
                 current["ask"] = " / ".join(q.get("question", "") for q in qs if isinstance(q, dict))[:400]
@@ -709,7 +713,7 @@ def _work_key(task, session_branch='', prev=''):
     return key, raw, auto
 
 
-def _works(tasks: list, session_branch: str, titles: dict) -> list:
+def _works(tasks: list, session_branch: str, titles: dict, *, delegated=False) -> list:
     works: list = []
     index: dict = {}
     prev = ""
@@ -736,6 +740,8 @@ def _works(tasks: list, session_branch: str, titles: dict) -> list:
             w["stage"] = enrich.stage(info)
             if info.get("title"):
                 w["title"] = info["title"]
+        elif delegated and not w['title']:
+            w['title'] = tasks[w['tasks'][0]].get('request') or tasks[w['tasks'][0]]['prompt']
         elif not w["title"]:
             turns = []
             for i in w["tasks"]:
@@ -805,7 +811,7 @@ def claude_sessions(now: float) -> list[dict]:
             "compacts": info["compacts"],
             "fails": [f for f in info["fails"] if now - f["ts"] < 3600][-5:],
             "out_tokens": info["out_tokens"],
-            "agents": _subagents(path[:-6], now),
+            "agents": delegation.claude_children(path[:-6], info["tasks"], now),
         })
     return out
 
@@ -827,30 +833,6 @@ def _wait_reason(meta: dict, task: dict, last_tool: dict | None, running: bool) 
     if not running and last_tool and last_tool.get("blocked") == "auto":
         return {"kind": "auto", "text": last_tool.get("text") or last_tool.get("name") or "", "ts": last_tool.get("end") or at}
     return None
-
-
-def _subagents(base: str, now: float) -> dict:
-    running, done = [], 0
-    for meta_path in glob.glob(os.path.join(base, "subagents", "*.meta.json")):
-        try:
-            with open(meta_path, encoding="utf-8") as f:
-                meta = json.load(f)
-        except (OSError, ValueError):
-            continue
-        log = meta_path[:-len(".meta.json")] + ".jsonl"
-        try:
-            mtime = os.path.getmtime(log)
-            born = os.path.getmtime(meta_path)
-        except OSError:
-            continue
-        if now - mtime > WINDOW_SEC:
-            continue
-        if meta.get("finished") or now - mtime > 900:
-            done += 1
-        else:
-            running.append({"what": _clean(meta.get("description") or meta.get("agentType") or "", 80), "ts": born, "last": mtime})
-    running.sort(key=lambda a: a["ts"])
-    return {"running": running, "done": done}
 
 
 def _codex_turn(hist: sqlite3.Connection, tid: str, turn_id: str, status: str, started: float, completed: float) -> dict:
@@ -880,6 +862,7 @@ def _codex_turn(hist: sqlite3.Connection, tid: str, turn_id: str, status: str, s
             task = _new_task("", started)
         if kind == "agentMessage":
             _note(task, ts, d.get("text") or "")
+            task['raw_result'] = delegation.text(d.get('text'))
         elif kind == "commandExecution":
             cmd = d.get("command") or ""
             if d.get("exitCode") in (None,0) and local_runtime.launch_command(cmd):
@@ -906,11 +889,14 @@ def _codex_turn(hist: sqlite3.Connection, tid: str, turn_id: str, status: str, s
         elif kind == "webSearch":
             _record(task, ts, False, "웹 조사 · " + _clean(d.get("query") or "", 80), True)
         elif kind == "collabAgentToolCall":
+            delegation.codex_call(task, d, ts)
             _record(task, ts, False, "하위 에이전트에 맡김", True)
     if task is None:
         task = _new_task("", started)
     if status != "inProgress":
         _close(task, completed or task["last_ts"], {"interrupted": "중단", "failed": "실패"}.get(status, ""))
+    else:
+        task['raw_activity'] = task.pop('raw_result', '')
     return task
 
 
@@ -972,6 +958,30 @@ def _codex_tasks(hist, tid, turns, branch, database_identity):
     return sorted(saved['history'], key=lambda t: t['last_ts']) + recent
 
 
+def _codex_session_rows(st, now):
+    """Separate root/child budgets so child fan-out cannot evict the parent."""
+    fields = 'id, updated_at, cwd, title, git_branch, source, created_at'
+    roots, children = [], []
+    for row in st.execute(f'SELECT {fields} FROM threads WHERE archived=0 AND updated_at>? ORDER BY updated_at DESC',
+                          (int(now-WINDOW_SEC),)):
+        bucket, limit = (children, 80) if delegation.codex_parent(row[5]) else (roots, 40)
+        if len(bucket) < limit:
+            bucket.append(row)
+        if len(roots) == 40 and len(children) == 80:
+            break
+    selected = {r[0]: r for r in roots+children}
+    queue = list(children)
+    for row in queue:
+        parent = delegation.codex_parent(row[5])
+        if not parent or parent in selected or len(selected) >= 160:
+            continue
+        ancestor = st.execute(f'SELECT {fields} FROM threads WHERE id=?', (parent,)).fetchone()
+        if ancestor:
+            selected[parent] = ancestor
+            queue.append(ancestor)
+    return sorted(selected.values(), key=lambda r: r[1], reverse=True)
+
+
 def codex_sessions(now: float) -> list[dict]:
     _refresh_document_cache()
     if not os.path.exists(CODEX_STATE):
@@ -984,11 +994,7 @@ def codex_sessions(now: float) -> list[dict]:
             if database_identity != (os.path.realpath(CODEX_HISTORY), os.stat(CODEX_HISTORY).st_ino):
                 raise sqlite3.OperationalError('History database replaced while opening')
             # The open handle retains this identity even if its path is replaced later.
-            rows = st.execute(
-                "SELECT id, updated_at, cwd, title, git_branch, source, created_at FROM threads "
-                "WHERE archived = 0 AND updated_at > ? ORDER BY updated_at DESC LIMIT 40",
-                (int(now - WINDOW_SEC),),
-            ).fetchall()
+            rows = _codex_session_rows(st, now)
         except (OSError, sqlite3.Error):
             return []
         live_ids = {row[0] for row in rows}
@@ -998,8 +1004,6 @@ def codex_sessions(now: float) -> list[dict]:
                     cache.pop(identity, None)
         out = []
         for tid, updated, cwd, title, branch, source, created in rows:
-            if "subagent" in str(source or ""):
-                continue
             try:
                 turns = hist.execute(
                     "SELECT turn_id, status, started_at, completed_at, rollout_ordinal FROM thread_turns WHERE thread_id = ? "
@@ -1025,6 +1029,7 @@ def codex_sessions(now: float) -> list[dict]:
             idle_state = "입력 대기" if done[-1].get("ask") else "쉬는 중"
             out.append({
                 "agent": "codex",
+                "source_parent": delegation.codex_parent(source),
                 "cwd_path": cwd or "",
                 "created_at": float(created or 0),
                 "role": "외부 평가" if re.search(r'검토|평가|\breview\b|\baudit\b', title or '', re.I) else "위임 작업",
@@ -1034,7 +1039,7 @@ def codex_sessions(now: float) -> list[dict]:
                 "cwd": _short_dir(cwd or ""),
                 "branch": branch or "",
                 "tasks": done,
-                "works": _works(tasks, branch or "", TITLES),
+                "works": _works(tasks, branch or "", TITLES, delegated=bool(delegation.codex_parent(source)) or source == 'exec'),
                 "last_ts": float(updated),
             })
         return out

@@ -29,7 +29,7 @@ class DmgLayoutTests(unittest.TestCase):
             native_alias.return_value.to_bytes.return_value = b'background-alias-record'
             self.dmg.write_finder_layout(self.folder)
         with DSStore.open(str(self.folder / '.DS_Store'), 'r') as store:
-            self.assertEqual(store['Forkrail.app']['Iloc'], (196, 244))
+            self.assertEqual(store['Huginn.app']['Iloc'], (196, 244))
             self.assertEqual(store['Applications']['Iloc'], (524, 244))
             view = store['.']['icvp']
             self.assertEqual(view['backgroundType'], 2)
@@ -40,18 +40,18 @@ class DmgLayoutTests(unittest.TestCase):
             self.assertEqual(store['.']['bwsp']['WindowBounds'], '{{160, 160}, {720, 440}}')
             self.assertEqual(view['backgroundImageAlias'], b'background-alias-record')
 
-    @unittest.skipUnless(os.environ.get('FORKRAIL_DMG_INTEGRATION') == '1', 'opt-in mounted DMG integration')
+    @unittest.skipUnless(os.environ.get('HUGINN_DMG_INTEGRATION') == '1', 'opt-in mounted DMG integration')
     def test_readonly_image_contains_a_copyable_app_and_portable_finder_layout(self):
         from PIL import Image
-        app = self.folder / 'source/Forkrail.app'
-        executable = app / 'Contents/MacOS/Forkrail'
+        app = self.folder / 'source/Huginn.app'
+        executable = app / 'Contents/MacOS/Huginn'
         executable.parent.mkdir(parents=True)
         executable.write_bytes(b'fixture app; never executed')
         executable.chmod(0o755)
-        (app / 'Contents/Info.plist').write_bytes(plistlib.dumps({'CFBundleName': 'Forkrail'}))
+        (app / 'Contents/Info.plist').write_bytes(plistlib.dumps({'CFBundleName': 'Huginn'}))
         icon = self.folder / 'volume.icns'
-        Image.open(Path(__file__).resolve().parents[1] / 'app/assets/forkrail-icon.png').save(icon)
-        output = self.folder / 'Forkrail.dmg'
+        Image.open(Path(__file__).resolve().parents[1] / 'app/assets/huginn-icon.png').save(icon)
+        output = self.folder / 'Huginn.dmg'
         self.dmg.create_dmg(app, output, self.folder / 'work', icon)
         details = plistlib.loads(subprocess.check_output(['hdiutil', 'imageinfo', '-plist', str(output)]))
         self.assertEqual(details['Format'], 'UDZO')
@@ -62,8 +62,8 @@ class DmgLayoutTests(unittest.TestCase):
             result = self.dmg.verify_layout(mount)
             self.assertEqual(result['applications_target'], '/Applications')
             self.assertEqual(result['window_size'], [720, 440])
-            self.assertEqual((mount / 'Forkrail.app/Contents/MacOS/Forkrail').read_bytes(), executable.read_bytes())
-            self.assertTrue((mount / 'Forkrail.app/Contents/MacOS/Forkrail').stat().st_mode & 0o111)
+            self.assertEqual((mount / 'Huginn.app/Contents/MacOS/Huginn').read_bytes(), executable.read_bytes())
+            self.assertTrue((mount / 'Huginn.app/Contents/MacOS/Huginn').stat().st_mode & 0o111)
             with self.assertRaises(OSError):
                 (mount / 'should-be-readonly').write_text('cannot write')
         finally:

@@ -117,7 +117,7 @@ type AppUpdates struct {
 	verifySignature                            func(context.Context, string, bool) (bool, error)
 	markOrigin                                 func(string, string) error
 	confirmInstall                             func(UpdateState) (bool, error)
-	launchInstaller                            func(string) error
+	launchInstaller                            func(string, string) error
 	afterLaunch                                func()
 }
 
@@ -323,12 +323,15 @@ func (u *AppUpdates) Check() UpdateState {
 		s.Message = "새 버전을 다운로드할 수 있습니다."
 	})
 }
+
+const applyUpdateFlag = "--apply-update"
+
 func installerName(version, target string) string {
 	suffix := ".dmg"
 	if target == "windows-x64" {
 		suffix = "-Setup.exe"
 	}
-	return "Forkrail-" + version + "-" + target + suffix
+	return appName + "-" + version + "-" + target + suffix
 }
 func (u *AppUpdates) releaseAssets(release *updateRelease) (updateAsset, updateAsset, updateAsset, error) {
 	version := strings.TrimPrefix(release.Tag, "v")
@@ -414,7 +417,7 @@ func (u *AppUpdates) Download() UpdateState {
 	if json.Unmarshal(data, &manifest) != nil || manifest.Version != version || manifest.Target != u.config.target || manifest.Signed == nil || manifest.SourceDirty == nil || *manifest.SourceDirty || !updateCommit.MatchString(manifest.SourceCommit) || len(manifest.Artifacts) != 2 {
 		return u.fail(errUpdateInvalid)
 	}
-	expectedZip := "Forkrail-" + version + "-" + u.config.target + ".zip"
+	expectedZip := strings.TrimSuffix(strings.TrimSuffix(installer.Name, ".dmg"), "-Setup.exe") + ".zip"
 	if !((manifest.Artifacts[0] == installer.Name && manifest.Artifacts[1] == expectedZip) || (manifest.Artifacts[1] == installer.Name && manifest.Artifacts[0] == expectedZip)) {
 		return u.fail(errUpdateInvalid)
 	}
@@ -426,7 +429,7 @@ func (u *AppUpdates) Download() UpdateState {
 		return u.fail(errUpdateInvalid)
 	}
 	u.change(func(s *UpdateState) { s.Signed = *manifest.Signed; s.TotalBytes = installer.Size })
-	directory, err := os.MkdirTemp(u.config.tempRoot, "Forkrail-update-")
+	directory, err := os.MkdirTemp(u.config.tempRoot, "Huginn-update-")
 	if err != nil {
 		return u.fail(err)
 	}
@@ -483,10 +486,7 @@ func (u *AppUpdates) Download() UpdateState {
 	success = true
 	return u.change(func(s *UpdateState) {
 		s.Status = "ready"
-		s.Message = "파일 검증을 마쳤습니다. 설치 버튼을 누르면 OS 설치창을 엽니다."
-		if s.OS == "macos" {
-			s.Message = "파일 검증을 마쳤습니다. DMG를 열고 앱을 Applications로 끌어다 놓으면 업데이트할 수 있습니다."
-		}
+		s.Message = "파일 검증을 마쳤습니다. 설치하면 앱을 새 버전으로 바꾸고 다시 시작합니다."
 	})
 }
 
@@ -636,22 +636,16 @@ func (u *AppUpdates) Install() UpdateState {
 		u.clearDownload()
 		return u.fail(err)
 	}
-	if err := u.launchInstaller(u.installerPath); err != nil {
+	if err := u.launchInstaller(u.installerPath, u.Info().LatestVersion); err != nil {
 		return u.change(func(s *UpdateState) {
 			s.Status = "ready"
-			s.Message = "OS 설치창을 열지 못했거나 실행을 취소했습니다. 다시 시도해 주세요."
-			if s.OS == "macos" {
-				s.Message = "DMG를 열지 못했거나 실행을 취소했습니다. 다시 시도해 주세요."
-			}
+			s.Message = "업데이트 설치를 시작하지 못했습니다. 다시 시도해 주세요."
 		})
 	}
 	u.launched = true
 	state := u.change(func(s *UpdateState) {
 		s.Status = "installing"
-		s.Message = "OS 설치창을 열었습니다. 설치 후 다시 실행하면 적용된 버전을 확인할 수 있습니다."
-		if s.OS == "macos" {
-			s.Message = "DMG를 열었습니다. 이 앱이 종료되면 Forkrail을 Applications로 끌어다 놓고 기존 앱을 교체해 주세요."
-		}
+		s.Message = "앱을 종료하고 새 버전으로 바꾼 뒤 다시 시작합니다."
 	})
 	if u.afterLaunch != nil {
 		go u.afterLaunch()
@@ -690,7 +684,7 @@ func (u *AppUpdates) requestOnce(ctx context.Context, address, token string, ass
 		req.Header.Set("Accept", "application/octet-stream")
 	}
 	req.Header.Set("X-GitHub-Api-Version", "2022-11-28")
-	req.Header.Set("User-Agent", "Forkrail-Updater")
+	req.Header.Set("User-Agent", "Huginn-Updater")
 	if token != "" {
 		req.Header.Set("Authorization", "Bearer "+token)
 	}

@@ -85,7 +85,7 @@ func TestProxyKeepsDocumentsOutOfNativePage(t *testing.T) {
 			t.Error("document request reached the upstream from the native webview")
 		}
 		w.Header().Set("Content-Security-Policy", "frame-ancestors 'none'")
-		io.WriteString(w, "<html><head><title>Forkrail</title></head><body>내용</body></html>")
+		io.WriteString(w, "<html><head><title>Huginn</title></head><body>내용</body></html>")
 	}))
 	defer backend.Close()
 	target, _ := url.Parse(backend.URL)
@@ -97,7 +97,7 @@ func TestProxyKeepsDocumentsOutOfNativePage(t *testing.T) {
 	}
 	board := httptest.NewRecorder()
 	proxy.ServeHTTP(board, httptest.NewRequest(http.MethodGet, "/", nil))
-	if !strings.Contains(board.Header().Get("Content-Security-Policy"), "frame-ancestors 'none'") || !strings.Contains(board.Body.String(), `src="/_forkrail/links.js"`) {
+	if !strings.Contains(board.Header().Get("Content-Security-Policy"), "frame-ancestors 'none'") || !strings.Contains(board.Body.String(), `src="/_huginn/links.js"`) {
 		t.Fatalf("board policy or link handling missing: %q %q", board.Header().Get("Content-Security-Policy"), board.Body)
 	}
 }
@@ -125,6 +125,30 @@ func TestProxyRejectsUnknownAndAlternateRoutes(t *testing.T) {
 	proxy.ServeHTTP(result, req)
 	if result.Code < 400 {
 		t.Fatalf("browser reached the event-ingestion route: %d", result.Code)
+	}
+}
+
+func TestProxyServesSharedTheme(t *testing.T) {
+	const stylesheet = ":root { --bg: #171714; --primary: #c6a766; }"
+	backend := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/assets/theme.css" {
+			t.Errorf("unexpected stylesheet path: %s", r.URL.Path)
+		}
+		w.Header().Set("Content-Type", "text/css; charset=utf-8")
+		io.WriteString(w, stylesheet)
+	}))
+	defer backend.Close()
+	target, _ := url.Parse(backend.URL)
+	for _, origin := range []string{"wails://wails", "http://wails.localhost"} {
+		t.Run(origin, func(t *testing.T) {
+			proxy := fixtureProxy(t, target, origin)
+			result := httptest.NewRecorder()
+			proxy.ServeHTTP(result, httptest.NewRequest(http.MethodGet, "/assets/theme.css", nil))
+			if result.Code != http.StatusOK || result.Body.String() != stylesheet ||
+				!strings.HasPrefix(result.Header().Get("Content-Type"), "text/css") {
+				t.Fatalf("shared theme unavailable: status=%d type=%q body=%q", result.Code, result.Header().Get("Content-Type"), result.Body)
+			}
+		})
 	}
 }
 

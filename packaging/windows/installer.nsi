@@ -2,20 +2,21 @@ Unicode True
 !include "MUI2.nsh"
 !include "x64.nsh"
 !include "FileFunc.nsh"
-!define FORKRAIL_UNINSTALL "Software\Microsoft\Windows\CurrentVersion\Uninstall\Forkrail"
-Name "Forkrail"
+!define HUGINN_UNINSTALL "Software\Microsoft\Windows\CurrentVersion\Uninstall\Huginn"
+!define LEGACY_UNINSTALL "Software\Microsoft\Windows\CurrentVersion\Uninstall\Forkrail"
+Name "Huginn"
 OutFile "${OUTPUT}"
-InstallDir "$LOCALAPPDATA\Programs\Forkrail"
-InstallDirRegKey HKCU "${FORKRAIL_UNINSTALL}" "InstallLocation"
+InstallDir "$LOCALAPPDATA\Programs\Huginn"
+InstallDirRegKey HKCU "${HUGINN_UNINSTALL}" "InstallLocation"
 RequestExecutionLevel user
 SetCompressor /SOLID lzma
 VIProductVersion "${VERSION}.0"
-VIAddVersionKey "ProductName" "Forkrail"
-VIAddVersionKey "FileDescription" "Forkrail Installer"
+VIAddVersionKey "ProductName" "Huginn"
+VIAddVersionKey "FileDescription" "Huginn Installer"
 VIAddVersionKey "FileVersion" "${RELEASE_VERSION}"
-VIAddVersionKey "LegalCopyright" "Forkrail contributors"
-!define MUI_ICON "${SOURCE}\Forkrail.ico"
-!define MUI_UNICON "${SOURCE}\Forkrail.ico"
+VIAddVersionKey "LegalCopyright" "Huginn contributors"
+!define MUI_ICON "${SOURCE}\Huginn.ico"
+!define MUI_UNICON "${SOURCE}\Huginn.ico"
 !insertmacro MUI_PAGE_WELCOME
 !insertmacro MUI_PAGE_INSTFILES
 !insertmacro MUI_PAGE_FINISH
@@ -28,6 +29,10 @@ Var Backup
 Var InstallParent
 Var ServiceBusy
 Var CloseAttempts
+Var CheckDir
+Var CheckApp
+Var CheckService
+Var LegacyDir
 
 !macro CHECK_CLOSED Prefix
 Function ${Prefix}CheckClosed
@@ -36,13 +41,13 @@ Function ${Prefix}CheckClosed
   StrCpy $CloseAttempts 40
   retry_check:
   ; OPEN_EXISTING with no sharing checks the running image without modifying it.
-  IfFileExists "$INSTDIR\Forkrail.exe" 0 service_check
-  System::Call 'kernel32::CreateFileW(w "$INSTDIR\Forkrail.exe", i 0x40000000, i 0, p 0, i 3, i 0, p 0) p .r0'
+  IfFileExists "$CheckDir\$CheckApp" 0 service_check
+  System::Call 'kernel32::CreateFileW(w "$CheckDir\$CheckApp", i 0x40000000, i 0, p 0, i 3, i 0, p 0) p .r0'
   IntCmp $0 -1 in_use
   System::Call 'kernel32::CloseHandle(p r0)'
   service_check:
-  IfFileExists "$INSTDIR\service\forkrail-service.exe" 0 closed
-  System::Call 'kernel32::CreateFileW(w "$INSTDIR\service\forkrail-service.exe", i 0x40000000, i 0, p 0, i 3, i 0, p 0) p .r0'
+  IfFileExists "$CheckDir\service\$CheckService" 0 closed
+  System::Call 'kernel32::CreateFileW(w "$CheckDir\service\$CheckService", i 0x40000000, i 0, p 0, i 3, i 0, p 0) p .r0'
   IntCmp $0 -1 in_use
   System::Call 'kernel32::CloseHandle(p r0)'
   Goto closed
@@ -54,7 +59,7 @@ Function ${Prefix}CheckClosed
     Goto retry_check
   give_up:
     IfSilent +2
-    MessageBox MB_ICONSTOP "Close Forkrail and its service, then try again."
+    MessageBox MB_ICONSTOP "Close Huginn and its service, then try again."
     SetErrorLevel 3
     Quit
   closed:
@@ -65,7 +70,7 @@ FunctionEnd
 
 !macro INSTALL_LOCK Prefix
 Function ${Prefix}LockInstaller
-  System::Call 'kernel32::CreateMutexW(p 0, i 0, w "Local\ForkrailInstaller") p .r0 ?e'
+  System::Call 'kernel32::CreateMutexW(p 0, i 0, w "Local\HuginnInstaller") p .r0 ?e'
   Pop $1
   StrCmp $0 "0" lock_failed
   StrCmp $1 "183" lock_failed
@@ -73,7 +78,7 @@ Function ${Prefix}LockInstaller
   Return
   lock_failed:
     IfSilent +2
-    MessageBox MB_ICONSTOP "Another Forkrail install or uninstall is in progress."
+    MessageBox MB_ICONSTOP "Another Huginn install or uninstall is in progress."
     SetErrorLevel 4
     Quit
 FunctionEnd
@@ -81,10 +86,20 @@ FunctionEnd
 !insertmacro INSTALL_LOCK ""
 !insertmacro INSTALL_LOCK "un."
 
+Function RelaunchIfRequested
+  ${GetParameters} $R0
+  ClearErrors
+  ${GetOptions} $R0 "/RELAUNCH" $R1
+  IfErrors relaunch_done
+  IfFileExists "$INSTDIR\Huginn.exe" 0 relaunch_done
+  Exec '"$INSTDIR\Huginn.exe"'
+  relaunch_done:
+FunctionEnd
+
 Function .onInit
   Call LockInstaller
   ${IfNot} ${RunningX64}
-    MessageBox MB_ICONSTOP "Forkrail requires 64-bit Windows."
+    MessageBox MB_ICONSTOP "Huginn requires 64-bit Windows."
     Abort
   ${EndIf}
   SetShellVarContext current
@@ -103,6 +118,7 @@ Function .onInit
     SetErrorLevel 2
     Abort
   runtime_ready:
+  ReadRegStr $LegacyDir HKCU "${LEGACY_UNINSTALL}" "InstallLocation"
 FunctionEnd
 
 Function un.onInit
@@ -134,7 +150,7 @@ Function un.CheckServiceFile
     Push "StopLocate"
 FunctionEnd
 
-Section "Forkrail" SEC_MAIN
+Section "Huginn" SEC_MAIN
   ; Win32 resolves a new path too, whereas the NSIS path helper requires it to exist.
   System::Call 'kernel32::GetFullPathNameW(w "$INSTDIR", i ${NSIS_MAX_STRLEN}, w .r0, p 0) i .r1'
   IntCmp $1 0 invalid_directory
@@ -143,13 +159,24 @@ Section "Forkrail" SEC_MAIN
   StrCpy $0 $INSTDIR 1 -1
   StrCmp $0 '\' 0 +2
   StrCpy $INSTDIR $INSTDIR -1
+  StrCmp $INSTDIR "$LOCALAPPDATA\Huginn" invalid_directory
   StrCmp $INSTDIR "$LOCALAPPDATA\Forkrail" invalid_directory
+  StrCmp $INSTDIR $LegacyDir invalid_directory
   ${DirState} "$INSTDIR" $0
   StrCmp $0 "1" 0 prepare
-    IfFileExists "$INSTDIR\Forkrail.exe" 0 invalid_directory
+    IfFileExists "$INSTDIR\Huginn.exe" 0 invalid_directory
     IfFileExists "$INSTDIR\Uninstall.exe" 0 invalid_directory
   prepare:
+  StrCpy $CheckDir $INSTDIR
+  StrCpy $CheckApp "Huginn.exe"
+  StrCpy $CheckService "huginn-service.exe"
   Call CheckClosed
+  StrCmp $LegacyDir "" legacy_closed
+    StrCpy $CheckDir $LegacyDir
+    StrCpy $CheckApp "Forkrail.exe"
+    StrCpy $CheckService "forkrail-service.exe"
+    Call CheckClosed
+  legacy_closed:
   ${GetParent} "$INSTDIR" $InstallParent
   StrCmp $InstallParent "" invalid_directory
   ClearErrors
@@ -176,25 +203,38 @@ Section "Forkrail" SEC_MAIN
   IfErrors rollback
   ClearErrors
   SetOutPath "$INSTDIR"
-  CreateDirectory "$SMPROGRAMS\Forkrail"
-  CreateShortcut "$SMPROGRAMS\Forkrail\Forkrail.lnk" "$INSTDIR\Forkrail.exe" "" "$INSTDIR\Forkrail.ico"
-  WriteRegStr HKCU "${FORKRAIL_UNINSTALL}" "DisplayName" "Forkrail"
-  WriteRegStr HKCU "${FORKRAIL_UNINSTALL}" "DisplayVersion" "${RELEASE_VERSION}"
-  WriteRegStr HKCU "${FORKRAIL_UNINSTALL}" "Publisher" "Forkrail contributors"
-  WriteRegStr HKCU "${FORKRAIL_UNINSTALL}" "InstallLocation" "$INSTDIR"
-  WriteRegStr HKCU "${FORKRAIL_UNINSTALL}" "UninstallString" '$\"$INSTDIR\Uninstall.exe$\"'
-  WriteRegStr HKCU "${FORKRAIL_UNINSTALL}" "DisplayIcon" "$INSTDIR\Forkrail.exe"
-  WriteRegDWORD HKCU "${FORKRAIL_UNINSTALL}" "NoModify" 1
-  WriteRegDWORD HKCU "${FORKRAIL_UNINSTALL}" "NoRepair" 1
+  CreateDirectory "$SMPROGRAMS\Huginn"
+  CreateShortcut "$SMPROGRAMS\Huginn\Huginn.lnk" "$INSTDIR\Huginn.exe" "" "$INSTDIR\Huginn.ico"
+  WriteRegStr HKCU "${HUGINN_UNINSTALL}" "DisplayName" "Huginn"
+  WriteRegStr HKCU "${HUGINN_UNINSTALL}" "DisplayVersion" "${RELEASE_VERSION}"
+  WriteRegStr HKCU "${HUGINN_UNINSTALL}" "Publisher" "Huginn contributors"
+  WriteRegStr HKCU "${HUGINN_UNINSTALL}" "InstallLocation" "$INSTDIR"
+  WriteRegStr HKCU "${HUGINN_UNINSTALL}" "UninstallString" '$\"$INSTDIR\Uninstall.exe$\"'
+  WriteRegStr HKCU "${HUGINN_UNINSTALL}" "DisplayIcon" "$INSTDIR\Huginn.exe"
+  WriteRegDWORD HKCU "${HUGINN_UNINSTALL}" "NoModify" 1
+  WriteRegDWORD HKCU "${HUGINN_UNINSTALL}" "NoRepair" 1
   IfErrors registration_failed
-  StrCmp $Backup "" done
+  Delete "$SMPROGRAMS\Forkrail\Forkrail.lnk"
+  RMDir "$SMPROGRAMS\Forkrail"
+  StrCmp $Backup "" legacy_cleanup
   ; Clean only application-owned paths; leave unrelated files in the backup.
-  Delete "$Backup\Forkrail.exe"
-  Delete "$Backup\Forkrail.ico"
+  Delete "$Backup\Huginn.exe"
+  Delete "$Backup\Huginn.ico"
   Delete "$Backup\release.json"
   Delete "$Backup\Uninstall.exe"
   RMDir /r "$Backup\service"
   RMDir "$Backup"
+  legacy_cleanup:
+  StrCmp $LegacyDir "" done
+  IfFileExists "$LegacyDir\Forkrail.exe" 0 legacy_unregister
+    Delete "$LegacyDir\Forkrail.exe"
+    Delete "$LegacyDir\Forkrail.ico"
+    Delete "$LegacyDir\release.json"
+    Delete "$LegacyDir\Uninstall.exe"
+    RMDir /r "$LegacyDir\service"
+    RMDir "$LegacyDir"
+  legacy_unregister:
+  DeleteRegKey HKCU "${LEGACY_UNINSTALL}"
   Goto done
   rollback:
     StrCmp $Backup "" stage_failed
@@ -208,33 +248,41 @@ Section "Forkrail" SEC_MAIN
     RMDir /r "$Stage"
   stage_message:
     IfSilent +2
-    MessageBox MB_ICONSTOP "Forkrail could not be installed. The previous version was preserved. Check file permissions and try again."
+    MessageBox MB_ICONSTOP "Huginn could not be installed. The previous version was preserved. Check file permissions and try again."
+    Call RelaunchIfRequested
     SetErrorLevel 5
     Quit
   rollback_failed:
     RMDir /r "$Stage"
     DetailPrint "The previous installation is available at $Backup"
     IfSilent +2
-    MessageBox MB_ICONSTOP "Forkrail could not be installed. The previous installation is available at $Backup"
+    MessageBox MB_ICONSTOP "Huginn could not be installed. The previous installation is available at $Backup"
+    Call RelaunchIfRequested
     SetErrorLevel 7
     Quit
   registration_failed:
     IfSilent +2
     MessageBox MB_ICONSTOP "The application was copied to $INSTDIR but Windows registration could not be completed."
+    Call RelaunchIfRequested
     SetErrorLevel 7
     Quit
   invalid_directory:
     IfSilent +2
-    MessageBox MB_ICONSTOP "Choose an empty folder or an existing Forkrail installation. The Forkrail data directory cannot be used."
+    MessageBox MB_ICONSTOP "Choose an empty folder or an existing Huginn installation. The Huginn data directory cannot be used."
+    Call RelaunchIfRequested
     SetErrorLevel 5
     Quit
   done:
+  Call RelaunchIfRequested
 SectionEnd
 
 Section "Uninstall"
+  StrCpy $CheckDir $INSTDIR
+  StrCpy $CheckApp "Huginn.exe"
+  StrCpy $CheckService "huginn-service.exe"
   Call un.CheckClosed
   ; _?= is also accepted by NSIS. Only remove an actual installation.
-  ReadRegStr $0 HKCU "${FORKRAIL_UNINSTALL}" "InstallLocation"
+  ReadRegStr $0 HKCU "${HUGINN_UNINSTALL}" "InstallLocation"
   StrCmp $0 $INSTDIR 0 uninstall_failed
   IfFileExists "$INSTDIR\service\*.*" 0 detach
   StrCpy $ServiceBusy "0"
@@ -252,8 +300,8 @@ Section "Uninstall"
   Rename "$INSTDIR" "$Stage"
   IfErrors uninstall_failed
   ClearErrors
-  Delete "$Stage\Forkrail.exe"
-  Delete "$Stage\Forkrail.ico"
+  Delete "$Stage\Huginn.exe"
+  Delete "$Stage\Huginn.ico"
   Delete "$Stage\release.json"
   Delete "$Stage\Uninstall.exe"
   RMDir /r "$Stage\service"
@@ -265,15 +313,17 @@ Section "Uninstall"
   uninstall_cleanup_failed:
     StrCpy $1 "Remaining application files are available at $Stage."
   remove_registration:
+    Delete "$SMPROGRAMS\Huginn\Huginn.lnk"
+    RMDir "$SMPROGRAMS\Huginn"
     Delete "$SMPROGRAMS\Forkrail\Forkrail.lnk"
     RMDir "$SMPROGRAMS\Forkrail"
     ClearErrors
-    DeleteRegKey HKCU "${FORKRAIL_UNINSTALL}"
+    DeleteRegKey HKCU "${HUGINN_UNINSTALL}"
     IfErrors uninstall_unregister_failed
     StrCmp $1 "" uninstall_done
     Goto uninstall_incomplete
   uninstall_unregister_failed:
-    StrCpy $1 "Windows could not remove the Forkrail uninstall entry. $1"
+    StrCpy $1 "Windows could not remove the Huginn uninstall entry. $1"
   uninstall_incomplete:
     DetailPrint "$1"
     IfSilent +2
@@ -282,7 +332,7 @@ Section "Uninstall"
     Quit
   uninstall_failed:
     IfSilent +2
-    MessageBox MB_ICONSTOP "Forkrail could not be uninstalled. Close Forkrail and retry. Your installation and uninstall entry are preserved."
+    MessageBox MB_ICONSTOP "Huginn could not be uninstalled. Close Huginn and retry. Your installation and uninstall entry are preserved."
     SetErrorLevel 6
     Quit
   uninstall_done:

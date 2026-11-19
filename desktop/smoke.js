@@ -1,18 +1,24 @@
-(async (version) => {
+(async (version, appName) => {
   const record = window.go?.main?.UISmoke?.Report;
   if (!record) return;
 
   try {
-    if (document.title !== "Forkrail" || !document.querySelector("#main")) {
-      const error = document.querySelector("#forkrail-start-error")?.textContent?.trim();
-      throw new Error(error || "Forkrail board DOM is missing");
+    if (document.title !== appName || !document.querySelector("#main")) {
+      const error = document.querySelector("#huginn-start-error")?.textContent?.trim();
+      throw new Error(error || appName + " board DOM is missing");
+    }
+
+    const themeResponse = await fetch("/assets/theme.css", { cache: "no-store" });
+    if (!themeResponse.ok || !themeResponse.headers.get("content-type")?.includes("text/css") ||
+        !getComputedStyle(document.documentElement).getPropertyValue("--primary").trim()) {
+      throw new Error("Bundled shared theme is missing or not applied");
     }
 
     const healthResponse = await fetch("/api/health", { cache: "no-store" });
     const health = await healthResponse.json();
-    if (!healthResponse.ok || health.ok !== true || health.app !== "Forkrail" ||
+    if (!healthResponse.ok || health.ok !== true || health.app !== "Huginn" ||
         health.api !== 1 || health.version !== version || !health.instance) {
-      throw new Error("WebView did not reach the bundled Forkrail service");
+      throw new Error("WebView did not reach the bundled Huginn service");
     }
 
     const updateInfo = window.go?.main?.AppUpdates?.Info;

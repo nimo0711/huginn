@@ -1,12 +1,13 @@
 {
-  "name": "Forkrail",
-  "version": "1.2.0-rc.3",
+  "name": "Huginn",
+  "version": "1.2.0-rc.7",
   "package_version": "1.2.0",
-  "bundle_id": "app.forkrail.desktop",
-  "repository": "nimo0711/forkrail",
+  "bundle_id": "app.huginn.desktop",
+  "repository": "nimo0711/huginn",
   "platforms": [
     "macos-arm64",
     "macos-x86_64",
     "windows-x64"
-  ]
+  ],
+  "display_name": "Huginn"
 }

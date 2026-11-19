@@ -1,4 +1,4 @@
-# Forkrail
+# Huginn
 
 Claude·Codex의 병렬 작업에서 세션의 관계, 현재 작업, 진척과 산출물을 한곳에서 확인하는 데스크톱 앱입니다.
 
@@ -6,15 +6,15 @@ Claude·Codex의 병렬 작업에서 세션의 관계, 현재 작업, 진척과 
 
 배포 대상은 Windows 10/11 x64, macOS 13 이상 Apple Silicon·Intel입니다. 설치 파일에는 Python 서비스가 포함됩니다. Python이나 Go를 사용자가 따로 설치할 필요가 없습니다.
 
-[GitHub Releases](https://github.com/nimo0711/forkrail/releases)에서 운영체제에 맞는 파일을 받습니다. 저장소가 비공개이면 접근 권한이 있는 GitHub 계정으로 로그인해야 합니다. 아직 게시된 릴리즈가 없다면 [Actions의 설치 후보](https://github.com/nimo0711/forkrail/actions)에서 시험 결과와 파일을 확인합니다.
+[GitHub Releases](https://github.com/nimo0711/huginn/releases)에서 운영체제에 맞는 파일을 받습니다. 저장소가 비공개이면 접근 권한이 있는 GitHub 계정으로 로그인해야 합니다. 아직 게시된 릴리즈가 없다면 [Actions의 설치 후보](https://github.com/nimo0711/huginn/actions)에서 시험 결과와 파일을 확인합니다.
 
 | 환경 | 설치 파일 | 실행 |
 | --- | --- | --- |
-| Mac Apple Silicon | `Forkrail-<버전>-macos-arm64.dmg` | 응용 프로그램의 Forkrail |
-| Mac Intel | `Forkrail-<버전>-macos-x86_64.dmg` | 응용 프로그램의 Forkrail |
-| Windows x64 | `Forkrail-<버전>-windows-x64-Setup.exe` | 시작 메뉴의 Forkrail |
+| Mac Apple Silicon | `Huginn-<버전>-macos-arm64.dmg` | 응용 프로그램의 Huginn |
+| Mac Intel | `Huginn-<버전>-macos-x86_64.dmg` | 응용 프로그램의 Huginn |
+| Windows x64 | `Huginn-<버전>-windows-x64-Setup.exe` | 시작 메뉴의 Huginn |
 
-Mac에서는 DMG를 열고 **Forkrail 아이콘을 Applications 폴더로 드래그**합니다. 복사가 끝나면 응용 프로그램에서 Forkrail을 실행하고 설치 디스크를 추출합니다. 업데이트도 앱을 종료한 뒤 같은 방법으로 교체합니다.
+Mac에서는 DMG를 열고 **Huginn 아이콘을 Applications 폴더로 드래그**합니다. 복사가 끝나면 응용 프로그램에서 Huginn을 실행하고 설치 디스크를 추출합니다. 이후 업데이트는 설정의 앱 업데이트에서 버튼 한 번으로 진행되며, 앱이 스스로 새 버전으로 바꾼 뒤 다시 시작합니다.
 
 Windows에는 Microsoft WebView2 Runtime이 필요합니다. 없으면 설치 프로그램이 Microsoft 설치 페이지를 안내합니다. 각 OS의 ZIP도 제공하며, 안의 폴더 전체를 유지해야 합니다.
 
@@ -22,7 +22,7 @@ Windows에는 Microsoft WebView2 Runtime이 필요합니다. 없으면 설치 �
 
 ## 앱 동작
 
-앱을 열면 필요한 로컬 서비스를 함께 시작합니다. 앱이 완전히 종료되면 자신이 시작한 서비스도 종료합니다. 이미 같은 OS 계정의 호환 작업 보드가 실행 중이면 그 서비스와 기존 데이터를 사용하며, 앱 종료 시 기존 서비스는 그대로 둡니다. 연결했던 서비스가 종료되거나 교체되면 연결을 중단합니다. 서비스를 다시 시작한 뒤 앱도 다시 열어 주세요. 기본 주소는 <http://127.0.0.1:8790>입니다.
+앱을 열면 필요한 로컬 서비스를 함께 시작합니다. 앱이 완전히 종료되면 자신이 시작한 서비스도 종료합니다. 이미 같은 OS 계정의 호환 서비스가 실행 중이면 그 서비스와 기존 데이터를 사용하며, 앱 종료 시 기존 서비스는 그대로 둡니다. 연결했던 서비스가 종료되거나 교체되면 연결을 중단합니다. 서비스를 다시 시작한 뒤 앱도 다시 열어 주세요. 기본 주소는 <http://127.0.0.1:8790>입니다.
 
 - Claude·Codex 세션과 하위 평가 세션의 관계
 - Jira 스토리·태스크 또는 Jira 없는 작업 묶음 기준 진척
@@ -42,8 +42,8 @@ Windows는 로컬 Windows 사용자 기록을 읽습니다. WSL 내부 세션은
 
 | 실행 방식 | 데이터 위치 |
 | --- | --- |
-| 설치본 · Mac | `~/Library/Application Support/Forkrail` |
-| 설치본 · Windows | `%LOCALAPPDATA%/Forkrail` |
+| 설치본 · Mac | `~/Library/Application Support/Huginn` |
+| 설치본 · Windows | `%LOCALAPPDATA%/Huginn` |
 | 소스에서 실행 | 저장소 폴더 |
 
 이 폴더에 작업 DB, 연결·바로가기 설정, 요약 캐시를 저장합니다. 앱 업데이트나 제거는 이 데이터를 지우지 않습니다. AI 기록은 현재 사용자의 `.claude`, `.codex`에서 읽으며 설치 파일에 포함하지 않습니다.
@@ -52,7 +52,7 @@ Windows는 로컬 Windows 사용자 기록을 읽습니다. WSL 내부 세션은
 
 | 환경 변수 | 용도 |
 | --- | --- |
-| `FORKRAIL_DATA_DIR` | 데이터 폴더 명시 지정 |
+| `HUGINN_DATA_DIR` | 데이터 폴더 명시 지정 |
 | `WORK_BOARD_PORT` | 로컬 서비스 포트, 기본 `8790` |
 | `WORK_BOARD_DB` | 작업 DB 경로 명시 지정 |
 | `WORK_BOARD_URL` | `wb` 명령의 전송 대상 |
@@ -63,8 +63,8 @@ Windows는 로컬 Windows 사용자 기록을 읽습니다. WSL 내부 세션은
 Python 3.12를 권장합니다. Windows의 프로세스 탐지에는 psutil이 필요합니다.
 
 ```sh
-git clone https://github.com/nimo0711/forkrail.git
-cd forkrail
+git clone https://github.com/nimo0711/huginn.git
+cd huginn
 python -m pip install psutil==7.2.2
 python server.py
 ```
@@ -96,3 +96,7 @@ go test ./...
 - `app/`: Signal 아이콘 정본과 기존 Swift 개발 창
 
 로컬 사용량은 확인 가능한 기록의 합계이며 서비스 청구서나 계정 한도와 다를 수 있습니다. 세션 감지는 AI 도구의 로컬 기록 형식과 사용 중인 환경에 영향을 받습니다.
+
+## Forkrail에서 Huginn으로 이전
+
+기존 앱을 종료한 뒤 Huginn.app을 응용 프로그램으로 복사하고 Huginn을 실행하세요. Huginn은 처음 실행할 때 새 데이터 폴더에 작업 DB가 없으면 이전 `Forkrail` 데이터 폴더의 작업 DB·연결·바로가기·앱 설정·요약 캐시·전송 대기 기록을 복사해 옵니다. 이전 폴더는 지우지 않습니다. 실행을 확인한 뒤 이전 Forkrail.app 파일과 Dock 아이콘을 제거하고 Huginn을 Dock에 등록합니다. 앱 이름이 달라 기존 Forkrail.app은 드래그만으로 교체되지 않습니다. Windows 설치 파일은 이전 Forkrail 앱이 종료되기를 기다린 뒤 `Programs\Huginn`에 설치하고, 이전 설치 파일·제거 항목·시작 메뉴를 정리합니다.

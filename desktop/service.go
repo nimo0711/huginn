@@ -22,13 +22,13 @@ import (
 )
 
 // The existing server predates the versioned health API. Its Signal web icon
-// and board-state schema are required before treating that listener as Forkrail.
+// and board-state schema are required before treating that listener as Huginn.
 const legacyIconSHA256 = "2877122ef68df6287532dd95e9b4a7b309adc0b16add46a8a2156537db636377"
 
 var (
 	errPortConflict     = errors.New("해당 포트를 다른 서비스가 사용 중입니다")
 	errUnexpectedHealth = errors.New("내장 서비스의 응답이 앱과 일치하지 않습니다")
-	errServiceChanged   = errors.New("처음 연결한 Forkrail 서비스가 종료되었거나 바뀌었습니다")
+	errServiceChanged   = errors.New("처음 연결한 Huginn 서비스가 종료되었거나 바뀌었습니다")
 )
 
 type serviceConfig struct {
@@ -72,7 +72,7 @@ type healthResponse struct {
 }
 
 func (h healthResponse) currentAPI() bool {
-	return h.OK && h.App == "Forkrail" && h.API == 1 && h.Version != ""
+	return h.OK && (h.App == appName || h.App == legacyAppName) && h.API == 1 && h.Version != ""
 }
 
 var loopbackDialer = net.Dialer{Timeout: 2 * time.Second}
@@ -357,7 +357,7 @@ func smokeService(ctx context.Context, cfg serviceConfig) error {
 	if err != nil {
 		return err
 	}
-	if !bytes.Contains(page, []byte("<title>Forkrail</title>")) || !bytes.Contains(page, []byte(`id="main"`)) {
+	if !bytes.Contains(page, []byte("<title>"+appName+"</title>")) || !bytes.Contains(page, []byte(`id="main"`)) {
 		return errors.New("내장 서비스의 보드 화면을 확인할 수 없습니다")
 	}
 	return nil

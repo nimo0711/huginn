@@ -160,10 +160,10 @@ class ActionStore:
                 '새 터미널을 선택하면 macOS의 .command 기본 앱을 사용합니다. 별도 앱은 전체 경로로 설정하세요.\n'
                 f"{wb} actions configure --launch-app '/Applications/<터미널 앱>.app'"
             )
-        return self.connections.guide(wb)+'\n\n'+f'''작업 보드 연결·바로가기 등록 안내
+        return self.connections.guide(wb)+'\n\n'+f'''Huginn 연결·바로가기 등록 안내
 
 이 도움말은 Claude와 Codex 모두 사용할 수 있습니다. 사용자가 원하는 버튼과 실행 위치를 확인한 뒤 등록하세요. 등록은 스킬을 실행하지 않습니다.
-보드의 검색 범위는 Claude·Codex 로컬 스킬, Codex 시스템 스킬, 활성화된 Claude 플러그인입니다. Codex 플러그인 스킬은 현재 보드가 활성 여부를 확인하지 못하므로 연결된 Codex 세션에서 실행하세요. 캐시 폴더만 보고 활성화된 스킬로 등록하지 마세요.
+Huginn의 검색 범위는 Claude·Codex 로컬 스킬, Codex 시스템 스킬, 활성화된 Claude 플러그인입니다. Codex 플러그인 스킬은 현재 Huginn이 활성 여부를 확인하지 못하므로 연결된 Codex 세션에서 실행하세요. 캐시 폴더만 보고 활성화된 스킬로 등록하지 마세요.
 
 1. 설치·활성화된 스킬의 정확한 ID 조회:
 {wb} actions skills --cwd {folder}
@@ -233,7 +233,7 @@ class ActionStore:
         return self.delivery.send(session,item,request_id,prompt)
 
     def write_launcher(self, directory, identifier, args, cwd, *, env=None, label=''):
-        note = '이 컴퓨터의 CLI 로그인 정보를 변경합니다. 인증을 마치면 작업 보드의 연결 확인을 눌러 주세요.'
+        note = '이 컴퓨터의 CLI 로그인 정보를 변경합니다. 인증을 마치면 Huginn의 연결 확인을 눌러 주세요.'
         if IS_WINDOWS:
             path = directory / (identifier + '.json')
             write_powershell_launcher(path, args, cwd, env=env, label=f'{label}\n{note}' if label else '',
@@ -251,7 +251,7 @@ class ActionStore:
             lines.extend([
                 'printf "%s\\n" ' + shlex.quote(label), 'printf "%s\\n" ' + shlex.quote(note),
                 shlex.join(args), 'result=$?',
-                'printf "%s\\n" ' + shlex.quote('작업 보드로 돌아가 연결 확인을 눌러 주세요. 이 창은 닫아도 됩니다.'),
+                'printf "%s\\n" ' + shlex.quote('Huginn으로 돌아가 연결 확인을 눌러 주세요. 이 창은 닫아도 됩니다.'),
                 'exit "$result"',
             ])
         else:

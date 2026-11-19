@@ -1,4 +1,4 @@
-"""Entry point for the bundled Forkrail service and local CLI tools."""
+"""Entry point for the bundled Huginn service and local CLI tools."""
 import argparse
 from contextlib import closing
 import ctypes
@@ -16,6 +16,7 @@ import threading
 
 
 DURABLE_SETTINGS = ('settings.json', 'favorites.json', 'connections.json')
+LEGACY_CACHES = ('work_titles.json', 'story_cache.json')
 RENAME_EXCL = 0x00000004
 
 
@@ -62,7 +63,7 @@ def migrate(source, destination):
     if not database.is_file() or database.is_symlink():
         raise ValueError('원본 폴더에서 board.db를 찾을 수 없습니다.')
     destination.parent.mkdir(parents=True, exist_ok=True)
-    with tempfile.TemporaryDirectory(prefix='.forkrail-migrate-', dir=destination.parent) as folder:
+    with tempfile.TemporaryDirectory(prefix='.huginn-migrate-', dir=destination.parent) as folder:
         staged = Path(folder) / 'data'
         staged.mkdir(mode=0o700)
         settings = staged / '.actions'
@@ -83,10 +84,37 @@ def migrate(source, destination):
         publish_migration(staged, destination)
 
 
+def adopt_legacy_data(data_dir, legacy):
+    data_dir = data_dir.expanduser().absolute()
+    if (data_dir / 'board.db').exists() or not (legacy / 'board.db').is_file() or (legacy / 'board.db').is_symlink():
+        return False
+    data_dir.parent.mkdir(parents=True, exist_ok=True)
+    with tempfile.TemporaryDirectory(prefix='.huginn-adopt-', dir=data_dir.parent) as folder:
+        staged = Path(folder) / 'data'
+        migrate(legacy, staged)
+        for name in LEGACY_CACHES:
+            path = legacy / name
+            if path.is_file() and not path.is_symlink():
+                shutil.copyfile(path, staged / name)
+        data_dir.mkdir(mode=0o700, exist_ok=True)
+        for entry in staged.iterdir():
+            target = data_dir / entry.name
+            if not target.exists() and not target.is_symlink():
+                entry.rename(target)
+    pending = legacy / 'spool'
+    if pending.is_dir() and not pending.is_symlink():
+        spool = data_dir / 'spool'
+        spool.mkdir(mode=0o700, exist_ok=True)
+        for path in pending.iterdir():
+            if path.is_file() and not path.is_symlink() and not (spool / path.name).exists():
+                shutil.copyfile(path, spool / path.name)
+    return True
+
+
 def configure_service(port, data_dir, instance):
     os.environ['WORK_BOARD_PORT'] = str(port)
-    os.environ['FORKRAIL_DATA_DIR'] = str(data_dir.expanduser().resolve())
-    os.environ['FORKRAIL_INSTANCE'] = instance
+    os.environ['HUGINN_DATA_DIR'] = str(data_dir.expanduser().resolve())
+    os.environ['HUGINN_INSTANCE'] = instance
 
 
 def serve(args):
@@ -94,6 +122,9 @@ def serve(args):
 
     parent_alive = parent_monitor(args.parent_pid)
     configure_service(args.port, args.data_dir, args.instance)
+    from runtime_paths import DATA_DIR, LEGACY_PRODUCT, user_data_dir
+    if DATA_DIR == user_data_dir().resolve():
+        adopt_legacy_data(DATA_DIR, user_data_dir(LEGACY_PRODUCT))
     import server
 
     with server.create_server() as httpd:
@@ -114,7 +145,7 @@ def serve(args):
 
 
 def self_test():
-    with tempfile.TemporaryDirectory(prefix='forkrail-self-test-') as folder:
+    with tempfile.TemporaryDirectory(prefix='huginn-self-test-') as folder:
         root = Path(folder)
         home = root / '테스트 홈'
         home.mkdir()
@@ -152,7 +183,7 @@ def check_service(port, instance):
             return body
 
     health = json.loads(request('/api/health'))
-    if (health.get('ok') is not True or health.get('app') != 'Forkrail' or health.get('api') != 1
+    if (health.get('ok') is not True or health.get('app') != 'Huginn' or health.get('api') != 1
             or not health.get('version') or health.get('instance') != instance):
         raise ValueError('서비스 점검에서 올바른 제품 정보를 확인하지 못했습니다.')
     request('/api/health', headers={'Origin': 'https://foreign.example'}, status=403)
@@ -181,7 +212,7 @@ def main(argv=None):
         import claude_hook
         return claude_hook.main()
 
-    parser = argparse.ArgumentParser(prog='forkrail-service')
+    parser = argparse.ArgumentParser(prog='huginn-service')
     commands = parser.add_subparsers(dest='command', required=True)
     service = commands.add_parser('serve')
     service.add_argument('--port', required=True, type=int)
@@ -189,7 +220,7 @@ def main(argv=None):
     service.add_argument('--instance', required=True)
     service.add_argument('--parent-pid', required=True, type=int)
     commands.add_parser('self-test')
-    commands.add_parser('wb', help='run a work board command')
+    commands.add_parser('wb', help='run a Huginn command')
     commands.add_parser('hook', help='read a Claude hook event from standard input')
     migration = commands.add_parser('migrate')
     migration.add_argument('--from', required=True, type=Path, dest='source')
@@ -202,13 +233,13 @@ def main(argv=None):
             serve(args)
         elif args.command == 'self-test':
             self_test()
-            print('Forkrail service self-test passed')
+            print('Huginn service self-test passed')
         elif args.command == 'migrate':
             migrate(args.source, args.data_dir)
         else:
             parser.error('hook does not take additional arguments')
     except (OSError, ValueError, sqlite3.Error) as error:
-        print(f'Forkrail: {error}', file=sys.stderr)
+        print(f'Huginn: {error}', file=sys.stderr)
         return 2
     return 0
 

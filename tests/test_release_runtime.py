@@ -19,13 +19,13 @@ SERVICE = [sys.executable, str(ROOT / 'desktop_service.py')]
 
 class ReleaseRuntimeTests(unittest.TestCase):
     def setUp(self):
-        self.tmp = tempfile.TemporaryDirectory(prefix='forkrail-service-')
+        self.tmp = tempfile.TemporaryDirectory(prefix='huginn-service-')
         self.addCleanup(self.tmp.cleanup)
         self.root = Path(self.tmp.name)
         self.home = self.root / '테스트 사용자'
         self.home.mkdir()
         self.env = {key: value for key, value in os.environ.items()
-                    if not key.startswith(('WORK_BOARD_', 'FORKRAIL_'))}
+                    if not key.startswith(('WORK_BOARD_', 'HUGINN_'))}
         self.env.update(HOME=str(self.home), USERPROFILE=str(self.home))
 
     def service(self, *args):
@@ -40,7 +40,7 @@ class ReleaseRuntimeTests(unittest.TestCase):
                 self.assertGreater(httpd.server_port, 0)
 
     def test_source_paths_and_explicit_overrides(self):
-        self.env.update(FORKRAIL_DATA_DIR=str(self.root / '보드 자료'),
+        self.env.update(HUGINN_DATA_DIR=str(self.root / '보드 자료'),
                         WORK_BOARD_DB=str(self.root / '다른 기록.db'),
                         WORK_BOARD_SPOOL=str(self.root / '기록 대기'))
         code = ("import json, runtime_paths as p; print(json.dumps([str(x) for x in "
@@ -48,7 +48,7 @@ class ReleaseRuntimeTests(unittest.TestCase):
         run = subprocess.run([sys.executable, '-c', code], env=self.env, cwd=ROOT,
                              capture_output=True, encoding='utf-8', timeout=10)
         self.assertEqual(run.returncode, 0, run.stderr)
-        self.assertEqual(json.loads(run.stdout), [str(ROOT), self.env['FORKRAIL_DATA_DIR'],
+        self.assertEqual(json.loads(run.stdout), [str(ROOT), self.env['HUGINN_DATA_DIR'],
                          self.env['WORK_BOARD_DB'], self.env['WORK_BOARD_SPOOL']])
 
     def test_frozen_paths_use_platform_user_folder(self):
@@ -58,8 +58,8 @@ class ReleaseRuntimeTests(unittest.TestCase):
         resources = self.root / '읽기 전용 앱'
         local_app_data = self.home / 'Local Apps'
         self.env['LOCALAPPDATA'] = str(local_app_data)
-        for platform, data in [('darwin', self.home / 'Library/Application Support/Forkrail'),
-                               ('win32', local_app_data / 'Forkrail')]:
+        for platform, data in [('darwin', self.home / 'Library/Application Support/Huginn'),
+                               ('win32', local_app_data / 'Huginn')]:
             with self.subTest(platform=platform):
                 run = subprocess.run([sys.executable, '-c', code, str(resources), platform],
                                      env=self.env, cwd=ROOT, capture_output=True, encoding='utf-8', timeout=10)
@@ -94,7 +94,7 @@ class ReleaseRuntimeTests(unittest.TestCase):
             else:
                 self.fail('instance did not serve health')
             self.assertEqual(reply.status, 200)
-            self.assertEqual(body, {'ok': True, 'app': 'Forkrail', 'api': 1,
+            self.assertEqual(body, {'ok': True, 'app': 'Huginn', 'api': 1,
                                     'version': json.loads((ROOT / 'release.json').read_bytes())['version'],
                                     'instance': 'test-instance'})
             with contextlib.closing(http.client.HTTPConnection('127.0.0.1', port, timeout=1)) as conn:
@@ -233,6 +233,89 @@ class ReleaseRuntimeTests(unittest.TestCase):
         self.assertNotEqual(moved.returncode, 0)
         self.assertEqual(sentinel.read_bytes(), b'existing')
 
+    def default_folder(self, product):
+        if sys.platform == 'darwin':
+            return self.home / 'Library/Application Support' / product
+        if sys.platform == 'win32':
+            return self.home / 'Local' / product
+        return self.home / 'data' / product
+
+    def test_default_folder_adopts_legacy_board_once_and_keeps_the_original(self):
+        self.env.update(LOCALAPPDATA=str(self.home / 'Local'), XDG_DATA_HOME=str(self.home / 'data'))
+        legacy, data = self.default_folder('Forkrail'), self.default_folder('Huginn')
+        (legacy / '.actions').mkdir(parents=True)
+        (legacy / 'spool').mkdir()
+        with contextlib.closing(sqlite3.connect(legacy / 'board.db')) as db:
+            db.execute('CREATE TABLE kept (name TEXT)')
+            db.execute("INSERT INTO kept VALUES ('이전 기록')")
+            db.commit()
+        (legacy / '.actions/connections.json').write_text('{"summary":{"enabled":false}}', encoding='utf-8')
+        (legacy / '.actions/connection-checks.json').write_text('{}', encoding='utf-8')
+        (legacy / 'work_titles.json').write_text('{"제목":"요약"}', encoding='utf-8')
+        event = {'kind': 'story', 'story': 'MOVE-1', 'title': '전송 대기 기록'}
+        (legacy / 'spool/pending.jsonl').write_text(json.dumps(event) + '\n', encoding='utf-8')
+        (data / 'spool').mkdir(parents=True)
+        original = (legacy / 'board.db').read_bytes()
+        with socket.socket() as probe:
+            probe.bind(('127.0.0.1', 0))
+            port = probe.getsockname()[1]
+        process = subprocess.Popen([*SERVICE, 'serve', '--port', str(port), '--data-dir', str(data),
+                                    '--instance', 'adopt', '--parent-pid', str(os.getpid())],
+                                   env=self.env, cwd=self.root, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
+        try:
+            deadline, stories = time.monotonic() + 8, []
+            while time.monotonic() < deadline and process.poll() is None and not stories:
+                try:
+                    with contextlib.closing(http.client.HTTPConnection('127.0.0.1', port, timeout=.3)) as conn:
+                        conn.request('GET', '/api/state?story=MOVE-1')
+                        stories = [s for s in json.loads(conn.getresponse().read())['stories'] if s.get('story') == 'MOVE-1']
+                except (OSError, ValueError, KeyError):
+                    pass
+                time.sleep(.05)
+            self.assertEqual([s.get('title') for s in stories], ['전송 대기 기록'])
+        finally:
+            if process.poll() is None:
+                process.terminate()
+            _, errors = process.communicate(timeout=5)
+        with contextlib.closing(sqlite3.connect(data / 'board.db')) as db:
+            self.assertEqual(db.execute('SELECT name FROM kept').fetchall(), [('이전 기록',)])
+        self.assertEqual(sorted(x.name for x in (data / '.actions').iterdir() if not x.name.startswith('.')),
+                         ['connections.json'])
+        self.assertEqual((data / 'work_titles.json').read_text(encoding='utf-8'), '{"제목":"요약"}')
+        self.assertEqual((legacy / 'board.db').read_bytes(), original)
+        self.assertTrue((legacy / 'spool/pending.jsonl').is_file())
+
+        import desktop_service
+        with contextlib.closing(sqlite3.connect(legacy / 'board.db')) as db:
+            db.execute("INSERT INTO kept VALUES ('이후 기록')")
+            db.commit()
+        self.assertFalse(desktop_service.adopt_legacy_data(data, legacy))
+        with contextlib.closing(sqlite3.connect(data / 'board.db')) as db:
+            self.assertEqual(db.execute('SELECT count(*) FROM kept').fetchone(), (1,))
+
+    def test_explicit_folder_does_not_adopt_legacy_board(self):
+        self.env.update(LOCALAPPDATA=str(self.home / 'Local'), XDG_DATA_HOME=str(self.home / 'data'))
+        legacy = self.default_folder('Forkrail')
+        legacy.mkdir(parents=True)
+        with contextlib.closing(sqlite3.connect(legacy / 'board.db')) as db:
+            db.execute('CREATE TABLE kept (name TEXT)')
+        data = self.root / '지정 폴더'
+        with socket.socket() as probe:
+            probe.bind(('127.0.0.1', 0))
+            port = probe.getsockname()[1]
+        process = subprocess.Popen([*SERVICE, 'serve', '--port', str(port), '--data-dir', str(data),
+                                    '--instance', 'explicit', '--parent-pid', str(os.getpid())],
+                                   env=self.env, cwd=self.root, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        try:
+            deadline = time.monotonic() + 5
+            while time.monotonic() < deadline and not (data / 'board.db').exists():
+                time.sleep(.05)
+        finally:
+            process.terminate()
+            process.communicate(timeout=5)
+        with contextlib.closing(sqlite3.connect(data / 'board.db')) as db:
+            self.assertFalse(db.execute("SELECT 1 FROM sqlite_master WHERE name='kept'").fetchall())
+
     def test_service_self_test_ignores_explicit_database_and_spool(self):
         db = self.root / 'existing.db'
         db.write_bytes(b'preserve')
@@ -249,7 +332,7 @@ class ReleaseRuntimeTests(unittest.TestCase):
 
     def test_bundled_workboard_actions_use_data_directory(self):
         data = self.root / '작업 보드'
-        self.env['FORKRAIL_DATA_DIR'] = str(data)
+        self.env['HUGINN_DATA_DIR'] = str(data)
         run = self.service('wb', 'actions', 'configure', '--auto-terminal', 'off')
         self.assertEqual(run.returncode, 0, run.stderr)
         self.assertFalse(json.loads((data / '.actions/settings.json').read_bytes())['auto_terminal'])

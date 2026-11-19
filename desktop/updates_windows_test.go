@@ -12,7 +12,7 @@ func TestWindowsUpdatePreservesInternetZoneOnDownloadedInstaller(t *testing.T) {
 	if err := os.WriteFile(path, []byte("fixture"), 0600); err != nil {
 		t.Fatal(err)
 	}
-	source := "https://github.com/owner/forkrail/releases/tag/v1.2.0-rc.2"
+	source := "https://github.com/owner/huginn/releases/tag/v1.2.0-rc.2"
 	if err := markInstallerOrigin(path, source); err != nil {
 		t.Fatal(err)
 	}
