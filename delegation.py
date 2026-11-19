@@ -61,11 +61,11 @@ def attach(sessions, output_root=None):
                     candidates.setdefault(child, set()).add(parent['id'])
     links = {child: next(iter(options)) for child, options in candidates.items() if len(options) == 1}
     for child_id, parent_id in links.items():
-        seen, cursor = {child_id}, parent_id
-        while cursor in links and cursor not in seen:
+        seen, cursor = set(), parent_id
+        while cursor in links and cursor != child_id and cursor not in seen:
             seen.add(cursor)
             cursor = links[cursor]
-        if cursor in seen:
+        if cursor == child_id:
             continue
         child, parent = by_id[child_id], by_id[parent_id]
         child['parent_id'] = parent_id

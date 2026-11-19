@@ -835,10 +835,6 @@ def _wait_reason(meta: dict, task: dict, last_tool: dict | None, running: bool) 
     return None
 
 
-def _subagents(base: str, now: float) -> dict:
-    return delegation.claude_children(base, [], now)
-
-
 def _codex_turn(hist: sqlite3.Connection, tid: str, turn_id: str, status: str, started: float, completed: float) -> dict:
     columns={r[1] for r in hist.execute('PRAGMA table_info(thread_items)')}
     timing=', started_at_ms, completed_at_ms' if {'started_at_ms','completed_at_ms'}<=columns else ', NULL, NULL'

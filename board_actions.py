@@ -251,7 +251,7 @@ Huginn의 검색 범위는 Claude·Codex 로컬 스킬, Codex 시스템 스킬, 
             lines.extend([
                 'printf "%s\\n" ' + shlex.quote(label), 'printf "%s\\n" ' + shlex.quote(note),
                 shlex.join(args), 'result=$?',
-                'printf "%s\\n" ' + shlex.quote('Huginn로 돌아가 연결 확인을 눌러 주세요. 이 창은 닫아도 됩니다.'),
+                'printf "%s\\n" ' + shlex.quote('Huginn으로 돌아가 연결 확인을 눌러 주세요. 이 창은 닫아도 됩니다.'),
                 'exit "$result"',
             ])
         else:
