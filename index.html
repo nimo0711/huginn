@@ -1143,6 +1143,31 @@ h1,h2,h3,p { margin-top:0; }
  .progress-children summary { padding:8px 0; }
 }
 @media (max-width:580px) {
+
+.delegation-panel { padding:20px; }
+.delegation-heading,.delegated-row > summary { display:flex; align-items:center; justify-content:space-between; gap:12px; cursor:pointer; list-style:none; }
+.delegation-heading::-webkit-details-marker,.delegated-row > summary::-webkit-details-marker { display:none; }
+.delegation-heading > span:first-child { display:flex; align-items:center; gap:8px; font-weight:600; }
+.delegation-heading svg { width:16px; height:16px; flex-shrink:0; color:var(--dim); }
+.delegation-heading b { font-size:12px; color:var(--dim); font-weight:400; }
+.delegation-heading::after,.delegated-row > summary::after { content:'›'; color:var(--dim); }
+.delegation-heading .quiet { margin-left:auto; font-size:12px; }
+.delegation-panel[open] > summary::after,.delegated-row[open] > summary::after { transform:rotate(90deg); }
+.delegation-list { margin-top:16px; }
+.delegation-label { flex:1; min-width:0; overflow-wrap:anywhere; }
+.delegation-label small { display:block; font-size:12px; color:var(--dim); margin-top:4px; }
+.delegation-content { padding-top:16px; }
+.delegation-meta { display:flex; flex-wrap:wrap; align-items:center; gap:12px; color:var(--dim); font-size:12px; margin-bottom:12px; }
+.delegation-meta .text-button { margin-left:auto; }
+.delegation-pair { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:16px; }
+.delegation-pair h3 { font-size:12px; font-weight:500; color:var(--dim); margin:0 0 8px; }
+.delegation-pair pre,.handoff-panel pre { margin:0; padding:12px; border:1px solid var(--line); border-radius:4px; font-family:inherit; font-size:14px; line-height:1.7; white-space:pre-wrap; overflow-wrap:anywhere; max-height:320px; overflow:auto; }
+.delegation-wait { margin:0 0 12px; font-size:14px; }
+.handoff-panel { display:flex; flex-direction:column; gap:12px; margin-bottom:16px; }
+.handoff-panel > .text-button { align-self:flex-start; }
+.handoff-panel summary { cursor:pointer; color:var(--dim); font-size:12px; padding-bottom:8px; }
+@media(max-width:720px) { .delegation-pair { grid-template-columns:1fr; } .delegation-heading { flex-wrap:wrap; } .delegation-heading .quiet { margin-left:0; } }
+
  .bignum b { font-size:32px; }
  .usage-charts .chart { height:220px; min-height:220px; }
  .context-row { gap:16px; }
@@ -1930,10 +1955,10 @@ function workProgress(W) {
 function requestDone(W,t) {
   if(t.history)return t.history.total>0 && t.history.done===t.history.total;
   const pending=t.progress?.items?.some(i=>i.state!=="done");
-  return Boolean(t.end_ts && t.result && ["완료","답변"].includes(t.outcome) && !t.ask && !pending && !(W.current && t===W.last && ["run","wait","stall"].includes(phase(W.s))));
+  return Boolean(t.end_ts && (t.result || t.raw_result) && ["완료","답변"].includes(t.outcome) && !t.ask && !pending && !(W.current && t===W.last && ["run","wait","stall"].includes(phase(W.s))));
 }
 function requestStage(W) {
-  const t=W.last, complete=requestDone(W,t) && !activeDelegates(W).length && !(W.current && W.s.agents?.running?.length);
+  const t=W.last, complete=requestDone(W,t) && !activeDelegates(W).length && !nativePending(W);
   const index=complete?3:t.n_steps>0?2:t.n_checks>0?1:0;
   return {index,complete,modified:t.n_steps>0,label:["계획","작업","수정","완료"][index]};
 }
@@ -1948,10 +1973,10 @@ function unitMembers(W) {
   return members.length?members:[W];
 }
 function delegatedFinished(s,seen=new Set()) {
-  if(seen.has(s.id) || ["run","wait","stall"].includes(phase(s)) || s.agents?.running?.length)return false;
+  if(seen.has(s.id) || ["run","wait","stall"].includes(phase(s)))return false;
   const path=new Set(seen);path.add(s.id);
   return s.works.length>0 && s.works.every(w=>{
-    const m=workOf(s,w);return m.ts.every(t=>requestDone(m,t));
+    const m=workOf(s,w);return !nativePending(m) && m.ts.every(t=>requestDone(m,t));
   }) && delegatedSessions(s).every(c=>delegatedFinished(c,path));
 }
 function unitProgress(W) {
@@ -1978,10 +2003,10 @@ function unitProgress(W) {
   rows.sort((a,b)=>a.ts-b.ts);
   const done=rows.reduce((sum,r)=>sum+(r.doneCount ?? (r.done?1:0)),0);
   const total=rows.reduce((sum,r)=>sum+(r.count || 1),0);
-  const delegatedDone=[...children.values()].every(c=>delegatedFinished(c)) && !members.some(m=>m.current && m.s.agents?.running?.length);
+  const delegatedDone=[...children.values()].every(c=>delegatedFinished(c)) && !members.some(nativePending);
   const complete=total>0 && done===total && delegatedDone;
   const modified=members.some(m=>m.nSteps>0),worked=members.some(m=>m.nChecks>0);
-  const index=complete?3:modified?2:worked?1:0;
+  const index=complete?3:modified?2:worked || !delegatedDone?1:0;
   const scope=W.w.unit?.kind==='story'?'스토리 기준':W.w.unit?.kind==='issue'?'Jira 작업 기준':(W.w.unit?.key || W.w.story)?'태스크 기준':'작업 묶음 기준';
   return {rows,done,total,scope,stage:{index,complete,modified,label:['계획','작업','수정','완료'][index]}};
 }
@@ -2005,6 +2030,56 @@ function rootSessions(list) {
 }
 function delegatedSessions(s) { return data.sessions.filter(c=>c.parent_id===s.id); }
 function displayPhase(s) {
+function nativePending(W) {
+  const items=W.s.agents?.items;
+  if(!items)return Boolean(W.current && W.s.agents?.running?.length);
+  const calls=new Map(W.ts.flatMap(t=>t.delegations || []).map(r=>[r.id,r]));
+  return items.some(r=>(calls.has(r.id) || W.ts.some(t=>t.ts===r.parent_task_ts))
+    && !['completed','failed','interrupted'].includes(calls.get(r.id)?.status)
+    && ['running','waiting','unknown'].includes(r.status));
+}
+function delegationRows(W) {
+  const rows=new Map(W.ts.flatMap(t=>t.delegations || []).map(r=>[r.id,{...r}]));
+  for(const r of W.s.agents?.items || []) {
+    if(!rows.has(r.id) && !W.ts.some(t=>t.ts===r.parent_task_ts))continue;
+    const original=rows.get(r.id),merged={...original,...r};
+    if(original && ['completed','failed','interrupted'].includes(original.status)) {
+      Object.assign(merged,{status:original.status,result:original.result || r.result,end_ts:original.end_ts,wait:null});
+    }
+    rows.set(r.id,merged);
+  }
+  const allCalls=W.s.tasks.flatMap(t=>t.delegations || []);
+  for(const c of delegatedSessions(W.s).filter(c=>(c.parent_work?c.parent_work===W.w.key:W.current) || [...rows.values()].some(r=>r.child_id===c.id))) {
+    const calls=allCalls.filter(r=>r.child_id===c.id).sort((a,b)=>a.ts-b.ts),used=new Set();
+    const tasks=(c.tasks || []).filter(t=>!t.history);
+    for(const [i,t] of tasks.entries()) {
+      // Pair exact recorded instructions in order; never assign the latest result to an older call.
+      const r=calls.find(r=>!used.has(r.id) && r.ts<=t.ts && r.prompt && r.prompt===t.instruction);
+      if(r)used.add(r.id);
+      if(r && !rows.has(r.id))continue;
+      if(!r && c.parent_work && c.parent_work!==W.w.key)continue;
+      const id=r?.id || `session:${c.id}:${t.ts}`,last=i===tasks.length-1,p=last?phase(c):'off';
+      const wait=last?waitOf(c):null,complete=requestDone({s:c,current:last,last:t},t);
+      rows.set(id,{...r,id,child_id:c.id,agent:c.agent,label:r?.label || c.role || '위임 작업',
+        prompt:r?.prompt || t.instruction || t.prompt || '',ts:r?.ts || t.ts,last_ts:t.last_ts || c.last_ts,
+        end_ts:t.end_ts || 0,result:t.end_ts?(t.raw_result || t.result || ''):'',activity:t.raw_activity || t.now || '',wait,
+        status:p==='wait'?'waiting':p==='run'?'running':t.outcome==='실패'?'failed':t.outcome==='중단'?'interrupted':complete?'completed':'unknown'});
+    }
+  }
+  return [...rows.values()].sort((a,b)=>b.ts-a.ts);
+}
+function delegationStatus(r) {
+  const state=r.status==='running' && r.last_ts && now()-r.last_ts>900?'unknown':r.status;
+  return {completed:['완료','done'],waiting:['응답 대기','wait'],failed:['실패','stall'],interrupted:['중단','stall'],unknown:['활동 확인','idle'],running:['작업 중','run']}[state] || ['상태 미확인','idle'];
+}
+function delegationBody(r) {
+  const state=delegationStatus(r)[0],terminal=['completed','failed','interrupted'].includes(r.status);
+  const elapsed=r.ts?span(Math.max(0,(terminal && r.end_ts?r.end_ts:now())-r.ts)):'';
+  const waiting=r.wait?.text?`<p class="delegation-wait">${esc(r.wait.text)}${r.wait.ts?` · ${span(Math.max(0,now()-r.wait.ts))}째 대기`:''}</p>`:'';
+  const child=data.sessions.find(s=>s.id===r.child_id);
+  return `<div class="delegation-content"><div class="delegation-meta"><span>${elapsed?`${terminal?'소요':'경과'} ${elapsed}`:'시작 시각 미확인'}</span>${r.last_ts?`<span>최근 기록 ${hm(r.last_ts)}</span>`:''}${child?.works?.length?`<button class="text-button" data-open-session="${esc(child.id)}" data-work="${child.works.length-1}">작업 열기 ${ARROW}</button>`:''}</div>${waiting}
+    <div class="delegation-pair"><div><h3>위임한 지시</h3><pre>${esc(r.prompt || '지시문을 확인할 수 없습니다.')}</pre></div><div><h3>${r.result?'결과':'최근 활동'}</h3><pre>${esc(r.result || r.activity || (terminal?'결과 본문이 기록되지 않았습니다.':'아직 결과가 기록되지 않았습니다.'))}</pre></div></div></div>`;
+}
   const own=phase(s);
   if(["run","wait","stall"].includes(own))return own;
   const children=delegatedSessions(s).map(phase);
@@ -2012,12 +2087,21 @@ function displayPhase(s) {
 }
 function activeDelegates(W) { return delegatedSessions(W.s).filter(c=>(c.parent_work?c.parent_work===W.w.key:W.current) && ["run","wait","stall"].includes(phase(c))); }
 function delegatedMarkup(W) {
-  const children=delegatedSessions(W.s).filter(c=>c.parent_work?c.parent_work===W.w.key:W.current);
-  if(!children.length)return "";
-  return `<section class="resource-panel"><div class="section-heading"><h2>위임한 작업</h2><span>${children.length}개</span></div>${children.map(c=>{
-    const C=workOf(c,c.works[c.works.length-1]);
-    return `<div class="delegated-row"><button class="text-button" data-open-session="${esc(c.id)}" data-work="${c.works.length-1}">${esc(c.role || '위임 작업')} · Codex ${ARROW}</button> ${badge(workBadge(C))}${stageMarkup(C)}<p class="progress-next">${esc(workSummary(C))}</p></div>`;
-  }).join("")}</section>`;
+  const rows=delegationRows(W);
+  if(!rows.length)return '';
+  const done=rows.filter(r=>r.status==='completed').length,waiting=rows.filter(r=>r.status==='waiting').length;
+  return `<details class="resource-panel delegation-panel" data-key="delegations-${esc(workKey(W))}"><summary class="delegation-heading"><span>${SVG('<path d="M4 2v8a3 3 0 0 0 3 3h5M4 5h8M10 3l2 2-2 2M10 11l2 2-2 2"/>')}위임한 작업 <b>${rows.length}</b></span><span class="quiet">${waiting?`응답 대기 ${waiting} · `:''}완료 ${done}/${rows.length}</span></summary><div class="delegation-list">${rows.map(r=>{
+    const [word,tone]=delegationStatus(r);
+    return `<details class="delegated-row" data-key="delegate-${esc(r.id)}"><summary><span class="delegation-label">${esc(r.label || '위임 작업')}<small>${r.agent==='codex'?'Codex':'Claude'}</small></span>${badge({word,tone})}</summary>${delegationBody(r)}</details>`;
+  }).join('')}</div></details>`;
+}
+function handoffMarkup(W) {
+
+  const s=W.s;if(!s.parent_id)return '';
+  const parent=data.sessions.find(p=>p.id===s.parent_id);
+  const wi=parent?.works?.findIndex(w=>w.key===s.parent_work) ?? -1;
+  const link=parent?`<button class="text-button" data-open-session="${esc(parent.id)}" data-work="${wi>=0?wi:Math.max(0,(parent.works?.length || 1)-1)}">부모 ${parent.agent==='codex'?'Codex':'Claude'} 작업으로 ${ARROW}</button>`:'<span class="quiet">부모 세션의 기록을 현재 확인할 수 없습니다.</span>';
+  return `<div class="handoff-panel">${link}<details data-key="handoff-${esc(s.id)}"><summary>넘겨받은 지시 보기</summary><pre>${esc(s.handoff?.prompt || '원본 지시문을 확인할 수 없습니다.')}</pre></details></div>`;
 }
 function postCompletion(W) {
   const completed=Date.parse(W.info.resolved_at || "") / 1000;
@@ -2451,8 +2535,9 @@ function mainView(s) {
   return `<div class="workspace-page task-page" data-key="task-${esc(workKey(W))}">
     <nav class="breadcrumbs" aria-label="현재 위치"><button data-home="1">작업 현황</button><span>/</span><span>${esc(label(s))}</span><button class="text-button diagnostic" data-info="1" aria-expanded="${ui.infoOpen}" aria-controls="session-inline">세션 정보</button></nav>
     <header class="task-heading"><div class="task-kicker">${badge(st)}<span class="quiet">${W.w.story ? esc(W.w.story) : esc(s.agent === "codex" ? "Codex" : "Claude")}</span></div><h1>${esc(workTitle(W))}</h1>${workGoal(W) !== workTitle(W) ? `<p class="task-goal">${esc(workGoal(W))}</p>` : ""}<div class="task-meta"><span class="card-owner">${agentAv(s)}${esc(label(s))}</span><span>세션 · ${PH[p]} · 최근 활동 ${span(now() - s.last_ts)} 전</span>${W.w.story && !s.parent_id ? `<span>Jira · ${esc(W.info.status || "상태 미확인")}</span>` : ""}${mergeControl(s,W)}</div></header>
-    ${s.parent_id && data.sessions.some(p=>p.id===s.parent_id) ? `<button class="text-button" data-open-session="${esc(s.parent_id)}" data-work="${data.sessions.find(p=>p.id===s.parent_id)?.works.findIndex(w=>w.key===s.parent_work)}">${esc(s.role || '위임 작업')} · 부모 Claude 작업으로 ${ARROW}</button>` : ""}
-    ${ui.infoOpen ? sessionInline(s)+delegatedMarkup(W) : ""}
+    ${handoffMarkup(W)}
+      ${delegatedMarkup(W)}
+    ${ui.infoOpen ? sessionInline(s) : ""}
     ${s.works.length > 1 ? `<div class="work-switch" role="group" aria-label="이 세션의 작업">${s.works.map((w,j) => `<button class="wchip${j===wi ? " sel" : ""}" data-wi="${j}" aria-pressed="${j===wi}">${esc(workName(w))}</button>`).reverse().join("")}</div>` : ""}
     ${actionToolbar(W)}
     <div class="task-layout"><div class="task-primary">

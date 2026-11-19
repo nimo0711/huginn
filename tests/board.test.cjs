@@ -489,13 +489,14 @@ test('failure interruption and waiting keep whole work incomplete even if Jira s
   const b=board();load(b,fixture({task:{result:'질문'},session:{state:'입력 대기',wait:{kind:'perm',text:'승인'}}}));
   assert.equal(b.run('unitProgress(W).done'),0);
 });
-test('evaluators remain internal and reachable only in session information',()=>{
+test('evaluators remain out of the sidebar and reachable through collapsed task details',()=>{
   const b=board();load(b,fixture({task:{result:'끝',outcome:'완료'}}));
   b.run('data.sessions.push({...input.s,id:"child",state:"작업 중",parent_id:input.s.id,parent_work:input.w.key,role:"외부 평가",tasks:[{...input.s.tasks[0],end_ts:0,outcome:"진행"}]})');
   assert.equal(b.run('unitProgress(W).total'),1);
   assert.equal(b.run('unitProgress(W).stage.complete'),false);
   assert.ok(!b.run('tabs(data.sessions)').includes('data-open-session="child"'));
-  assert.ok(!b.run('mainView(input.s)').includes('data-open-session="child"'));
+  assert.ok(b.run('mainView(input.s)').includes('data-open-session="child"'));
+  assert.ok(!b.run('delegatedMarkup(W)').match(/<details[^>]* open/));
   b.run('ui.infoOpen=true');
   assert.ok(b.run('mainView(input.s)').includes('data-open-session="child"'));
 });
@@ -725,4 +726,76 @@ test('known native failure and cancellation messages remain actionable without e
   b.set({status,message,available:true});b.run('ui.updates=input');assert.ok(b.run('settingsView()').includes(message));
  }
  b.run('ui.updates.message="GET https://private.test?token=secret failed"');assert.ok(!b.run('settingsView()').includes('token=secret'));
+});
+
+test('delegation details pair original instructions and results without exposing HTML',()=>{
+  const b=board(),f=fixture({task:{delegations:[{id:'review',agent:'claude',label:'서버 검수',prompt:'<script>bad()</script>\n읽기 전용',result:'문제 없음',status:'completed',ts:100,end_ts:120,last_ts:120}]}});
+  load(b,f);
+  const view=b.run('delegatedMarkup(W)');
+  assert.ok(view.includes('위임한 지시'));
+  assert.ok(view.includes('결과'));
+  assert.ok(view.includes('&lt;script&gt;bad()&lt;/script&gt;'));
+  assert.ok(!view.includes('<script>bad()'));
+  assert.ok(view.includes('문제 없음'));
+  assert.ok(view.includes('20초'));
+  assert.ok(view.includes('<details'));
+});
+test('completed native children remain under the launch work and unresolved children are not called complete',()=>{
+  const b=board(),f=fixture({session:{agents:{items:[{id:'one',agent:'claude',label:'이전 작업',parent_task_ts:10,status:'completed',result:'이전 결과'},{id:'two',agent:'claude',label:'현재 검수',parent_task_ts:100,status:'unknown',prompt:'검수',last_ts:110,ts:101}],running:[],done:1}}});
+  load(b,f);
+  const view=b.run('delegatedMarkup(W)');
+  assert.ok(view.includes('현재 검수'));
+  assert.ok(!view.includes('이전 결과'));
+  assert.ok(view.includes('활동 확인'));
+  assert.ok(!view.includes('완료 1'));
+});
+test('parent navigation names the actual provider and exposes the handoff in child details',()=>{
+  const b=board(),f=fixture({session:{parent_id:'parent',parent_work:'work',handoff:{prompt:'원본 지시'}}});
+  load(b,f);
+  b.run("data.sessions.push({id:'parent',agent:'codex',works:[{key:'work'}]})");
+  const view=b.run('handoffMarkup(W)');
+  assert.ok(view.includes('부모 Codex 작업으로'));
+  assert.ok(view.includes('원본 지시'));
+  assert.ok(view.includes('data-work="0"'));
+});
+
+test('missing child log cannot erase a confirmed tool result or block a different work',()=>{
+ const b=board();load(b,fixture({task:{result:'완료',delegations:[{id:'a',status:'completed',result:'확인한 결과',end_ts:110}]},session:{agents:{items:[{id:'a',status:'unknown',result:'',parent_task_ts:100},{id:'old',status:'waiting',parent_task_ts:10}],running:[{parent_task_ts:10}]}}}));
+ assert.equal(b.run('delegationRows(W).find(r=>r.id==="a").result'),'확인한 결과');
+ assert.equal(b.run('requestStage(W).complete'),true);
+});
+test('follow-up delegation pairs each child turn with its own instruction and raw result',()=>{
+ const b=board();load(b,fixture({task:{delegations:[{id:'a',child_id:'child',prompt:'첫 검수',ts:10},{id:'b',child_id:'child',prompt:'다시 검수',ts:30}]}}));
+ b.run(`const child={id:'child',agent:'codex',parent_id:W.s.id,parent_work:W.w.key,state:'쉬는 중',last_ts:40,tasks:[
+ {ts:11,end_ts:20,last_ts:20,instruction:'첫 검수',result:'첫 결과',raw_result:'<div>첫 결과</div>',outcome:'답변'},
+ {ts:31,end_ts:40,last_ts:40,instruction:'다시 검수',result:'두 번째 결과',outcome:'답변'}],works:[{key:'검수',tasks:[0,1]}]};data.sessions.push(child);`);
+ assert.equal(b.run('delegationRows(W).find(r=>r.id==="a").result'),'<div>첫 결과</div>');
+ assert.equal(b.run('delegationRows(W).find(r=>r.id==="b").result'),'두 번째 결과');
+ assert.ok(b.run('delegatedMarkup(W)').includes('&lt;div&gt;첫 결과&lt;/div&gt;'));
+});
+
+test('an identical prompt from an older child turn never completes a newer delegation',()=>{
+ const b=board();load(b,fixture({task:{delegations:[{id:'new',child_id:'child',prompt:'검수',ts:30}]}}));
+ b.run(`data.sessions.push({id:'child',agent:'codex',parent_id:W.s.id,parent_work:W.w.key,state:'쉬는 중',last_ts:40,tasks:[
+ {ts:11,end_ts:20,last_ts:20,instruction:'검수',result:'옛 결과',outcome:'답변'},
+ {ts:31,end_ts:40,last_ts:40,instruction:'검수',result:'새 결과',outcome:'답변'}],works:[]});`);
+ assert.equal(b.run('delegationRows(W).find(r=>r.id==="new").result'),'새 결과');
+ assert.ok(b.run('delegationRows(W).find(r=>r.id==="new").end_ts>=30'));
+});
+
+test('a completed code-only child result remains complete and is safely escaped',()=>{
+ const b=board();load(b,fixture());
+ b.run(`data.sessions.push({id:'child',agent:'codex',parent_id:W.s.id,parent_work:W.w.key,state:'쉬는 중',last_ts:120,
+ tasks:[{ts:101,end_ts:120,last_ts:120,instruction:'코드 출력',result:'',raw_result:'<div>value</div>',outcome:'답변'}],works:[]});`);
+ assert.equal(b.run('delegationRows(W)[0].status'),'completed');
+ assert.ok(b.run('delegatedMarkup(W)').includes('&lt;div&gt;value&lt;/div&gt;'));
+});
+
+test('identical queued delegation requests keep FIFO result order',()=>{
+ const b=board();load(b,fixture({task:{delegations:[{id:'first',child_id:'child',prompt:'검수',ts:20},{id:'second',child_id:'child',prompt:'검수',ts:21}]}}));
+ b.run(`data.sessions.push({id:'child',agent:'codex',parent_id:W.s.id,parent_work:W.w.key,state:'쉬는 중',last_ts:50,tasks:[
+ {ts:30,end_ts:35,last_ts:35,instruction:'검수',result:'첫 결과',outcome:'답변'},
+ {ts:40,end_ts:50,last_ts:50,instruction:'검수',result:'둘째 결과',outcome:'답변'}],works:[]});`);
+ assert.equal(b.run('delegationRows(W).find(r=>r.id==="first").result'),'첫 결과');
+ assert.equal(b.run('delegationRows(W).find(r=>r.id==="second").result'),'둘째 결과');
 });
