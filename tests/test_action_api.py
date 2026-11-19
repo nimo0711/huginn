@@ -81,3 +81,11 @@ class ApiTests(unittest.TestCase):
     h._action()
    self.assertEqual(h.result[0],200);self.assertEqual(h.result[1]['status'],'accepted')
    sent=next(p for method,p in rpc.calls if method=='turn/start');self.assertTrue(sent['input'][0]['text'].endswith(prompt))
+ def test_feedback_uses_release_repository_and_rejects_foreign_origin(self):
+  h=self.handler({'action':'feedback','kind':'idea','title':'제안','body':'내용','repository':'evil/repo'})
+  with patch.object(server.feedback,'submit',return_value={'ok':True,'status':'created','url':'u','message':'m'}) as submit:h._action()
+  self.assertEqual(h.result[0],200)
+  self.assertEqual(submit.call_args.args[:4],(server.RELEASE['repository'],'idea','제안','내용'))
+  h=self.handler({'action':'feedback','kind':'idea','title':'제안','body':'내용'},'http://evil.test')
+  with patch.object(server.feedback,'submit') as submit:h._action();submit.assert_not_called()
+  self.assertEqual(h.result[0],403)

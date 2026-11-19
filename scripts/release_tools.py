@@ -15,7 +15,7 @@ SOURCE_FILES = (
     'desktop_service.py', 'runtime_paths.py', 'platform_support.py',
     'server.py', 'scan.py', 'usage.py', 'sprint.py', 'enrich.py', 'connections.py',
     'board_actions.py', 'session_delivery.py', 'local_runtime.py', 'branding.py',
-    'blocks.py', 'progress.py', 'delegation.py', 'title_summary.py',
+    'blocks.py', 'progress.py', 'delegation.py', 'title_summary.py', 'feedback.py',
     'wbcore.py', 'actions_cli.py', 'claude_hook.py', 'install_claude_hooks.py', 'wb',
     'index.html', 'stories.html', 'AGENT_GUIDE.md', 'release.json',
     'desktop/theme.css',
