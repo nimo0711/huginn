@@ -878,6 +878,21 @@ h1,h2,h3,p { margin-top:0; }
 .mobile-settings { display:none; }
 .side-links { display:flex; align-items:center; justify-content:space-between; gap:12px; }
 .theme-toggle { display:inline-flex; align-items:center; gap:6px; height:28px; padding:4px 8px; border:1px solid var(--line); border-radius:5px; background:none; color:var(--sub); font:inherit; font-size:12px; cursor:pointer; }
+.feedback-dialog { height:fit-content; }
+.feedback-form { display:flex; flex-direction:column; min-height:0; }
+.feedback-body { padding:4px 20px 8px; overflow:auto; }
+.feedback-body .choice-row { margin-top:16px; }
+.feedback-dialog .choice { display:inline-flex; align-items:center; gap:8px; min-height:36px; padding:8px 12px; border:1px solid var(--line2); border-radius:5px; background:var(--panel2); color:var(--sub); font-size:14px; }
+.feedback-dialog .choice:hover { background:var(--hover); color:var(--ink); }
+.feedback-dialog .choice:has(input:focus-visible) { outline:2px solid var(--sub); outline-offset:2px; }
+.feedback-form [data-feedback-status] a { color:var(--primary); font-weight:600; text-decoration:none; display:inline-flex; align-items:center; gap:4px; }
+.feedback-form [data-feedback-status] a:hover { text-decoration:underline; }
+.choice-row label.choice { cursor:pointer; }
+.choice-row label.choice input { margin:0; accent-color:var(--primary); }
+.choice-row label.choice:has(input:checked) { border-color:var(--primary); color:var(--ink); box-shadow:inset 0 0 0 1px var(--primary); }
+.feedback-form .skill-dialog-footer { display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; }
+.feedback-form .skill-dialog-footer .action-feedback { margin:0; flex:1 1 220px; color:var(--sub); font-size:13px; }
+.side-foot [data-open-feedback] { margin-top:-4px; }
 .choice-row { display:flex; flex-wrap:wrap; gap:8px; align-content:flex-start; }
 .choice-row .choice { display:inline-flex; align-items:center; gap:8px; min-height:36px; }
 .choice-row .choice[aria-pressed=true] { border-color:var(--primary); color:var(--ink); box-shadow:inset 0 0 0 1px var(--primary); }
@@ -1194,10 +1209,11 @@ h1,h2,h3,p { margin-top:0; }
     </div>
     <div id="use"></div>
     <div class="list" id="tabs"></div>
-    <div class="side-foot"><button class="tab workspace-nav" data-open-settings aria-label="설정"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M7 1L9 1L9.5 3L10.5 3.5L12.5 2.5L13.5 3.5L12.5 5.5L13 6.5L15 7L15 9L13 9.5L12.5 10.5L13.5 12.5L12.5 13.5L10.5 12.5L9.5 13L9 15L7 15L6.5 13L5.5 12.5L3.5 13.5L2.5 12.5L3.5 10.5L3 9.5L1 9L1 7L3 6.5L3.5 5.5L2.5 3.5L3.5 2.5L5.5 3.5L6.5 3Z"/><circle cx="8" cy="8" r="2"/></svg><span>설정</span></button><div class="side-links"><a href="/stories">작업 기록 →</a><button class="theme-toggle" type="button" data-theme-toggle aria-pressed="false"><svg class="theme-moon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M13.5 9.5A5.5 5.5 0 016.5 2.5a5.5 5.5 0 107 7z"/></svg><svg class="theme-sun" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><circle cx="8" cy="8" r="3"/><path d="M8 1v1.5M8 13.5V15M1 8h1.5M13.5 8H15M3 3l1 1M12 12l1 1M3 13l1-1M12 4l1-1"/></svg><span>라이트 모드</span></button></div></div>
+    <div class="side-foot"><button class="tab workspace-nav" data-open-settings aria-label="설정"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M7 1L9 1L9.5 3L10.5 3.5L12.5 2.5L13.5 3.5L12.5 5.5L13 6.5L15 7L15 9L13 9.5L12.5 10.5L13.5 12.5L12.5 13.5L10.5 12.5L9.5 13L9 15L7 15L6.5 13L5.5 12.5L3.5 13.5L2.5 12.5L3.5 10.5L3 9.5L1 9L1 7L3 6.5L3.5 5.5L2.5 3.5L3.5 2.5L5.5 3.5L6.5 3Z"/><circle cx="8" cy="8" r="2"/></svg><span>설정</span></button><button class="tab workspace-nav" type="button" data-open-feedback><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" aria-hidden="true"><path d="M2 3h12v8H6l-3 3v-3H2z"/><path d="M5 6h6M5 8.5h4"/></svg><span>의견 보내기</span></button><div class="side-links"><a href="/stories">작업 기록 →</a><button class="theme-toggle" type="button" data-theme-toggle aria-pressed="false"><svg class="theme-moon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M13.5 9.5A5.5 5.5 0 016.5 2.5a5.5 5.5 0 107 7z"/></svg><svg class="theme-sun" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><circle cx="8" cy="8" r="3"/><path d="M8 1v1.5M8 13.5V15M1 8h1.5M13.5 8H15M3 3l1 1M12 12l1 1M3 13l1-1M12 4l1-1"/></svg><span>라이트 모드</span></button></div></div>
   </aside>
   <main class="main" id="main" tabindex="-1"><div class="empty" role="status">작업 현황을 불러오는 중입니다.</div></main>
 </div>
+<dialog id="feedback-dialog" class="skill-dialog feedback-dialog" aria-labelledby="feedback-dialog-title" aria-describedby="feedback-dialog-description"></dialog>
 <dialog id="skill-dialog" class="skill-dialog" aria-labelledby="skill-dialog-title" aria-describedby="skill-dialog-description"></dialog>
 <script>
 const STALL_SEC = 300;
@@ -2985,12 +3001,50 @@ function appearanceView() {
   <div class="settings-form-section"><div><h3>밝기</h3><p class="quiet">시스템 설정을 고르면 운영체제의 다크·라이트 모드를 따라갑니다.</p></div><div class="choice-row" role="group" aria-label="밝기">${THEME_MODES.map(([id,label])=>`<button type="button" class="soft-button choice" data-theme-mode="${id}" aria-pressed="${id===mode}">${label}</button>`).join('')}</div></div>
   <div class="settings-form-section"><div><h3>강조색</h3><p class="quiet">버튼·선택 표시·링크에 쓰입니다. 진행·완료 같은 상태색은 바뀌지 않습니다.</p></div><div class="choice-row" role="group" aria-label="강조색">${ACCENTS.map(([id,label])=>`<button type="button" class="soft-button choice" data-accent-choice="${id}" aria-pressed="${id===accent}"><span class="accent-swatch" style="background:var(--swatch-${id})"></span>${label}</button>`).join('')}</div></div></section>`;
 }
+const FEEDBACK_KINDS=[['bug','버그 신고'],['idea','의견·제안']];
+function feedbackMarkup() {
+  return `<form class="feedback-form" data-feedback-form novalidate><header class="skill-dialog-header"><div class="section-heading"><h2 id="feedback-dialog-title">의견 보내기</h2><button type="button" class="text-button" data-feedback-close aria-label="의견 보내기 창 닫기">${SVG('<path d="m4 4 8 8M12 4l-8 8"/>')}</button></div><p id="feedback-dialog-description">불편한 점이나 바라는 기능을 알려 주세요. Huginn 저장소의 GitHub 이슈로 등록되며, 앱 버전과 운영체제가 함께 전달됩니다.</p></header>
+  <div class="feedback-body"><div class="choice-row" role="radiogroup" aria-label="종류">${FEEDBACK_KINDS.map(([id,label],i)=>`<label class="soft-button choice"><input type="radio" name="kind" value="${id}"${i?'':' checked'}>${label}</label>`).join('')}</div>
+  <label class="settings-field">제목<input name="title" maxlength="120" autocomplete="off" placeholder="한 줄로 요약해 주세요"></label>
+  <label class="settings-field">내용<textarea name="body" rows="8" maxlength="5000" placeholder="어떤 화면에서 무엇을 했을 때 어떻게 됐는지 적어 주세요."></textarea></label></div>
+  <footer class="skill-dialog-footer"><p class="action-feedback" role="status" aria-live="polite" data-feedback-status></p><div class="action-buttons"><button type="button" class="soft-button settings-secondary" data-feedback-close>닫기</button><button type="submit" class="soft-button settings-primary" data-feedback-submit>보내기</button></div></footer></form>`;
+}
+function openFeedback() {
+  const dialog=document.getElementById('feedback-dialog');
+  dialog.innerHTML=feedbackMarkup();
+  if(!dialog.open)dialog.showModal();
+  dialog.querySelector('[name=title]')?.focus();
+}
+function githubLink(url,label) {
+  return /^https:\/\/github\.com\/[^\s"'<>]+$/.test(url || '')?` <a href="${esc(url)}" target="_blank" rel="noopener noreferrer">${label} ${ARROW}</a>`:'';
+}
+async function sendFeedback(form) {
+  const status=form.querySelector('[data-feedback-status]'),button=form.querySelector('[data-feedback-submit]');
+  const fields={kind:form.querySelector('[name=kind]:checked')?.value || 'idea',title:form.elements.title.value.trim(),body:form.elements.body.value.trim()};
+  if(!fields.title || !fields.body){status.textContent='제목과 내용을 입력해 주세요.';(fields.title?form.elements.body:form.elements.title).focus();return;}
+  button.disabled=true;status.textContent='보내는 중입니다.';
+  try {
+    const catalog=await loadActionCatalog('');
+    if(!catalog?.token)throw new Error('Huginn에 연결하지 못했습니다. 잠시 후 다시 시도해 주세요.');
+    const r=await fetch('/api/actions',{method:'POST',headers:{'Content-Type':'application/json','X-Work-Board-Token':catalog.token},body:JSON.stringify({action:'feedback',...fields})});
+    const result=await r.json();
+    if(!r.ok)throw new Error(result.error || '보내지 못했습니다.');
+    status.innerHTML=esc(result.message || '')+githubLink(result.url,result.status==='created'?'등록한 이슈 보기':'GitHub에서 작성하기');
+    if(result.status==='created'){form.elements.title.disabled=true;form.elements.body.disabled=true;return;}
+  } catch(error) {
+    status.textContent=error.message || '보내지 못했습니다. 다시 시도해 주세요.';
+  }
+  button.disabled=false;
+}
+document.getElementById('feedback-dialog').addEventListener('submit',e=>{e.preventDefault();sendFeedback(e.target);});
 function syncThemeToggle() {
   const light=document.documentElement.dataset.theme==='light';
   document.querySelectorAll('[data-theme-toggle]').forEach(x=>{x.setAttribute('aria-pressed',String(light));x.querySelector('span').textContent=light?'다크 모드':'라이트 모드';x.setAttribute('aria-label',light?'다크 모드로 전환':'라이트 모드로 전환');});
 }
 document.addEventListener('click',async e=>{
   if(e.target.closest('[data-retry]')){refresh();return;}
+  if(e.target.closest('[data-open-feedback]')){openFeedback();return;}
+  if(e.target.closest('[data-feedback-close]')){document.getElementById('feedback-dialog').close();return;}
   if(e.target.closest('[data-theme-toggle]')){store.set('wb.theme',document.documentElement.dataset.theme==='light'?'dark':'light');applyTheme();render(true);return;}
   const mode=e.target.closest('[data-theme-mode]');if(mode){store.set('wb.theme',mode.dataset.themeMode);applyTheme();render(true);return;}
   const accent=e.target.closest('[data-accent-choice]');if(accent){store.set('wb.accent',accent.dataset.accentChoice);applyTheme();render(true);return;}

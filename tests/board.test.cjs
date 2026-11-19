@@ -829,3 +829,23 @@ test('theme boot script applies stored choices before the stylesheet without tru
     }
   }
 });
+
+test('feedback dialog validates input, posts a feedback action and links only to GitHub',async()=>{
+  const requests=[];let reply=null;
+  const b=board({setTimeout,clearTimeout,AbortController,fetch:async(url,options)=>{if(options?.method==='POST'){requests.push(JSON.parse(options.body));return {ok:true,json:async()=>reply};}return {ok:true,json:async()=>({token:'t'})};}});
+  b.run('data={sessions:[]};ui.actionData={"":{token:"t",at:Date.now()}}');
+  const markup=b.run('feedbackMarkup()');
+  assert.ok(markup.includes('name="kind" value="bug" checked'));assert.ok(markup.includes('name="title"'));assert.ok(markup.includes('name="body"'));
+  b.run(`globalThis.makeForm=(title,body)=>{const status={textContent:'',innerHTML:''},button={disabled:false},fields={title:{value:title,disabled:false,focus(){}},body:{value:body,disabled:false,focus(){}}};
+    return {status,button,fields,elements:fields,querySelector:s=>s==='[data-feedback-status]'?status:s==='[data-feedback-submit]'?button:s==='[name=kind]:checked'?{value:'idea'}:null};}`);
+  b.run('globalThis.f=makeForm("  ","내용")');await b.run('sendFeedback(f)');
+  assert.equal(requests.length,0);assert.equal(b.run('f.status.textContent'),'제목과 내용을 입력해 주세요.');
+  reply={ok:true,status:'created',url:'https://github.com/owner/huginn/issues/7',message:'의견을 등록했습니다.'};b.run('globalThis.f=makeForm(" 제안 ","내용")');
+  await b.run('sendFeedback(f)');
+  assert.deepEqual(requests[0],{action:'feedback',kind:'idea',title:'제안',body:'내용'});
+  assert.ok(b.run('f.status.innerHTML').includes('href="https://github.com/owner/huginn/issues/7"'));
+  assert.equal(b.run('f.fields.title.disabled'),true);
+  reply={ok:true,status:'browser',url:'javascript:alert(1)',message:'작성 페이지로 보냅니다.'};b.run('globalThis.f=makeForm("제안","내용")');
+  await b.run('sendFeedback(f)');
+  assert.ok(!b.run('f.status.innerHTML').includes('href'));assert.equal(b.run('f.button.disabled'),false);
+});
