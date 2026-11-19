@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Huginn</title>
 <link rel="icon" type="image/png" href="/assets/brand.png">
-<script data-theme-boot>try{if(localStorage.getItem("wb.theme")==="light")document.documentElement.dataset.theme="light";}catch(e){}</script>
+<script data-theme-boot>try{var r=document.documentElement,t=localStorage.getItem("wb.theme"),a=localStorage.getItem("wb.accent")||"";if(t==="light"||t==="system"&&matchMedia("(prefers-color-scheme: light)").matches)r.dataset.theme="light";if(/^(blue|teal|violet)$/.test(a))r.dataset.accent=a;}catch(e){}</script>
 <link rel="stylesheet" href="/assets/theme.css">
 <style>
 * { box-sizing: border-box; }
@@ -878,6 +878,10 @@ h1,h2,h3,p { margin-top:0; }
 .mobile-settings { display:none; }
 .side-links { display:flex; align-items:center; justify-content:space-between; gap:12px; }
 .theme-toggle { display:inline-flex; align-items:center; gap:6px; height:28px; padding:4px 8px; border:1px solid var(--line); border-radius:5px; background:none; color:var(--sub); font:inherit; font-size:12px; cursor:pointer; }
+.choice-row { display:flex; flex-wrap:wrap; gap:8px; align-content:flex-start; }
+.choice-row .choice { display:inline-flex; align-items:center; gap:8px; min-height:36px; }
+.choice-row .choice[aria-pressed=true] { border-color:var(--primary); color:var(--ink); box-shadow:inset 0 0 0 1px var(--primary); }
+.accent-swatch { width:14px; height:14px; border-radius:50%; flex:none; box-shadow:0 0 0 1px var(--line2); }
 .theme-toggle:hover { color:var(--ink); border-color:var(--line2); }
 .theme-toggle svg { width:14px; height:14px; flex:none; }
 .theme-toggle .theme-sun, :root[data-theme="light"] .theme-toggle .theme-moon { display:none; }
@@ -2394,10 +2398,11 @@ function settingsView() {
   const environment=globalCatalog?.environment || {};
   const shortcuts=catalog?.shortcuts || [],pending=ui.actionBusy?' disabled':'';
   const tab=ui.settingsTab || 'connections';
-  const tabs=[['connections','연결'],['environment','작업 환경'],['skills','스킬'],['guide','AI용 도움말'],['updates','앱 업데이트']];
+  const tabs=[['connections','연결'],['environment','작업 환경'],['skills','스킬'],['guide','AI용 도움말'],['appearance','화면'],['updates','앱 업데이트']];
   let content='';
   if(tab==='connections')content=connectionsView();
   if(tab==='updates')content=updatesView();
+  if(tab==='appearance')content=appearanceView();
   if(tab==='environment')content=`<section class="result-panel"><div class="section-heading"><div><h2>작업 환경</h2><p class="quiet">세션 화면에 표시할 버튼과 실행 앱을 정합니다.</p></div></div><form data-action-settings="1">
   <div class="settings-form-section"><div><h3>세션에서 바로 열기</h3><p>감지한 항목만 버튼으로 표시합니다.</p></div><div>
   <label class="settings-row"><span>로컬 서버<p>세션이 실행한 서버의 열기 버튼을 표시합니다.</p></span><span class="settings-switch"><input type="checkbox" name="auto_servers" aria-label="로컬 서버" ${config.auto_servers?'checked':''}${pending}><span aria-hidden="true"></span></span></label>
@@ -2962,13 +2967,33 @@ async function refresh() {
   }
 }
 
+const THEME_MODES=[['system','시스템 설정'],['dark','다크'],['light','라이트']];
+const ACCENTS=[['gold','금색'],['blue','청색'],['teal','청록'],['violet','보라']];
+const systemLight=window.matchMedia?.('(prefers-color-scheme: light)');
+function themeChoice() { const value=store.get('wb.theme');return THEME_MODES.some(([id])=>id===value)?value:'dark'; }
+function accentChoice() { const value=store.get('wb.accent');return ACCENTS.some(([id])=>id===value)?value:'gold'; }
+function applyTheme() {
+  const root=document.documentElement,mode=themeChoice(),accent=accentChoice();
+  if(mode==='light' || (mode==='system' && systemLight?.matches))root.dataset.theme='light';else delete root.dataset.theme;
+  if(accent==='gold')delete root.dataset.accent;else root.dataset.accent=accent;
+  syncThemeToggle();
+}
+systemLight?.addEventListener?.('change',()=>{if(themeChoice()==='system')applyTheme();});
+function appearanceView() {
+  const mode=themeChoice(),accent=accentChoice();
+  return `<section class="result-panel" data-key="appearance"><div class="section-heading"><div><h2>화면</h2><p class="quiet">밝기와 강조색을 정합니다. 이 컴퓨터에 저장되며 작업 기록 화면에도 적용됩니다.</p></div></div>
+  <div class="settings-form-section"><div><h3>밝기</h3><p class="quiet">시스템 설정을 고르면 운영체제의 다크·라이트 모드를 따라갑니다.</p></div><div class="choice-row" role="group" aria-label="밝기">${THEME_MODES.map(([id,label])=>`<button type="button" class="soft-button choice" data-theme-mode="${id}" aria-pressed="${id===mode}">${label}</button>`).join('')}</div></div>
+  <div class="settings-form-section"><div><h3>강조색</h3><p class="quiet">버튼·선택 표시·링크에 쓰입니다. 진행·완료 같은 상태색은 바뀌지 않습니다.</p></div><div class="choice-row" role="group" aria-label="강조색">${ACCENTS.map(([id,label])=>`<button type="button" class="soft-button choice" data-accent-choice="${id}" aria-pressed="${id===accent}"><span class="accent-swatch" style="background:var(--swatch-${id})"></span>${label}</button>`).join('')}</div></div></section>`;
+}
 function syncThemeToggle() {
   const light=document.documentElement.dataset.theme==='light';
   document.querySelectorAll('[data-theme-toggle]').forEach(x=>{x.setAttribute('aria-pressed',String(light));x.querySelector('span').textContent=light?'다크 모드':'라이트 모드';x.setAttribute('aria-label',light?'다크 모드로 전환':'라이트 모드로 전환');});
 }
 document.addEventListener('click',async e=>{
   if(e.target.closest('[data-retry]')){refresh();return;}
-  if(e.target.closest('[data-theme-toggle]')){const root=document.documentElement,light=root.dataset.theme!=='light';if(light)root.dataset.theme='light';else delete root.dataset.theme;store.set('wb.theme',light?'light':'dark');syncThemeToggle();return;}
+  if(e.target.closest('[data-theme-toggle]')){store.set('wb.theme',document.documentElement.dataset.theme==='light'?'dark':'light');applyTheme();render(true);return;}
+  const mode=e.target.closest('[data-theme-mode]');if(mode){store.set('wb.theme',mode.dataset.themeMode);applyTheme();render(true);return;}
+  const accent=e.target.closest('[data-accent-choice]');if(accent){store.set('wb.accent',accent.dataset.accentChoice);applyTheme();render(true);return;}
   if(e.target.closest('[data-open-settings]')){ui.sid=SETTINGS;ui.stage=null;ui.req=null;ui.menu=false;store.set('wb.sid',ui.sid);rememberNavigation();render();document.getElementById('main').scrollTop=0;return;}
   const update=e.target.closest('[data-update-action]');if(update){await runUpdateAction(update.dataset.updateAction);return;}
   const tab=e.target.closest('[data-settings-tab]');if(tab){ui.settingsTab=tab.dataset.settingsTab;render(true);return;}
