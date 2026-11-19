@@ -25,7 +25,7 @@ def prepare_assets(folder, target, destination, signed, commit):
 
 def main():
     root=Path(__file__).resolve().parents[1];tag=os.environ.get('INPUT_TAG','')
-    release=config(root,tag);signed=os.environ.get('FORKRAIL_SIGNED')=='1'
+    release=config(root,tag);signed=os.environ.get('HUGINN_SIGNED')=='1'
     if '-' not in release['version'] and not signed:raise ValueError('Stable drafts require signed installers')
     if not tag:raise ValueError('An existing version tag is required')
     commit=verify_tag_commit(tag)

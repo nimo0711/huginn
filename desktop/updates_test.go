@@ -31,7 +31,7 @@ func updateFixture(t *testing.T, handler http.HandlerFunc) *http.Client {
 }
 func fixtureUpdater(t *testing.T, client *http.Client) *AppUpdates {
 	t.Helper()
-	u := newAppUpdates(context.Background(), updateConfig{version: "1.2.0-rc.1", repository: "owner/forkrail", target: "macos-arm64", tempRoot: t.TempDir()}, client)
+	u := newAppUpdates(context.Background(), updateConfig{version: "1.2.0-rc.1", repository: "owner/huginn", target: "macos-arm64", tempRoot: t.TempDir()}, client)
 	u.authToken = func(context.Context) string { return "" }
 	t.Cleanup(u.shutdown)
 	return u
@@ -59,10 +59,10 @@ func releaseFixture(version string, draft, pre bool) map[string]any {
 	return map[string]any{"tag_name": "v" + version, "draft": draft, "prerelease": pre, "assets": []any{
 		map[string]any{"id": 1, "name": "macos-arm64-release-manifest.json", "size": 1},
 		map[string]any{"id": 2, "name": "macos-arm64-SHA256SUMS", "size": 1},
-		map[string]any{"id": 3, "name": "Forkrail-" + version + "-macos-arm64.dmg", "size": len(dmgFixture())},
+		map[string]any{"id": 3, "name": "Huginn-" + version + "-macos-arm64.dmg", "size": len(dmgFixture())},
 	}}
 }
-func TestUpdaterDownloadsHuginnAndLegacyArtifacts(t *testing.T) {
+func TestUpdaterDownloadsOnlyHuginnArtifacts(t *testing.T) {
 	for _, prefix := range []string{"Huginn", "Forkrail"} {
 		for _, mixed := range []bool{false, true} {
 			t.Run(fmt.Sprintf("%s/mixed=%v", prefix, mixed), func(t *testing.T) {
@@ -82,23 +82,30 @@ func TestUpdaterDownloadsHuginnAndLegacyArtifacts(t *testing.T) {
 				assets[2].(map[string]any)["name"] = name
 				client := updateFixture(t, func(w http.ResponseWriter, r *http.Request) {
 					switch r.URL.Path {
-					case "/repos/owner/forkrail/releases":
+					case "/repos/owner/huginn/releases":
 						json.NewEncoder(w).Encode([]any{release})
-					case "/repos/owner/forkrail/releases/assets/1":
+					case "/repos/owner/huginn/releases/assets/1":
 						w.Write(manifest)
-					case "/repos/owner/forkrail/releases/assets/2":
+					case "/repos/owner/huginn/releases/assets/2":
 						fmt.Fprint(w, sums)
-					case "/repos/owner/forkrail/releases/assets/3":
+					case "/repos/owner/huginn/releases/assets/3":
 						w.Write(payload)
 					default:
 						fmt.Fprint(w, `{"private":false}`)
 					}
 				})
 				u := fixtureUpdater(t, client)
-				if got := u.Check(); got.Status != "available" {
+				got := u.Check()
+				if prefix != appName {
+					if got.Status != "error" {
+						t.Fatalf("legacy artifact name accepted: %+v", got)
+					}
+					return
+				}
+				if got.Status != "available" {
 					t.Fatalf("release not found: %+v", got)
 				}
-				got := u.Download()
+				got = u.Download()
 				if mixed {
 					if got.Status != "error" {
 						t.Fatalf("mixed artifact names accepted: %+v", got)
@@ -158,7 +165,7 @@ func TestUpdaterDownloadVerifiesBeforeReadyAndInstall(t *testing.T) {
 			if bad == "unsigned-stable" {
 				version = "1.2.0"
 			}
-			name := "Forkrail-" + version + "-macos-arm64.dmg"
+			name := "Huginn-" + version + "-macos-arm64.dmg"
 			payload := dmgFixture()
 			switch bad {
 			case "pkg-as-dmg":
@@ -200,13 +207,13 @@ func TestUpdaterDownloadVerifiesBeforeReadyAndInstall(t *testing.T) {
 			}
 			client := updateFixture(t, func(w http.ResponseWriter, r *http.Request) {
 				switch r.URL.Path {
-				case "/repos/owner/forkrail/releases":
+				case "/repos/owner/huginn/releases":
 					json.NewEncoder(w).Encode([]any{release})
-				case "/repos/owner/forkrail/releases/assets/1":
+				case "/repos/owner/huginn/releases/assets/1":
 					w.Write(manifestBytes)
-				case "/repos/owner/forkrail/releases/assets/2":
+				case "/repos/owner/huginn/releases/assets/2":
 					fmt.Fprint(w, sums)
-				case "/repos/owner/forkrail/releases/assets/3":
+				case "/repos/owner/huginn/releases/assets/3":
 					w.Write(payload)
 				default:
 					fmt.Fprint(w, `{}`)
@@ -275,7 +282,7 @@ func TestUpdateRedirectNeverForwardsAuthentication(t *testing.T) {
 		fmt.Fprint(w, "verified")
 	})
 	u := fixtureUpdater(t, client)
-	body, err := u.fetchSmall(context.Background(), "https://api.github.com/repos/owner/forkrail/releases/assets/1", "test-secret", true, 100)
+	body, err := u.fetchSmall(context.Background(), "https://api.github.com/repos/owner/huginn/releases/assets/1", "test-secret", true, 100)
 	if err != nil || string(body) != "verified" || leaked.Load() {
 		t.Fatalf("redirect safety: %q %v leaked=%v", body, err, leaked.Load())
 	}
@@ -285,7 +292,7 @@ func TestUpdateRejectsUnsafeRedirect(t *testing.T) {
 		t.Run(location, func(t *testing.T) {
 			var count atomic.Int32
 			u := fixtureUpdater(t, updateFixture(t, func(w http.ResponseWriter, r *http.Request) { count.Add(1); http.Redirect(w, r, location, 302) }))
-			_, err := u.fetchSmall(context.Background(), "https://api.github.com/repos/owner/forkrail/releases/assets/1", "secret", true, 100)
+			_, err := u.fetchSmall(context.Background(), "https://api.github.com/repos/owner/huginn/releases/assets/1", "secret", true, 100)
 			if err == nil || count.Load() != 1 {
 				t.Fatalf("unsafe redirect attempted: %v requests=%d", err, count.Load())
 			}
@@ -302,8 +309,8 @@ func TestUpdateVersionValidation(t *testing.T) {
 
 func validDownloadFixture(t *testing.T, stream func(http.ResponseWriter, *http.Request)) *AppUpdates {
 	t.Helper()
-	name := "Forkrail-1.2.0-rc.2-macos-arm64.dmg"
-	manifest := []byte(`{"version":"1.2.0-rc.2","target":"macos-arm64","signed":false,"source_commit":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","source_dirty":false,"artifacts":["Forkrail-1.2.0-rc.2-macos-arm64.dmg","Forkrail-1.2.0-rc.2-macos-arm64.zip"]}`)
+	name := "Huginn-1.2.0-rc.2-macos-arm64.dmg"
+	manifest := []byte(`{"version":"1.2.0-rc.2","target":"macos-arm64","signed":false,"source_commit":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","source_dirty":false,"artifacts":["Huginn-1.2.0-rc.2-macos-arm64.dmg","Huginn-1.2.0-rc.2-macos-arm64.zip"]}`)
 	sums := fmt.Sprintf("%x  macos-arm64-release-manifest.json\n%x  %s\n", sha256.Sum256(manifest), sha256.Sum256(dmgFixture()), name)
 	release := releaseFixture("1.2.0-rc.2", false, true)
 	assets := release["assets"].([]any)
@@ -311,13 +318,13 @@ func validDownloadFixture(t *testing.T, stream func(http.ResponseWriter, *http.R
 	assets[1].(map[string]any)["size"] = len(sums)
 	return fixtureUpdater(t, updateFixture(t, func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
-		case "/repos/owner/forkrail/releases":
+		case "/repos/owner/huginn/releases":
 			json.NewEncoder(w).Encode([]any{release})
-		case "/repos/owner/forkrail/releases/assets/1":
+		case "/repos/owner/huginn/releases/assets/1":
 			w.Write(manifest)
-		case "/repos/owner/forkrail/releases/assets/2":
+		case "/repos/owner/huginn/releases/assets/2":
 			fmt.Fprint(w, sums)
-		case "/repos/owner/forkrail/releases/assets/3":
+		case "/repos/owner/huginn/releases/assets/3":
 			stream(w, r)
 		default:
 			fmt.Fprint(w, `{}`)

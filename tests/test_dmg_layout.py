@@ -40,7 +40,7 @@ class DmgLayoutTests(unittest.TestCase):
             self.assertEqual(store['.']['bwsp']['WindowBounds'], '{{160, 160}, {720, 440}}')
             self.assertEqual(view['backgroundImageAlias'], b'background-alias-record')
 
-    @unittest.skipUnless(os.environ.get('FORKRAIL_DMG_INTEGRATION') == '1', 'opt-in mounted DMG integration')
+    @unittest.skipUnless(os.environ.get('HUGINN_DMG_INTEGRATION') == '1', 'opt-in mounted DMG integration')
     def test_readonly_image_contains_a_copyable_app_and_portable_finder_layout(self):
         from PIL import Image
         app = self.folder / 'source/Huginn.app'
@@ -50,7 +50,7 @@ class DmgLayoutTests(unittest.TestCase):
         executable.chmod(0o755)
         (app / 'Contents/Info.plist').write_bytes(plistlib.dumps({'CFBundleName': 'Huginn'}))
         icon = self.folder / 'volume.icns'
-        Image.open(Path(__file__).resolve().parents[1] / 'app/assets/forkrail-icon.png').save(icon)
+        Image.open(Path(__file__).resolve().parents[1] / 'app/assets/huginn-icon.png').save(icon)
         output = self.folder / 'Huginn.dmg'
         self.dmg.create_dmg(app, output, self.folder / 'work', icon)
         details = plistlib.loads(subprocess.check_output(['hdiutil', 'imageinfo', '-plist', str(output)]))

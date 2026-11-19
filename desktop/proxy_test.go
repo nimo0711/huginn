@@ -85,7 +85,7 @@ func TestProxyKeepsDocumentsOutOfNativePage(t *testing.T) {
 			t.Error("document request reached the upstream from the native webview")
 		}
 		w.Header().Set("Content-Security-Policy", "frame-ancestors 'none'")
-		io.WriteString(w, "<html><head><title>Forkrail</title></head><body>내용</body></html>")
+		io.WriteString(w, "<html><head><title>Huginn</title></head><body>내용</body></html>")
 	}))
 	defer backend.Close()
 	target, _ := url.Parse(backend.URL)
@@ -97,7 +97,7 @@ func TestProxyKeepsDocumentsOutOfNativePage(t *testing.T) {
 	}
 	board := httptest.NewRecorder()
 	proxy.ServeHTTP(board, httptest.NewRequest(http.MethodGet, "/", nil))
-	if !strings.Contains(board.Header().Get("Content-Security-Policy"), "frame-ancestors 'none'") || !strings.Contains(board.Body.String(), `src="/_forkrail/links.js"`) {
+	if !strings.Contains(board.Header().Get("Content-Security-Policy"), "frame-ancestors 'none'") || !strings.Contains(board.Body.String(), `src="/_huginn/links.js"`) {
 		t.Fatalf("board policy or link handling missing: %q %q", board.Header().Get("Content-Security-Policy"), board.Body)
 	}
 }

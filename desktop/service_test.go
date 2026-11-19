@@ -56,7 +56,7 @@ func mockBoard(t *testing.T, health, state string, icon []byte) (*httptest.Serve
 const legacyState = `{"now":1760000000.5,"stories":[],"story":"","items":[],"metrics":[],"timeline":[],"sessions":[]}`
 
 func TestLegacyServiceMustMatchIconAndState(t *testing.T) {
-	icon, err := os.ReadFile("../tests/fixtures/forkrail-legacy-icon.png")
+	icon, err := os.ReadFile("../tests/fixtures/huginn-legacy-icon.png")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -72,7 +72,7 @@ func TestLegacyServiceMustMatchIconAndState(t *testing.T) {
 		{"health only", `{"ok":true}`, `{}`, nil, false},
 		{"unrelated icon", `{"ok":true}`, legacyState, []byte("other"), false},
 		{"invalid state", `{"ok":true}`, `{"now":1,"stories":{},"story":"","items":[],"metrics":[],"timeline":[],"sessions":[]}`, icon, false},
-		{"unsupported API", `{"ok":true,"app":"Forkrail","api":2,"version":"2.0.0"}`, legacyState, icon, false},
+		{"unsupported API", `{"ok":true,"app":"Huginn","api":2,"version":"2.0.0"}`, legacyState, icon, false},
 		{"branded impostor", `{"ok":true,"app":"Other","api":1}`, legacyState, icon, false},
 	} {
 		t.Run(test.name, func(t *testing.T) {
@@ -126,7 +126,7 @@ func TestOwnedServiceReceivesParentAndDataAndStops(t *testing.T) {
 }
 
 func TestOwnedServiceRejectsWrongInstance(t *testing.T) {
-	t.Setenv("FORKRAIL_FIXTURE_INSTANCE", "wrong")
+	t.Setenv("HUGINN_FIXTURE_INSTANCE", "wrong")
 	cfg := fixtureConfig(t)
 	service, err := startService(context.Background(), cfg)
 	if service != nil || !errors.Is(err, errUnexpectedHealth) {
@@ -140,7 +140,7 @@ func TestOwnedServiceRejectsWrongInstance(t *testing.T) {
 }
 
 func TestOwnedServiceStopsOnReadinessTimeout(t *testing.T) {
-	t.Setenv("FORKRAIL_FIXTURE_INSTANCE", "unready")
+	t.Setenv("HUGINN_FIXTURE_INSTANCE", "unready")
 	cfg := fixtureConfig(t)
 	cfg.readinessTimeout = 350 * time.Millisecond
 	start := time.Now()
@@ -244,7 +244,7 @@ func runFixture(args []string) error {
 		return err
 	}
 	instance := values["--instance"]
-	if mode := os.Getenv("FORKRAIL_FIXTURE_INSTANCE"); mode != "" {
+	if mode := os.Getenv("HUGINN_FIXTURE_INSTANCE"); mode != "" {
 		instance = mode
 	}
 	mux := http.NewServeMux()
@@ -253,7 +253,7 @@ func runFixture(args []string) error {
 			w.WriteHeader(http.StatusServiceUnavailable)
 			return
 		}
-		fmt.Fprintf(w, `{"ok":true,"app":"Forkrail","api":1,"version":"1.2.0-rc.1","instance":%q}`, instance)
+		fmt.Fprintf(w, `{"ok":true,"app":"Huginn","api":1,"version":"1.2.0-rc.1","instance":%q}`, instance)
 	})
 	mux.HandleFunc("/api/sessions", func(w http.ResponseWriter, r *http.Request) {
 		io.WriteString(w, `{"sessions":[]}`)

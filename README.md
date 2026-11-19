@@ -42,8 +42,8 @@ Windows는 로컬 Windows 사용자 기록을 읽습니다. WSL 내부 세션은
 
 | 실행 방식 | 데이터 위치 |
 | --- | --- |
-| 설치본 · Mac | `~/Library/Application Support/Forkrail` |
-| 설치본 · Windows | `%LOCALAPPDATA%/Forkrail` |
+| 설치본 · Mac | `~/Library/Application Support/Huginn` |
+| 설치본 · Windows | `%LOCALAPPDATA%/Huginn` |
 | 소스에서 실행 | 저장소 폴더 |
 
 이 폴더에 작업 DB, 연결·바로가기 설정, 요약 캐시를 저장합니다. 앱 업데이트나 제거는 이 데이터를 지우지 않습니다. AI 기록은 현재 사용자의 `.claude`, `.codex`에서 읽으며 설치 파일에 포함하지 않습니다.
@@ -52,7 +52,7 @@ Windows는 로컬 Windows 사용자 기록을 읽습니다. WSL 내부 세션은
 
 | 환경 변수 | 용도 |
 | --- | --- |
-| `FORKRAIL_DATA_DIR` | 데이터 폴더 명시 지정 |
+| `HUGINN_DATA_DIR` | 데이터 폴더 명시 지정 |
 | `WORK_BOARD_PORT` | 로컬 서비스 포트, 기본 `8790` |
 | `WORK_BOARD_DB` | 작업 DB 경로 명시 지정 |
 | `WORK_BOARD_URL` | `wb` 명령의 전송 대상 |
@@ -99,4 +99,4 @@ go test ./...
 
 ## Forkrail에서 Huginn으로 이전
 
-기존 앱을 종료한 뒤 Huginn.app을 응용 프로그램으로 복사하고 Huginn을 실행하세요. 설정과 데이터는 기존 폴더를 계속 사용합니다. 실행을 확인한 뒤 이전 Forkrail.app 파일과 Dock 아이콘을 제거하고 Huginn을 Dock에 등록합니다. 앱 이름이 달라 기존 Forkrail.app은 드래그만으로 교체되지 않습니다. Windows는 기존 설치 위치를 갱신하고 시작 메뉴를 Huginn으로 바꿉니다.
+기존 앱을 종료한 뒤 Huginn.app을 응용 프로그램으로 복사하고 Huginn을 실행하세요. Huginn은 처음 실행할 때 새 데이터 폴더에 작업 DB가 없으면 이전 `Forkrail` 데이터 폴더의 작업 DB·연결·바로가기·앱 설정·요약 캐시·전송 대기 기록을 복사해 옵니다. 이전 폴더는 지우지 않습니다. 실행을 확인한 뒤 이전 Forkrail.app 파일과 Dock 아이콘을 제거하고 Huginn을 Dock에 등록합니다. 앱 이름이 달라 기존 Forkrail.app은 드래그만으로 교체되지 않습니다. Windows 설치 파일은 이전 Forkrail 앱이 종료되기를 기다린 뒤 `Programs\Huginn`에 설치하고, 이전 설치 파일·제거 항목·시작 메뉴를 정리합니다.

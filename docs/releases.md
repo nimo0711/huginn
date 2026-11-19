@@ -88,9 +88,9 @@ Mac의 GitHub Actions secrets:
 | `APPLE_APP_IDENTITY` | Developer ID Application의 정확한 서명 이름 |
 | `APPLE_ID`, `APPLE_TEAM_ID`, `APPLE_APP_PASSWORD` | 공증용 Apple 계정·팀·앱 전용 암호 |
 
-CI는 일회용 키체인에서 내부 실행 파일→앱 순서로 서명하고 앱을 공증한 뒤, 이 앱을 담은 DMG를 Developer ID Application으로 서명·공증합니다. ZIP에도 공증 티켓이 첨부된 동일한 앱이 들어갑니다. DMG 방식에는 Developer ID Installer 인증서가 필요하지 않습니다. 완료 후 인증 자료를 제거합니다. 로컬에서는 기존 키체인에 필요한 ID와 공증 프로필을 직접 등록한 뒤 `FORKRAIL_APPLE_APP_IDENTITY`, `FORKRAIL_NOTARY_PROFILE`을 지정하고 `build_release.py --signed`를 실행합니다. 별도 키체인이라면 `FORKRAIL_NOTARY_KEYCHAIN`도 지정합니다.
+CI는 일회용 키체인에서 내부 실행 파일→앱 순서로 서명하고 앱을 공증한 뒤, 이 앱을 담은 DMG를 Developer ID Application으로 서명·공증합니다. ZIP에도 공증 티켓이 첨부된 동일한 앱이 들어갑니다. DMG 방식에는 Developer ID Installer 인증서가 필요하지 않습니다. 완료 후 인증 자료를 제거합니다. 로컬에서는 기존 키체인에 필요한 ID와 공증 프로필을 직접 등록한 뒤 `HUGINN_APPLE_APP_IDENTITY`, `HUGINN_NOTARY_PROFILE`을 지정하고 `build_release.py --signed`를 실행합니다. 별도 키체인이라면 `HUGINN_NOTARY_KEYCHAIN`도 지정합니다.
 
-Windows는 `WINDOWS_CERTIFICATE_BASE64`, `WINDOWS_CERTIFICATE_PASSWORD` secrets로 pfx 기반 서명을 지원합니다. 앱·내장 서비스·설치 파일에 서명한 뒤 SignTool로 확인합니다. 하드웨어 토큰이나 클라우드 서명 서비스만 제공하는 인증서는 해당 공급자의 방식으로 별도 연동해야 합니다. 로컬 빌드는 `FORKRAIL_WINDOWS_CERT_FILE`, `FORKRAIL_WINDOWS_CERT_PASSWORD`, 필요하면 `FORKRAIL_SIGNTOOL`을 지정합니다.
+Windows는 `WINDOWS_CERTIFICATE_BASE64`, `WINDOWS_CERTIFICATE_PASSWORD` secrets로 pfx 기반 서명을 지원합니다. 앱·내장 서비스·설치 파일에 서명한 뒤 SignTool로 확인합니다. 하드웨어 토큰이나 클라우드 서명 서비스만 제공하는 인증서는 해당 공급자의 방식으로 별도 연동해야 합니다. 로컬 빌드는 `HUGINN_WINDOWS_CERT_FILE`, `HUGINN_WINDOWS_CERT_PASSWORD`, 필요하면 `HUGINN_SIGNTOOL`을 지정합니다.
 
 현재 인증서가 없으면 unsigned 후보까지만 검증할 수 있습니다. 보안 경고를 우회하거나 다른 앱의 서명을 재사용하지 않습니다.
 
@@ -109,17 +109,17 @@ Windows는 `WINDOWS_CERTIFICATE_BASE64`, `WINDOWS_CERTIFICATE_PASSWORD` secrets�
 Mac:
 
 ```sh
-'/Applications/Huginn.app/Contents/Resources/service/forkrail-service' migrate \
+'/Applications/Huginn.app/Contents/Resources/service/huginn-service' migrate \
   --from '<기존 보드 폴더>' \
-  --data-dir "$HOME/Library/Application Support/Forkrail"
+  --data-dir "$HOME/Library/Application Support/Huginn"
 ```
 
 Windows PowerShell:
 
 ```powershell
-& "$env:LOCALAPPDATA\Programs\Forkrail\service\forkrail-service.exe" migrate `
+& "$env:LOCALAPPDATA\Programs\Huginn\service\huginn-service.exe" migrate `
   --from '<기존 보드 폴더>' `
-  --data-dir "$env:LOCALAPPDATA\Forkrail"
+  --data-dir "$env:LOCALAPPDATA\Huginn"
 ```
 
 SQLite의 backup 기능으로 DB를 복사하고 연결·바로가기·앱 설정만 이전합니다. 원본을 수정하지 않으며 실행 중인 요청·소켓·임시 명령 파일은 복사하지 않습니다. 이미 대상 데이터가 있으면 중단합니다.
@@ -136,6 +136,8 @@ SQLite의 backup 기능으로 DB를 복사하고 연결·바로가기·앱 설�
 
 ## Huginn 이름 변경
 
-1.2.0-rc.5부터 다운로드 파일명과 GitHub 저장소도 Huginn으로 통일합니다. 저장소는 `nimo0711/huginn`이고 설치 파일은 `Huginn-<버전>-<대상>` 이름을 사용합니다. `release.json`의 `display_name`이 배포 파일명과 표시 이름의 기준입니다. 내부 실행 파일·서비스 API 식별자·앱 bundle ID·기존 데이터 경로는 설정과 기록을 계속 읽기 위해 유지합니다.
+1.2.0-rc.5부터 다운로드 파일명과 GitHub 저장소도 Huginn으로 통일합니다. 저장소는 `nimo0711/huginn`이고 설치 파일은 `Huginn-<버전>-<대상>` 이름을 사용합니다. `release.json`의 `display_name`이 배포 파일명과 표시 이름의 기준입니다.
+
+1.2.0-rc.6부터 내부 실행 파일(`Huginn.exe`, `huginn-service`), 앱 bundle ID(`app.huginn.desktop`), 데이터 폴더(macOS `~/Library/Application Support/Huginn`, Windows `%LOCALAPPDATA%\Huginn`), 설치 위치(`%LOCALAPPDATA%\Programs\Huginn`), 환경 변수(`HUGINN_*`)도 Huginn으로 바꿉니다. 기본 데이터 폴더로 처음 실행할 때 새 폴더에 작업 DB가 없으면 이전 `Forkrail` 폴더에서 작업 DB·설정·요약 캐시·전송 대기 기록을 복사하며 원본은 남겨 둡니다. 데이터 폴더를 직접 지정한 실행은 복사하지 않습니다. macOS는 bundle ID가 바뀌어 알림 등 시스템 권한을 다시 허용해야 할 수 있습니다. Windows 설치 파일은 이전 Forkrail 앱이 종료되기를 기다린 뒤 이전 설치 파일·제거 항목·시작 메뉴를 정리합니다. 데스크톱 앱은 같은 API의 이전 이름 서비스도 연결 대상으로 인정합니다. rc.5 앱의 업데이트 확인은 설치 파일 이름과 체크섬만 검증하므로 rc.6을 그대로 받아 설치할 수 있습니다.
 
 rc.4 이전 앱은 예전 저장소 주소와 파일명만 읽으므로 rc.5 설치 파일로 한 번 교체해 주세요. 이후 업데이트는 새 저장소에서 확인합니다. macOS 설치 파일에는 Huginn.app이 들어 있습니다. 이전 Forkrail.app은 자동 삭제하지 않으며, Huginn 실행을 확인한 뒤 이전 앱 파일과 Dock 아이콘을 제거할 수 있습니다. 설정과 대화 기록은 유지됩니다.

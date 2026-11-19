@@ -25,8 +25,8 @@ import (
 )
 
 const appName = "Huginn"
-const productID = "Forkrail"
-const bundleID = "app.forkrail.desktop"
+const legacyAppName = "Forkrail"
+const bundleID = "app.huginn.desktop"
 
 // scripts/build_release.py supplies the full version from release.json.
 var releaseVersion = "1.2.0-rc.1"
@@ -86,12 +86,12 @@ func desktopConfig(smokeRoot string) (serviceConfig, error) {
 		return serviceConfig{}, err
 	}
 	parent := filepath.Dir(executable)
-	servicePath := filepath.Join(parent, "service", "forkrail-service.exe")
+	servicePath := filepath.Join(parent, "service", "huginn-service.exe")
 	if goruntime.GOOS == "darwin" {
-		servicePath = filepath.Join(parent, "..", "Resources", "service", "forkrail-service")
+		servicePath = filepath.Join(parent, "..", "Resources", "service", "huginn-service")
 	}
 	if goruntime.GOOS != "darwin" && goruntime.GOOS != "windows" {
-		servicePath = filepath.Join(parent, "service", "forkrail-service")
+		servicePath = filepath.Join(parent, "service", "huginn-service")
 	}
 
 	port := 8790
@@ -107,7 +107,7 @@ func desktopConfig(smokeRoot string) (serviceConfig, error) {
 		}
 	}
 
-	dataDir := os.Getenv("FORKRAIL_DATA_DIR")
+	dataDir := os.Getenv("HUGINN_DATA_DIR")
 	explicitState := dataDir != "" || os.Getenv("WORK_BOARD_DB") != "" || os.Getenv("WORK_BOARD_SPOOL") != ""
 	if smokeRoot != "" && dataDir == "" {
 		dataDir = filepath.Join(smokeRoot, "data")
@@ -149,15 +149,15 @@ func defaultDataDir() (string, error) {
 	}
 	switch goruntime.GOOS {
 	case "darwin":
-		return filepath.Join(home, "Library", "Application Support", productID), nil
+		return filepath.Join(home, "Library", "Application Support", appName), nil
 	case "windows":
 		local := os.Getenv("LOCALAPPDATA")
 		if local == "" {
 			local = filepath.Join(home, "AppData", "Local")
 		}
-		return filepath.Join(local, productID), nil
+		return filepath.Join(local, appName), nil
 	default:
-		return filepath.Join(home, ".local", "share", productID), nil
+		return filepath.Join(home, ".local", "share", appName), nil
 	}
 }
 

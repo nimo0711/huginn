@@ -31,14 +31,14 @@ func runSmokeMode(mode string) (runErr error) {
 		}
 		data, _ := json.Marshal(evidence)
 		fmt.Println(string(data))
-		if path := os.Getenv("FORKRAIL_SMOKE_RESULT"); path != "" {
+		if path := os.Getenv("HUGINN_SMOKE_RESULT"); path != "" {
 			if err := os.WriteFile(path, append(data, '\n'), 0600); err != nil {
 				runErr = errors.Join(runErr, err)
 			}
 		}
 	}()
 
-	root, err := os.MkdirTemp("", "forkrail-smoke-")
+	root, err := os.MkdirTemp("", "huginn-smoke-")
 	if err != nil {
 		return err
 	}

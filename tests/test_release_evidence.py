@@ -18,7 +18,7 @@ class ReleaseEvidenceTests(unittest.TestCase):
         self.version=config(Path(__file__).resolve().parents[1])['version']
         names=[f'Huginn-{self.version}-macos-arm64{suffix}' for suffix in ['.dmg','.zip']]
         for name in names:(self.root/name).write_bytes(b'fixture package')
-        self.manifest={'name':'Forkrail','version':self.version,'target':'macos-arm64','signed':False,'artifacts':names}
+        self.manifest={'name':'Huginn','version':self.version,'target':'macos-arm64','signed':False,'artifacts':names}
         (self.root/'release-manifest.json').write_text(json.dumps(self.manifest))
         write_checksums(self.root,[*(self.root/n for n in names),self.root/'release-manifest.json'])
 

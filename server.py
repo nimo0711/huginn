@@ -32,7 +32,7 @@ ACTIONS = board_actions.ActionStore(DATA_DIR / ".actions")
 SESSION_IDLE_SEC = 30 * 60
 SPOOL = SPOOL_DIR
 RELEASE = release_info()
-INSTANCE = os.environ.get("FORKRAIL_INSTANCE", "")
+INSTANCE = os.environ.get("HUGINN_INSTANCE", "")
 
 
 def action_environment() -> dict:

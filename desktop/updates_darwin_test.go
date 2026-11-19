@@ -66,7 +66,7 @@ func TestMacUpdatePreservesQuarantineOnDownloadedInstaller(t *testing.T) {
 	if err := os.WriteFile(path, []byte("fixture"), 0600); err != nil {
 		t.Fatal(err)
 	}
-	if err := markInstallerOrigin(path, "https://github.com/owner/forkrail/releases/tag/v1.2.0-rc.2"); err != nil {
+	if err := markInstallerOrigin(path, "https://github.com/owner/huginn/releases/tag/v1.2.0-rc.2"); err != nil {
 		t.Fatal(err)
 	}
 	data := make([]byte, 1024)

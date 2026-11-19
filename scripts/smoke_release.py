@@ -45,7 +45,7 @@ def smoke(executable,env,folder):
         evidence.unlink(missing_ok=True)
         with socket.socket() as listener:
             listener.bind(('127.0.0.1',0));port=listener.getsockname()[1]
-        current={**env,'FORKRAIL_SMOKE_RESULT':str(evidence),'WORK_BOARD_PORT':str(port)}
+        current={**env,'HUGINN_SMOKE_RESULT':str(evidence),'WORK_BOARD_PORT':str(port)}
         run([executable,flag],env=current)
         data=json.loads(evidence.read_text(encoding='utf-8'))
         if data.get('ok') is not True or data.get('mode')!=mode:raise ValueError('Packaged '+mode+' smoke did not pass')
@@ -132,10 +132,35 @@ def windows_known_local_app_data():
         ole.CoTaskMemFree(result)
 
 
+LEGACY_UNINSTALL = r'Software\Microsoft\Windows\CurrentVersion\Uninstall\Forkrail'
+
+
+def register_legacy_install(directory):
+    import winreg
+
+    for relative in ('Forkrail.exe', 'Forkrail.ico', 'release.json', 'Uninstall.exe', 'service/forkrail-service.exe'):
+        path = directory / relative
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(b'legacy ' + relative.encode('ascii'))
+    with winreg.CreateKeyEx(winreg.HKEY_CURRENT_USER, LEGACY_UNINSTALL, 0,
+                            winreg.KEY_WRITE | winreg.KEY_WOW64_32KEY) as entry:
+        winreg.SetValueEx(entry, 'InstallLocation', 0, winreg.REG_SZ, str(directory))
+
+
+def legacy_uninstall_entry_exists():
+    import winreg
+
+    try:
+        with winreg.OpenKey(winreg.HKEY_CURRENT_USER, LEGACY_UNINSTALL, 0, winreg.KEY_READ | winreg.KEY_WOW64_32KEY):
+            return True
+    except FileNotFoundError:
+        return False
+
+
 def windows_uninstall_entry():
     import winreg
 
-    key = r'Software\Microsoft\Windows\CurrentVersion\Uninstall\Forkrail'
+    key = r'Software\Microsoft\Windows\CurrentVersion\Uninstall\Huginn'
     try:
         with winreg.OpenKey(winreg.HKEY_CURRENT_USER, key, 0, winreg.KEY_READ | winreg.KEY_WOW64_32KEY) as entry:
             return {name: winreg.QueryValueEx(entry, name)[0]
@@ -157,15 +182,26 @@ def require_preserved_markers(*markers):
 def smoke_windows_installer(installer, installed, env, folder, marker, version):
     # The installer uses the Windows Known Folder even when the app test sets
     # LOCALAPPDATA explicitly. This path is exercised only on disposable CI.
-    default_data = windows_known_local_app_data() / 'Forkrail'
+    default_data = windows_known_local_app_data() / 'Huginn'
     default_data.mkdir(exist_ok=True)
-    default_marker = default_data / ('.forkrail-release-smoke-' + uuid.uuid4().hex)
+    default_marker = default_data / ('.huginn-release-smoke-' + uuid.uuid4().hex)
     with default_marker.open('x', encoding='utf-8') as handle:
         handle.write('preserve')
     try:
         run_nsis(installer, env, '/D', default_data, expected=5)
         require_preserved_markers(marker, default_marker)
+
+        legacy = folder / 'Programs Forkrail'
+        register_legacy_install(legacy)
+        legacy_before = installed_files(legacy)
+        with windows_file_in_use(legacy / 'Forkrail.exe'):
+            run_nsis(installer, env, '/D', installed, expected=3)
+        if installed_files(legacy) != legacy_before or not legacy_uninstall_entry_exists() or installed.exists():
+            raise ValueError('Locked legacy app was changed by the installer')
         run_nsis(installer, env, '/D', installed)
+        if legacy.exists() or legacy_uninstall_entry_exists():
+            raise ValueError('Installer left the legacy Forkrail installation or its registration')
+        require_preserved_markers(marker, default_marker)
         registration = {
             'InstallLocation': str(installed),
             'DisplayVersion': version,
@@ -178,7 +214,7 @@ def smoke_windows_installer(installer, installed, env, folder, marker, version):
         # The update uses the registered path. A locked app must leave that
         # registration and every installed file intact.
         before = installed_files(installed)
-        with windows_file_in_use(installed / 'Forkrail.exe'):
+        with windows_file_in_use(installed / 'Huginn.exe'):
             run_nsis(installer, env, expected=3)
             if installed_files(installed) != before or windows_uninstall_entry() != registration:
                 raise ValueError('Failed update changed the existing installation')
@@ -188,7 +224,7 @@ def smoke_windows_installer(installer, installed, env, folder, marker, version):
         # shutdown. A temporary image lock must be retried without forcing exit.
         acquired = threading.Event()
         def closing_app():
-            with windows_file_in_use(installed / 'Forkrail.exe'):
+            with windows_file_in_use(installed / 'Huginn.exe'):
                 acquired.set()
                 time.sleep(1.5)
         shutdown = threading.Thread(target=closing_app, daemon=True)
@@ -209,7 +245,7 @@ def smoke_windows_installer(installer, installed, env, folder, marker, version):
         if stale.exists() or windows_uninstall_entry() != registration:
             raise ValueError('Upgrade retained obsolete service files or changed the registered location')
         require_preserved_markers(marker, default_marker)
-        result = smoke(installed / 'Forkrail.exe', env, folder)
+        result = smoke(installed / 'Huginn.exe', env, folder)
 
         # The copied uninstaller runs synchronously, so the test observes the
         # actual uninstall exit code and can lock a nested application file.
@@ -239,11 +275,11 @@ def main():
     output=ROOT/'dist'/args.target
     name=artifact_stem(release,args.target)
     ci=os.environ.get('GITHUB_ACTIONS')=='true' and os.environ.get('RUNNER_ENVIRONMENT')=='github-hosted'
-    with tempfile.TemporaryDirectory(prefix='Forkrail QA 한글 ') as tmp:
+    with tempfile.TemporaryDirectory(prefix='Huginn QA 한글 ') as tmp:
         folder=Path(tmp);home=folder/'home';home.mkdir()
         local=folder/'local';local.mkdir();data=folder/'data';data.mkdir()
         env={**os.environ,'HOME':str(home),'USERPROFILE':str(home),'LOCALAPPDATA':str(local),
-             'FORKRAIL_DATA_DIR':str(data),'PYTHONUTF8':'1'}
+             'HUGINN_DATA_DIR':str(data),'PYTHONUTF8':'1'}
         marker=data/'keep-user-data';marker.write_text('preserve',encoding='utf-8')
         result={'target':args.target,'version':release['version'],'installer':None}
         archive = output / (name + '.zip')
@@ -259,15 +295,16 @@ def main():
         else:
             with zipfile.ZipFile(archive) as release_zip:
                 release_zip.extractall(portable)
-            result['portable'] = smoke(portable / 'Forkrail/Forkrail.exe', env, folder)
+            result['portable'] = smoke(portable / 'Huginn/Huginn.exe', env, folder)
             if ci:
-                installed = (local / 'Programs/Forkrail').resolve()
+                installed = (local / 'Programs/Huginn').resolve()
                 installer = output / (name + '-Setup.exe')
                 result['installed'] = smoke_windows_installer(
                     installer, installed, env, folder, marker, release['version'],
                 )
                 result['installer'] = (
-                    'installed, locked upgrade refused, closing app upgrade retried, upgraded, locked uninstall refused, '
+                    'legacy Forkrail install replaced after close, locked upgrade refused, closing app upgrade retried, '
+                    'upgraded, locked uninstall refused, '
                     'and uninstalled on disposable runner'
                 )
             else:result['installer']='not installed on developer machine'

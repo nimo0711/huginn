@@ -4,7 +4,7 @@
 
   try {
     if (document.title !== appName || !document.querySelector("#main")) {
-      const error = document.querySelector("#forkrail-start-error")?.textContent?.trim();
+      const error = document.querySelector("#huginn-start-error")?.textContent?.trim();
       throw new Error(error || appName + " board DOM is missing");
     }
 
@@ -16,7 +16,7 @@
 
     const healthResponse = await fetch("/api/health", { cache: "no-store" });
     const health = await healthResponse.json();
-    if (!healthResponse.ok || health.ok !== true || health.app !== "Forkrail" ||
+    if (!healthResponse.ok || health.ok !== true || health.app !== "Huginn" ||
         health.api !== 1 || health.version !== version || !health.instance) {
       throw new Error("WebView did not reach the bundled Huginn service");
     }

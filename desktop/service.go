@@ -22,7 +22,7 @@ import (
 )
 
 // The existing server predates the versioned health API. Its Signal web icon
-// and board-state schema are required before treating that listener as Forkrail.
+// and board-state schema are required before treating that listener as Huginn.
 const legacyIconSHA256 = "2877122ef68df6287532dd95e9b4a7b309adc0b16add46a8a2156537db636377"
 
 var (
@@ -72,7 +72,7 @@ type healthResponse struct {
 }
 
 func (h healthResponse) currentAPI() bool {
-	return h.OK && h.App == "Forkrail" && h.API == 1 && h.Version != ""
+	return h.OK && (h.App == appName || h.App == legacyAppName) && h.API == 1 && h.Version != ""
 }
 
 var loopbackDialer = net.Dialer{Timeout: 2 * time.Second}

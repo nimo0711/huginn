@@ -26,10 +26,10 @@ func markInstallerOrigin(path, source string) error {
 func verifyInstallerSignature(ctx context.Context, path string, required bool) (bool, error) {
 	// The path is environment data, never PowerShell source or a command argument
 	// interpolated into source. The output is a small status enum, never shown.
-	script := `$ErrorActionPreference='Stop'; $s=Get-AuthenticodeSignature -LiteralPath $env:FORKRAIL_UPDATE_INSTALLER; [Console]::Write($s.Status.ToString())`
+	script := `$ErrorActionPreference='Stop'; $s=Get-AuthenticodeSignature -LiteralPath $env:HUGINN_UPDATE_INSTALLER; [Console]::Write($s.Status.ToString())`
 	command := exec.CommandContext(ctx, filepath.Join(os.Getenv("SystemRoot"), "System32", "WindowsPowerShell", "v1.0", "powershell.exe"), "-NoProfile", "-NonInteractive", "-Command", script)
 	configureChild(command)
-	command.Env = append(os.Environ(), "FORKRAIL_UPDATE_INSTALLER="+path)
+	command.Env = append(os.Environ(), "HUGINN_UPDATE_INSTALLER="+path)
 	output, err := command.Output()
 	if err != nil {
 		return false, errUpdateInvalid

@@ -151,7 +151,7 @@ func nativeUpdateConfig(executable, version string) (updateConfig, error) {
 		BundleID                  string `json:"bundle_id"`
 		Platforms                 []string
 	}
-	if json.Unmarshal(data, &metadata) != nil || metadata.Name != productID || metadata.Version != version || metadata.BundleID != bundleID || !updateRepositoryPattern.MatchString(metadata.Repository) {
+	if json.Unmarshal(data, &metadata) != nil || metadata.Name != appName || metadata.Version != version || metadata.BundleID != bundleID || !updateRepositoryPattern.MatchString(metadata.Repository) {
 		return cfg, errUpdateInvalid
 	}
 	found := false
@@ -337,8 +337,6 @@ func (u *AppUpdates) releaseAssets(release *updateRelease) (updateAsset, updateA
 	}
 	wanted := []string{installerName(version, u.config.target), u.config.target + "-release-manifest.json", u.config.target + "-SHA256SUMS"}
 	var found [3]updateAsset
-	legacyName := strings.Replace(wanted[0], appName+"-", productID+"-", 1)
-	var legacy updateAsset
 	seen := map[string]bool{}
 	ids := map[int64]bool{}
 	if len(release.Assets) > 100 {
@@ -350,9 +348,6 @@ func (u *AppUpdates) releaseAssets(release *updateRelease) (updateAsset, updateA
 		}
 		seen[a.Name] = true
 		ids[a.ID] = true
-		if a.Name == legacyName {
-			legacy = a
-		}
 		for i, name := range wanted {
 			if a.Name == name {
 				found[i] = a
@@ -361,9 +356,6 @@ func (u *AppUpdates) releaseAssets(release *updateRelease) (updateAsset, updateA
 				}
 			}
 		}
-	}
-	if found[0].ID == 0 {
-		found[0] = legacy
 	}
 	for _, a := range found {
 		if a.ID == 0 {

@@ -706,10 +706,10 @@ test('unknown and negative download lengths never display invalid progress value
 
 test('release metadata controls the GitHub destination while malformed or foreign URLs use the fallback',()=>{
  const b=board();b.run('data={sessions:[]};ui.settingsTab="updates"');
- b.run('ui.actionData={"":{app:{release_url:"https://github.com/example-owner/Forkrail-next/releases"}}}');
- assert.ok(b.run('settingsView()').includes('href="https://github.com/example-owner/Forkrail-next/releases"'));
- b.run('ui.updates={status:"available",available:true,release_url:"https://github.com/example-owner/Forkrail-next/releases/tag/v2.0.0-rc.1",target:"macos-arm64",os:"macos"}');
- const view=b.run('settingsView()');assert.ok(view.includes('href="https://github.com/example-owner/Forkrail-next/releases/tag/v2.0.0-rc.1"'));assert.ok(view.includes('macOS · Apple Silicon'));assert.ok(!view.includes('macos-arm64'));
+ b.run('ui.actionData={"":{app:{release_url:"https://github.com/example-owner/Huginn-next/releases"}}}');
+ assert.ok(b.run('settingsView()').includes('href="https://github.com/example-owner/Huginn-next/releases"'));
+ b.run('ui.updates={status:"available",available:true,release_url:"https://github.com/example-owner/Huginn-next/releases/tag/v2.0.0-rc.1",target:"macos-arm64",os:"macos"}');
+ const view=b.run('settingsView()');assert.ok(view.includes('href="https://github.com/example-owner/Huginn-next/releases/tag/v2.0.0-rc.1"'));assert.ok(view.includes('macOS · Apple Silicon'));assert.ok(!view.includes('macos-arm64'));
  for(const url of ['javascript:alert(1)','https://github.com.evil.test/a/b/releases','https://github.com/a/b/releases?token=secret','https://github.com/a/../releases']) {
   b.set(url);b.run('ui.updates.release_url=input');assert.ok(b.run('settingsView()').includes('href="https://github.com/nimo0711/huginn/releases"'));
  }

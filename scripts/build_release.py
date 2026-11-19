@@ -30,26 +30,26 @@ def native_target():
 def make_icons():
     from PIL import Image
     folder=ROOT/'desktop/build';folder.mkdir(parents=True,exist_ok=True)
-    original=ROOT/'app/assets/forkrail-icon.png'
+    original=ROOT/'app/assets/huginn-icon.png'
     shutil.copy2(original,folder/'appicon.png')
     with Image.open(original) as source:
-        source.save(folder/'Forkrail.ico',sizes=[(16,16),(32,32),(48,48),(64,64),(128,128),(256,256)])
-        if sys.platform=='darwin':source.save(folder/'Forkrail.icns')
+        source.save(folder/'Huginn.ico',sizes=[(16,16),(32,32),(48,48),(64,64),(128,128),(256,256)])
+        if sys.platform=='darwin':source.save(folder/'Huginn.icns')
 
 
 def freeze_service(work, signed):
     source=work/'source';stage_sources(ROOT,source)
     cmd=[sys.executable,'-m','PyInstaller','--noconfirm','--clean','--onedir',
-         '--name','forkrail-service','--distpath',work/'frozen','--workpath',work/'pyinstaller',
+         '--name','huginn-service','--distpath',work/'frozen','--workpath',work/'pyinstaller',
          '--specpath',work,'--paths',source,'--collect-submodules','psutil']
     for item in ['index.html','stories.html','AGENT_GUIDE.md','release.json','app/brand.json',
-                 'app/assets/forkrail-icon.png','app/assets/forkrail-icon-web.png','desktop/theme.css']:
+                 'app/assets/huginn-icon.png','app/assets/huginn-icon-web.png','desktop/theme.css']:
         parent=Path(item).parent.as_posix()
         cmd+=['--add-data',str(source/item)+':'+parent]
-    if signed and sys.platform=='darwin':cmd+=['--codesign-identity',os.environ['FORKRAIL_APPLE_APP_IDENTITY']]
+    if signed and sys.platform=='darwin':cmd+=['--codesign-identity',os.environ['HUGINN_APPLE_APP_IDENTITY']]
     cmd+=[source/'desktop_service.py'];run(cmd,cwd=source)
-    service=work/'frozen/forkrail-service'
-    binary=service/('forkrail-service.exe' if sys.platform=='win32' else 'forkrail-service')
+    service=work/'frozen/huginn-service'
+    binary=service/('huginn-service.exe' if sys.platform=='win32' else 'huginn-service')
     run([binary,'self-test'],timeout=60)
     return service
 
@@ -70,11 +70,11 @@ def desktop_build(release,target):
         env['CGO_CFLAGS']=env.get('CGO_CFLAGS','')+' -mmacosx-version-min=13.0'
         env['CGO_LDFLAGS']=env.get('CGO_LDFLAGS','')+' -mmacosx-version-min=13.0'
     run(cmd,cwd=ROOT/'desktop',env=env)
-    return ROOT/'desktop/build/bin'/('Huginn.app' if goos=='darwin' else 'Forkrail.exe')
+    return ROOT/'desktop/build/bin'/('Huginn.app' if goos=='darwin' else 'Huginn.exe')
 
 
 def sign_mac(app, signed):
-    identity=os.environ['FORKRAIL_APPLE_APP_IDENTITY'] if signed else '-'
+    identity=os.environ['HUGINN_APPLE_APP_IDENTITY'] if signed else '-'
     flags=['--force','--sign',identity]
     if signed:flags+=['--options','runtime','--timestamp']
     for path in sorted(app.rglob('*'),key=lambda p:len(p.parts),reverse=True):
@@ -91,7 +91,7 @@ def package_mac(release,target,work,service,built,signed,output):
     shutil.copytree(built,app,symlinks=True)
     shutil.copytree(service,app/'Contents/Resources/service',symlinks=True)
     shutil.copy2(ROOT/'release.json',app/'Contents/Resources/release.json')
-    shutil.copy2(ROOT/'desktop/build/Forkrail.icns',app/'Contents/Resources/AppIcon.icns')
+    shutil.copy2(ROOT/'desktop/build/Huginn.icns',app/'Contents/Resources/AppIcon.icns')
     # Wails' XML plist begins with DOCTYPE, without an XML declaration.
     info=app/'Contents/Info.plist';data=plistlib.loads(info.read_bytes(),fmt=plistlib.FMT_XML)
     data.update(CFBundleName=release.get('display_name',release['name']),CFBundleDisplayName=release.get('display_name',release['name']),
@@ -99,20 +99,20 @@ def package_mac(release,target,work,service,built,signed,output):
                 CFBundleVersion=release['package_version'],CFBundleIconFile='AppIcon',LSMinimumSystemVersion='13.0',
                 NSHighResolutionCapable=True,NSHumanReadableCopyright='Huginn contributors')
     info.write_bytes(plistlib.dumps(data));verify_macos_bundle(app,target);sign_mac(app,signed)
-    run([app/'Contents/Resources/service/forkrail-service','self-test'],timeout=60)
+    run([app/'Contents/Resources/service/huginn-service','self-test'],timeout=60)
     stem=artifact_stem(release,target)
     if signed:
-        notary=['--keychain-profile',os.environ['FORKRAIL_NOTARY_PROFILE']]
-        if os.environ.get('FORKRAIL_NOTARY_KEYCHAIN'):notary+=['--keychain',os.environ['FORKRAIL_NOTARY_KEYCHAIN']]
+        notary=['--keychain-profile',os.environ['HUGINN_NOTARY_PROFILE']]
+        if os.environ.get('HUGINN_NOTARY_KEYCHAIN'):notary+=['--keychain',os.environ['HUGINN_NOTARY_KEYCHAIN']]
         # Staple the app before copying it into either distribution container.
         upload=work/'notarize.zip';run(['ditto','-c','-k','--sequesterRsrc','--keepParent',app,upload])
         run(['xcrun','notarytool','submit',upload,*notary,'--wait'])
         run(['xcrun','stapler','staple',app]);run(['spctl','--assess','--type','execute','--verbose',app])
     from create_dmg import create_dmg
     dmg=output/(stem+'.dmg')
-    create_dmg(app,dmg,work,ROOT/'desktop/build/Forkrail.icns')
+    create_dmg(app,dmg,work,ROOT/'desktop/build/Huginn.icns')
     if signed:
-        run(['codesign','--force','--sign',os.environ['FORKRAIL_APPLE_APP_IDENTITY'],
+        run(['codesign','--force','--sign',os.environ['HUGINN_APPLE_APP_IDENTITY'],
              '--timestamp','--identifier',release['bundle_id']+'.disk-image',dmg])
         run(['codesign','--verify','--strict',dmg])
         run(['xcrun','notarytool','submit',dmg,*notary,'--wait'])
@@ -124,21 +124,21 @@ def package_mac(release,target,work,service,built,signed,output):
 
 
 def sign_windows(path):
-    tool=os.environ.get('FORKRAIL_SIGNTOOL') or shutil.which('signtool')
+    tool=os.environ.get('HUGINN_SIGNTOOL') or shutil.which('signtool')
     if not tool:raise ValueError('signtool.exe must be on PATH for signed Windows builds')
     run([tool,'sign','/fd','SHA256','/tr','http://timestamp.digicert.com','/td','SHA256',
-         '/f',os.environ['FORKRAIL_WINDOWS_CERT_FILE'],'/p',os.environ['FORKRAIL_WINDOWS_CERT_PASSWORD'],path])
+         '/f',os.environ['HUGINN_WINDOWS_CERT_FILE'],'/p',os.environ['HUGINN_WINDOWS_CERT_PASSWORD'],path])
     run([tool,'verify','/pa',path])
 
 
 def package_windows(release,target,work,service,built,signed,output):
-    folder=work/'Forkrail';folder.mkdir()
-    shutil.copy2(built,folder/'Forkrail.exe');shutil.copytree(service,folder/'service')
+    folder=work/'Huginn';folder.mkdir()
+    shutil.copy2(built,folder/'Huginn.exe');shutil.copytree(service,folder/'service')
     shutil.copy2(ROOT/'release.json',folder/'release.json')
-    shutil.copy2(ROOT/'desktop/build/Forkrail.ico',folder/'Forkrail.ico')
+    shutil.copy2(ROOT/'desktop/build/Huginn.ico',folder/'Huginn.ico')
     if signed:
-        sign_windows(folder/'Forkrail.exe');sign_windows(folder/'service/forkrail-service.exe')
-    run([folder/'service/forkrail-service.exe','self-test'],timeout=60)
+        sign_windows(folder/'Huginn.exe');sign_windows(folder/'service/huginn-service.exe')
+    run([folder/'service/huginn-service.exe','self-test'],timeout=60)
     stem=artifact_stem(release,target)
     installer=output/(stem+'-Setup.exe')
     nsis=shutil.which('makensis') or str(Path(os.environ.get('ProgramFiles(x86)','C:/Program Files (x86)'))/'NSIS/makensis.exe')

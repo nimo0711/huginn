@@ -63,7 +63,7 @@ func newBoardProxy(service *boardService, nativeOrigin string) http.Handler {
 			http.NotFound(w, r)
 			return
 		}
-		if r.URL.Path == "/_forkrail/links.js" && r.Method == http.MethodGet {
+		if r.URL.Path == "/_huginn/links.js" && r.Method == http.MethodGet {
 			w.Header().Set("Content-Type", "text/javascript; charset=utf-8")
 			w.Header().Set("X-Content-Type-Options", "nosniff")
 			w.Write(linksScript)
@@ -84,7 +84,7 @@ func allowedBoardRoute(method, path string) bool {
 	switch method {
 	case http.MethodGet:
 		switch path {
-		case "/", "/stories", "/assets/brand.svg", "/assets/brand.png", "/assets/theme.css", "/_forkrail/links.js",
+		case "/", "/stories", "/assets/brand.svg", "/assets/brand.png", "/assets/theme.css", "/_huginn/links.js",
 			"/api/health", "/api/state", "/api/sessions", "/api/actions":
 			return true
 		}
@@ -140,7 +140,7 @@ func prepareBoardPage(resp *http.Response, target *url.URL) error {
 	if len(page) > maxHTML || !bytes.Contains(page, []byte("</head>")) {
 		return fmt.Errorf("unexpected board HTML")
 	}
-	injection := fmt.Sprintf(`<script src="/_forkrail/links.js" data-board-origin="%s"></script></head>`, target)
+	injection := fmt.Sprintf(`<script src="/_huginn/links.js" data-board-origin="%s"></script></head>`, target)
 	page = bytes.Replace(page, []byte("</head>"), []byte(injection), 1)
 	resp.Body = io.NopCloser(bytes.NewReader(page))
 	resp.ContentLength = int64(len(page))

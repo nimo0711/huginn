@@ -10,16 +10,20 @@ FROZEN = getattr(sys, 'frozen', False)
 RESOURCE_ROOT = Path(getattr(sys, '_MEIPASS', Path(__file__).resolve().parent))
 
 
-def user_data_dir():
+PRODUCT = 'Huginn'
+LEGACY_PRODUCT = 'Forkrail'
+
+
+def user_data_dir(product=PRODUCT):
     home = Path.home()
     if sys.platform == 'win32':
-        return Path(os.environ.get('LOCALAPPDATA') or home / 'AppData' / 'Local') / 'Forkrail'
+        return Path(os.environ.get('LOCALAPPDATA') or home / 'AppData' / 'Local') / product
     if sys.platform == 'darwin':
-        return home / 'Library' / 'Application Support' / 'Forkrail'
-    return Path(os.environ.get('XDG_DATA_HOME') or home / '.local' / 'share') / 'Forkrail'
+        return home / 'Library' / 'Application Support' / product
+    return Path(os.environ.get('XDG_DATA_HOME') or home / '.local' / 'share') / product
 
 
-data_override = os.environ.get('FORKRAIL_DATA_DIR')
+data_override = os.environ.get('HUGINN_DATA_DIR')
 if data_override:
     DATA_DIR = Path(data_override).expanduser()
 else:

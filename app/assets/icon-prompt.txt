@@ -1,9 +1,9 @@
 Huginn — Twins / approved 2026-11-19
 The user selected proposal 02 Twins and requested the whole app to follow its tone.
-Canonical original: forkrail-icon.png (legacy filename retained for compatibility).
+Canonical original: huginn-icon.png.
 Approved source: 문서/AI_Desk/작업_보드/디자인/Huginn_아이콘_시안_5종/02-twins.png
 Method: built-in image_gen, original design inspired by the user's Norse raven reference.
-Web derivative: forkrail-icon-web.png, 128px. Desktop, DMG and ICO formats derive from the same original. Preserve composition, artwork and alpha.
+Web derivative: huginn-icon-web.png, 128px. Desktop, DMG and ICO formats derive from the same original. Preserve composition, artwork and alpha.
 
 Direction:
 TWIN RAVENS: warm ivory tile #ECE5D5, two imposing ink-black ravens facing one another, symmetric but naturally drawn. Their heads occupy upper corners of central emblem and wings sweep toward a central base. Between their breasts a tiny simple antique-brass woven knot made of three broad ribbons. One short graceful branch beneath their feet connects both birds. Composition is wide and stable, not tall and cramped. Keep feathers to 3 large carved cuts per wing. Original contemporary heraldic stamp, no frame.
