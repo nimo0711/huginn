@@ -67,4 +67,11 @@ Windows 설치 마법사를 사람이 클릭하는 수동 검사와 서명·Smar
 - [x] 배포 파일명은 release.json의 display_name을 사용해 한곳에서 만든다. 빌드·검증·설치 시험·게시가 같은 규칙을 사용한다.
 - [x] 새 업데이터는 Huginn 파일명을 우선 찾고 이전 Forkrail 파일도 검증 가능한 범위에서 읽는다. 잘못된 이름·다른 플랫폼·체크섬 불일치는 거부한다.
 - [x] GitHub 저장소를 huginn으로 변경하고 원격·업데이트 주소·현재 안내 링크를 바꾼다.
-- [ ] 회귀 시험과 세 플랫폼 설치 검증 후 rc.5를 게시한다. 다운로드 폴더에 Huginn 이름의 Windows·Mac 설치 파일을 준비한다.
+- [x] 회귀 시험과 세 플랫폼 설치 검증 후 rc.5를 게시한다. 다운로드 폴더에 Huginn 이름의 Windows·Mac 설치 파일을 준비한다.
+
+### rc.5 검증·게시 결과
+
+- 검증 소스: `1ad667ccf58272b21e8b7e3822c77013c883f06f`. [Actions 44470775990](https://github.com/nimo0711/huginn/actions/runs/44470775990)에서 Windows x64·Mac Apple Silicon·Mac Intel 모두 회귀 검사와 실제 설치·WebView·내장 서비스 실행 검사를 통과했다.
+- GitHub 생성물을 내려받아 플랫폼·버전·소스 커밋과 설치 증거를 재검증했다. Mac 패키지의 실제 CLI로 AI 도움말을 출력해 Huginn 표시와 이전 이름 제거를 확인했고, 포함된 업데이트 저장소가 `nimo0711/huginn`임을 확인했다.
+- [Huginn 1.2.0-rc.5](https://github.com/nimo0711/huginn/releases/tag/v1.2.0-rc.5)를 비공개 저장소의 prerelease로 게시했다. 설치 파일·ZIP·검증 기록 15개를 다시 내려받아 모두 원본 SHA-256과 일치함을 확인했다. 서명·공증되지 않은 테스트 후보다.
+- `/Users/lsm/Downloads/Huginn-1.2.0-rc.5/`에 `Huginn-1.2.0-rc.5-windows-x64-Setup.exe`와 `Huginn-1.2.0-rc.5-macos-arm64.dmg`를 저장하고 체크섬을 확인했다. 기존 설치 앱을 자동 교체하지 않았으며 rc.4는 이번 DMG로 한 번 교체해야 한다.
