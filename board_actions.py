@@ -202,6 +202,8 @@ Huginn의 검색 범위는 Claude·Codex 로컬 스킬, Codex 시스템 스킬, 
             for root,scope in roots:
                 for path in sorted(root.glob('*/SKILL.md')):
                     add(path,agent,scope)
+        for path in sorted((self.home/'.claude/skills/synced').glob('[!.]*/[!.]*/SKILL.md')):
+            add(path,'claude','user','skill','anthropic-skills')
         settings={}
         for path in [self.home/'.claude/settings.json',self.home/'.claude/settings.local.json',cwd/'.claude/settings.json',cwd/'.claude/settings.local.json']:
             settings.update(read_json(path).get('enabledPlugins',{}))
