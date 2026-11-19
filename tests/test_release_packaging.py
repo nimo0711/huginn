@@ -15,7 +15,7 @@ class ReleasePackagingTests(unittest.TestCase):
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
         self.root = Path(self.temp.name)
-        self.config = {'name':'Forkrail', 'version':'1.2.0-rc.1',
+        self.config = {'name':'Forkrail', 'display_name':'Huginn', 'version':'1.2.0-rc.1',
                        'package_version':'1.2.0', 'bundle_id':'app.forkrail.desktop',
                        'repository':'nimo0711/forkrail',
                        'platforms':['macos-arm64','macos-x86_64','windows-x64']}
@@ -28,9 +28,15 @@ class ReleasePackagingTests(unittest.TestCase):
 
     def test_filename_and_installer_versions_reject_path_or_argument_injection(self):
         for field, value in [('version','../leak'), ('package_version','1.2.0; touch x'),
-                             ('name','../../Other'),('bundle_id','app/forkrail')]:
+                             ('name','../../Other'),('display_name','../Huginn'),('display_name','Huginn --flag'),('bundle_id','app/forkrail')]:
             with self.subTest(field=field), self.assertRaises(ValueError):
                 release_tools.validate_config({**self.config,field:value})
+
+    def test_public_artifact_names_use_display_name_without_changing_identity(self):
+        for target in self.config['platforms']:
+            self.assertEqual(release_tools.artifact_stem(self.config,target), 'Huginn-1.2.0-rc.1-'+target)
+        self.assertEqual(self.config['name'],'Forkrail')
+        with self.assertRaises(ValueError):release_tools.artifact_stem(self.config,'../other')
 
     def test_repository_must_be_an_exact_github_owner_and_name(self):
         for repository in ['', '../forkrail', 'owner/repo/releases', 'https://evil.example/repo', 'owner/repo?token=x', None]:

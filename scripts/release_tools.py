@@ -54,6 +54,8 @@ def verify_macos_bundle(app, target, minimum=(13,0)):
 def validate_config(value, tag=None):
     if not isinstance(value,dict):raise ValueError('release.json must be an object')
     if value.get('name') != 'Forkrail':raise ValueError('Invalid product name')
+    if not re.fullmatch(r'[A-Za-z][A-Za-z0-9-]{0,63}',value.get('display_name',value['name'])):
+        raise ValueError('Invalid display name')
     if not re.fullmatch(r'\d+\.\d+\.\d+(?:-(?:rc|beta|alpha)\.\d+)?',value.get('version','')):
         raise ValueError('Invalid release version')
     if not re.fullmatch(r'\d+\.\d+\.\d+',value.get('package_version','')):
@@ -73,6 +75,12 @@ def validate_config(value, tag=None):
 
 def config(root, tag=None):
     return validate_config(json.loads((Path(root)/'release.json').read_text(encoding='utf-8')),tag)
+
+
+def artifact_stem(release, target):
+    validate_config(release)
+    if target not in TARGETS:raise ValueError('Unknown release target')
+    return release.get('display_name',release['name'])+'-'+release['version']+'-'+target
 
 
 def stage_sources(root, destination):

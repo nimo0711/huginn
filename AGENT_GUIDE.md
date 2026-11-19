@@ -1,4 +1,4 @@
-# 작업 보드 기록
+# Huginn 기록
 
 소스에서 실행할 때는 저장소의 `wb` 명령을 사용합니다. 설치 앱에는 Python 없이 동작하는 같은 명령이 포함됩니다.
 
@@ -9,10 +9,10 @@
 아래 예시는 소스 저장소 안에서 실행합니다. 설치 앱에서는 `./wb`를 위 명령으로 바꾸고, 다른 작업 폴더에서는 실행 파일의 전체 경로를 사용하세요.
 
 ```sh
-./wb story '작업 제목' --story work-board
-./wb status '검증' '진행 중' --title '변경 동작 확인' --story work-board
-./wb log '검증 결과 한 줄' --item '검증' --story work-board
-./wb status '검증' '완료' -m '확인한 결과' --story work-board
+./wb story '작업 제목' --story huginn
+./wb status '검증' '진행 중' --title '변경 동작 확인' --story huginn
+./wb log '검증 결과 한 줄' --item '검증' --story huginn
+./wb status '검증' '완료' -m '확인한 결과' --story huginn
 ```
 
 - Jira 키가 작업 브랜치에 있으면 자동으로 사용합니다. 없으면 `--story`에 작업 묶음 키를 지정합니다.

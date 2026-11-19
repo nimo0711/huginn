@@ -60,9 +60,9 @@ python scripts/smoke_release.py --target macos-arm64
 
 ## GitHub에서 빌드
 
-개발 브랜치 push와 버전 태그 push는 자동 빌드를 시작합니다. 세 환경의 Python·JavaScript·Go 시험, 내장 서비스 시험, 설치 파일 검증, 실제 WebView 시험 중 하나라도 실패하면 성공 릴리즈로 취급하지 않습니다. 결과는 Actions의 `Forkrail-<대상>` 아티팩트에서 받습니다. 보관 기간은 14일입니다.
+개발 브랜치 push와 버전 태그 push는 자동 빌드를 시작합니다. 세 환경의 Python·JavaScript·Go 시험, 내장 서비스 시험, 설치 파일 검증, 실제 WebView 시험 중 하나라도 실패하면 성공 릴리즈로 취급하지 않습니다. 결과는 Actions의 `Huginn-<대상>` 아티팩트에서 받습니다. 보관 기간은 14일입니다.
 
-`Build Forkrail installers` 워크플로가 기본 브랜치에 반영된 뒤에는 **Run workflow**로도 실행할 수 있습니다.
+`Build Huginn installers` 워크플로가 기본 브랜치에 반영된 뒤에는 **Run workflow**로도 실행할 수 있습니다.
 
 1. `release.json`의 버전을 변경하고 검증합니다. 예: `1.2.0-rc.1`.
 2. 검증한 커밋에 같은 버전의 태그 `v1.2.0-rc.1`을 만들어 GitHub에 push합니다. 태그 push의 자동 후보 빌드와 별도로, 서명·draft 배포는 다음 수동 실행으로 진행합니다.
@@ -136,4 +136,6 @@ SQLite의 backup 기능으로 DB를 복사하고 연결·바로가기·앱 설�
 
 ## Huginn 이름 변경
 
-1.2.0-rc.4부터 앱과 설치 화면에는 Huginn을 표시합니다. 기존 설치본에서 업데이트를 찾을 수 있도록 배포 파일의 Forkrail- 접두사, 내부 실행 파일 이름, 서비스 API 식별자, 앱 bundle ID, 데이터 경로와 GitHub 저장소 주소는 유지합니다. `release.json`의 `name`은 호환 식별자이고 `display_name`이 제품 표시 이름입니다. macOS 설치 파일에는 Huginn.app이 들어 있습니다. 이전 Forkrail.app은 자동 삭제하지 않으며, Huginn 실행을 확인한 뒤 사용자가 이전 앱 파일만 제거할 수 있습니다. 사용자 설정과 대화는 별도 데이터 경로를 계속 사용합니다.
+1.2.0-rc.5부터 다운로드 파일명과 GitHub 저장소도 Huginn으로 통일합니다. 저장소는 `nimo0711/huginn`이고 설치 파일은 `Huginn-<버전>-<대상>` 이름을 사용합니다. `release.json`의 `display_name`이 배포 파일명과 표시 이름의 기준입니다. 내부 실행 파일·서비스 API 식별자·앱 bundle ID·기존 데이터 경로는 설정과 기록을 계속 읽기 위해 유지합니다.
+
+rc.4 이전 앱은 예전 저장소 주소와 파일명만 읽으므로 rc.5 설치 파일로 한 번 교체해 주세요. 이후 업데이트는 새 저장소에서 확인합니다. macOS 설치 파일에는 Huginn.app이 들어 있습니다. 이전 Forkrail.app은 자동 삭제하지 않으며, Huginn 실행을 확인한 뒤 이전 앱 파일과 Dock 아이콘을 제거할 수 있습니다. 설정과 대화 기록은 유지됩니다.

@@ -286,7 +286,7 @@ class Handler(BaseHTTPRequestHandler):
         allowed_origins = {"http://" + host for host in allowed_hosts}
         if (len(hosts) != 1 or hosts[0] not in allowed_hosts
                 or len(origins) > 1 or origins and origins[0] not in allowed_origins):
-            self._json(403, {"error": "작업 보드 주소에서 열어 주세요."})
+            self._json(403, {"error": "Huginn 주소에서 열어 주세요."})
             return False
         return True
 
@@ -348,7 +348,7 @@ class Handler(BaseHTTPRequestHandler):
                              "connections": ACTIONS.connections.catalog()})
         elif url.path == "/api/actions":
             if self.headers.get('Host') not in {f'127.0.0.1:{PORT}',f'localhost:{PORT}'}:
-                self._json(403,{'error':'작업 보드 주소에서 열어 주세요.'});return
+                self._json(403,{'error':'Huginn 주소에서 열어 주세요.'});return
             sid = (parse_qs(url.query).get("sid") or [""])[0]
             with _scan_lock:
                 session = next((s for s in scan.all_sessions() if s["id"] == sid), None)
@@ -455,7 +455,7 @@ class Handler(BaseHTTPRequestHandler):
                 or self.headers.get("Host") not in {f"127.0.0.1:{PORT}", f"localhost:{PORT}"}
                 or not secrets.compare_digest(self.headers.get("X-Work-Board-Token", ""), ACTION_TOKEN)
                 or self.headers.get("Content-Type", "").split(";")[0] != "application/json"):
-            self._json(403, {"error": "작업 보드에서 직접 실행해 주세요."})
+            self._json(403, {"error": "Huginn에서 직접 실행해 주세요."})
             return
         try:
             length = int(self.headers.get("Content-Length") or 0)

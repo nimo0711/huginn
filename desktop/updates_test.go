@@ -62,6 +62,57 @@ func releaseFixture(version string, draft, pre bool) map[string]any {
 		map[string]any{"id": 3, "name": "Forkrail-" + version + "-macos-arm64.dmg", "size": len(dmgFixture())},
 	}}
 }
+func TestUpdaterDownloadsHuginnAndLegacyArtifacts(t *testing.T) {
+	for _, prefix := range []string{"Huginn", "Forkrail"} {
+		for _, mixed := range []bool{false, true} {
+			t.Run(fmt.Sprintf("%s/mixed=%v", prefix, mixed), func(t *testing.T) {
+				version := "1.2.0-rc.5"
+				stem := prefix + "-" + version + "-macos-arm64"
+				name, zipName := stem+".dmg", stem+".zip"
+				if mixed {
+					zipName = "Other-" + version + "-macos-arm64.zip"
+				}
+				payload := dmgFixture()
+				manifest, _ := json.Marshal(map[string]any{"version": version, "target": "macos-arm64", "signed": false, "source_dirty": false, "source_commit": strings.Repeat("a", 40), "artifacts": []string{name, zipName}})
+				sums := fmt.Sprintf("%x  macos-arm64-release-manifest.json\n%x  %s\n", sha256.Sum256(manifest), sha256.Sum256(payload), name)
+				release := releaseFixture(version, false, true)
+				assets := release["assets"].([]any)
+				assets[0].(map[string]any)["size"] = len(manifest)
+				assets[1].(map[string]any)["size"] = len(sums)
+				assets[2].(map[string]any)["name"] = name
+				client := updateFixture(t, func(w http.ResponseWriter, r *http.Request) {
+					switch r.URL.Path {
+					case "/repos/owner/forkrail/releases":
+						json.NewEncoder(w).Encode([]any{release})
+					case "/repos/owner/forkrail/releases/assets/1":
+						w.Write(manifest)
+					case "/repos/owner/forkrail/releases/assets/2":
+						fmt.Fprint(w, sums)
+					case "/repos/owner/forkrail/releases/assets/3":
+						w.Write(payload)
+					default:
+						fmt.Fprint(w, `{"private":false}`)
+					}
+				})
+				u := fixtureUpdater(t, client)
+				if got := u.Check(); got.Status != "available" {
+					t.Fatalf("release not found: %+v", got)
+				}
+				got := u.Download()
+				if mixed {
+					if got.Status != "error" {
+						t.Fatalf("mixed artifact names accepted: %+v", got)
+					}
+					return
+				}
+				if got.Status != "ready" || got.InstallerName != name {
+					t.Fatalf("installer unavailable: %+v", got)
+				}
+			})
+		}
+	}
+}
+
 func TestUpdaterSelectsSemverAndRejectsDraftAndChannel(t *testing.T) {
 	releases := []any{releaseFixture("9.0.0", true, false), releaseFixture("1.2.0-rc.2", false, true), releaseFixture("1.2.0-rc.10", false, true), releaseFixture("1.1.9", false, false)}
 	client := updateFixture(t, func(w http.ResponseWriter, r *http.Request) {

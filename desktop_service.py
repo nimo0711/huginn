@@ -1,4 +1,4 @@
-"""Entry point for the bundled Forkrail service and local CLI tools."""
+"""Entry point for the bundled Huginn service and local CLI tools."""
 import argparse
 from contextlib import closing
 import ctypes
@@ -189,7 +189,7 @@ def main(argv=None):
     service.add_argument('--instance', required=True)
     service.add_argument('--parent-pid', required=True, type=int)
     commands.add_parser('self-test')
-    commands.add_parser('wb', help='run a work board command')
+    commands.add_parser('wb', help='run a Huginn command')
     commands.add_parser('hook', help='read a Claude hook event from standard input')
     migration = commands.add_parser('migrate')
     migration.add_argument('--from', required=True, type=Path, dest='source')
@@ -202,13 +202,13 @@ def main(argv=None):
             serve(args)
         elif args.command == 'self-test':
             self_test()
-            print('Forkrail service self-test passed')
+            print('Huginn service self-test passed')
         elif args.command == 'migrate':
             migrate(args.source, args.data_dir)
         else:
             parser.error('hook does not take additional arguments')
     except (OSError, ValueError, sqlite3.Error) as error:
-        print(f'Forkrail: {error}', file=sys.stderr)
+        print(f'Huginn: {error}', file=sys.stderr)
         return 2
     return 0
 

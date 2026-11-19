@@ -6,13 +6,13 @@ Claude·Codex의 병렬 작업에서 세션의 관계, 현재 작업, 진척과 
 
 배포 대상은 Windows 10/11 x64, macOS 13 이상 Apple Silicon·Intel입니다. 설치 파일에는 Python 서비스가 포함됩니다. Python이나 Go를 사용자가 따로 설치할 필요가 없습니다.
 
-[GitHub Releases](https://github.com/nimo0711/forkrail/releases)에서 운영체제에 맞는 파일을 받습니다. 저장소가 비공개이면 접근 권한이 있는 GitHub 계정으로 로그인해야 합니다. 아직 게시된 릴리즈가 없다면 [Actions의 설치 후보](https://github.com/nimo0711/forkrail/actions)에서 시험 결과와 파일을 확인합니다.
+[GitHub Releases](https://github.com/nimo0711/huginn/releases)에서 운영체제에 맞는 파일을 받습니다. 저장소가 비공개이면 접근 권한이 있는 GitHub 계정으로 로그인해야 합니다. 아직 게시된 릴리즈가 없다면 [Actions의 설치 후보](https://github.com/nimo0711/huginn/actions)에서 시험 결과와 파일을 확인합니다.
 
 | 환경 | 설치 파일 | 실행 |
 | --- | --- | --- |
-| Mac Apple Silicon | `Forkrail-<버전>-macos-arm64.dmg` | 응용 프로그램의 Huginn |
-| Mac Intel | `Forkrail-<버전>-macos-x86_64.dmg` | 응용 프로그램의 Huginn |
-| Windows x64 | `Forkrail-<버전>-windows-x64-Setup.exe` | 시작 메뉴의 Huginn |
+| Mac Apple Silicon | `Huginn-<버전>-macos-arm64.dmg` | 응용 프로그램의 Huginn |
+| Mac Intel | `Huginn-<버전>-macos-x86_64.dmg` | 응용 프로그램의 Huginn |
+| Windows x64 | `Huginn-<버전>-windows-x64-Setup.exe` | 시작 메뉴의 Huginn |
 
 Mac에서는 DMG를 열고 **Huginn 아이콘을 Applications 폴더로 드래그**합니다. 복사가 끝나면 응용 프로그램에서 Huginn을 실행하고 설치 디스크를 추출합니다. 업데이트도 앱을 종료한 뒤 같은 방법으로 교체합니다.
 
@@ -22,7 +22,7 @@ Windows에는 Microsoft WebView2 Runtime이 필요합니다. 없으면 설치 �
 
 ## 앱 동작
 
-앱을 열면 필요한 로컬 서비스를 함께 시작합니다. 앱이 완전히 종료되면 자신이 시작한 서비스도 종료합니다. 이미 같은 OS 계정의 호환 작업 보드가 실행 중이면 그 서비스와 기존 데이터를 사용하며, 앱 종료 시 기존 서비스는 그대로 둡니다. 연결했던 서비스가 종료되거나 교체되면 연결을 중단합니다. 서비스를 다시 시작한 뒤 앱도 다시 열어 주세요. 기본 주소는 <http://127.0.0.1:8790>입니다.
+앱을 열면 필요한 로컬 서비스를 함께 시작합니다. 앱이 완전히 종료되면 자신이 시작한 서비스도 종료합니다. 이미 같은 OS 계정의 호환 서비스가 실행 중이면 그 서비스와 기존 데이터를 사용하며, 앱 종료 시 기존 서비스는 그대로 둡니다. 연결했던 서비스가 종료되거나 교체되면 연결을 중단합니다. 서비스를 다시 시작한 뒤 앱도 다시 열어 주세요. 기본 주소는 <http://127.0.0.1:8790>입니다.
 
 - Claude·Codex 세션과 하위 평가 세션의 관계
 - Jira 스토리·태스크 또는 Jira 없는 작업 묶음 기준 진척
@@ -63,8 +63,8 @@ Windows는 로컬 Windows 사용자 기록을 읽습니다. WSL 내부 세션은
 Python 3.12를 권장합니다. Windows의 프로세스 탐지에는 psutil이 필요합니다.
 
 ```sh
-git clone https://github.com/nimo0711/forkrail.git
-cd forkrail
+git clone https://github.com/nimo0711/huginn.git
+cd huginn
 python -m pip install psutil==7.2.2
 python server.py
 ```

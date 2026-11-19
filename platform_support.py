@@ -181,7 +181,7 @@ try {
     } finally { $process.Dispose() }
     $global:LASTEXITCODE = $code
 } catch {
-    Write-Error -ErrorAction Continue 'Forkrail could not open the selected command.'
+    Write-Error -ErrorAction Continue 'Huginn could not open the selected command.'
     $global:LASTEXITCODE = 1
 }
 __FORKRAIL_EXIT__

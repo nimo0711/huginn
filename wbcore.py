@@ -107,7 +107,7 @@ def post(events: list[dict], quiet: bool = False) -> bool:
     if spool(events):
         return True
     if not quiet:
-        print(f"작업 보드 기록 실패({URL}, {SPOOL})", file=sys.stderr)
+        print(f"Huginn 기록 실패({URL}, {SPOOL})", file=sys.stderr)
     return False
 
 
@@ -116,7 +116,7 @@ def main(argv=None) -> int:
     if argv[:1] == ['actions']:
         from actions_cli import main as actions_main
         return actions_main(argv[1:])
-    parser = argparse.ArgumentParser(prog="wb", description="작업 보드에 한 줄 기록")
+    parser = argparse.ArgumentParser(prog="wb", description="Huginn에 한 줄 기록")
     sub = parser.add_subparsers(dest="cmd", required=True)
 
     common = argparse.ArgumentParser(add_help=False)

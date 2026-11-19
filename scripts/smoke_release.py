@@ -15,7 +15,7 @@ import uuid
 import zipfile
 from contextlib import contextmanager
 
-from release_tools import config, sha256
+from release_tools import artifact_stem, config, sha256
 
 ROOT=Path(__file__).resolve().parents[1]
 
@@ -237,7 +237,7 @@ def main():
     args=parser.parse_args();release=config(ROOT)
     if args.target not in release['platforms']:raise ValueError('Unknown target')
     output=ROOT/'dist'/args.target
-    name='Forkrail-'+release['version']+'-'+args.target
+    name=artifact_stem(release,args.target)
     ci=os.environ.get('GITHUB_ACTIONS')=='true' and os.environ.get('RUNNER_ENVIRONMENT')=='github-hosted'
     with tempfile.TemporaryDirectory(prefix='Forkrail QA 한글 ') as tmp:
         folder=Path(tmp);home=folder/'home';home.mkdir()

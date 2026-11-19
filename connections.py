@@ -20,7 +20,7 @@ SCHEMA = {
     'jira': {'label':'Jira','description':'작업 제목·스토리·상태·스프린트', 'defaults':{'enabled':False,'site':'','project':''},
              'fields':[{'key':'site','label':'사이트 주소','type':'url','hint':'현재 acli에 로그인한 사이트의 주소'},
                        {'key':'project','label':'프로젝트 키','type':'text','hint':'스프린트에서 조회할 프로젝트 키'}],
-             'help':'주소와 프로젝트를 저장한 뒤 로그인 버튼을 누르세요. 터미널과 브라우저에서 본인 계정으로 로그인하고, 보드로 돌아와 연결 확인을 누릅니다. 이미 로그인했다면 연결 확인부터 사용할 수 있습니다. 인증은 이 컴퓨터의 acli가 관리합니다.'},
+             'help':'주소와 프로젝트를 저장한 뒤 로그인 버튼을 누르세요. 터미널과 브라우저에서 본인 계정으로 로그인하고, Huginn으로 돌아와 연결 확인을 누릅니다. 이미 로그인했다면 연결 확인부터 사용할 수 있습니다. 인증은 이 컴퓨터의 acli가 관리합니다.'},
     'gitlab': {'label':'GitLab','description':'그룹의 MR·머지 상태', 'defaults':{'enabled':False,'host':'','group':'','cwd':''},
                'fields':[{'key':'host','label':'호스트','type':'text','hint':'프로토콜을 제외한 호스트와 필요한 포트'},
                          {'key':'group','label':'그룹 경로','type':'text','hint':'하위 그룹은 /로 구분'},
@@ -303,7 +303,7 @@ class Connections:
         for kind,spec in SCHEMA.items():
             example={**spec['defaults'],'enabled':True}
             lines.append(kind+' · '+spec['label']+': '+json.dumps(example,ensure_ascii=False)+'\n'+spec['help'])
-        lines.append('연결 제거는 보드의 연결만 중지합니다. 계정 로그아웃·서버 종료·저장소 삭제는 하지 않습니다. 현재 작업의 기존 설정을 먼저 조회하고 사용자가 요청한 종류와 필드만 변경하세요.')
+        lines.append('연결 제거는 Huginn의 연결만 중지합니다. 계정 로그아웃·서버 종료·저장소 삭제는 하지 않습니다. 현재 작업의 기존 설정을 먼저 조회하고 사용자가 요청한 종류와 필드만 변경하세요.')
         return '\n'.join(lines)
 
 

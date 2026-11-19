@@ -328,7 +328,7 @@ func installerName(version, target string) string {
 	if target == "windows-x64" {
 		suffix = "-Setup.exe"
 	}
-	return "Forkrail-" + version + "-" + target + suffix
+	return appName + "-" + version + "-" + target + suffix
 }
 func (u *AppUpdates) releaseAssets(release *updateRelease) (updateAsset, updateAsset, updateAsset, error) {
 	version := strings.TrimPrefix(release.Tag, "v")
@@ -337,6 +337,8 @@ func (u *AppUpdates) releaseAssets(release *updateRelease) (updateAsset, updateA
 	}
 	wanted := []string{installerName(version, u.config.target), u.config.target + "-release-manifest.json", u.config.target + "-SHA256SUMS"}
 	var found [3]updateAsset
+	legacyName := strings.Replace(wanted[0], appName+"-", productID+"-", 1)
+	var legacy updateAsset
 	seen := map[string]bool{}
 	ids := map[int64]bool{}
 	if len(release.Assets) > 100 {
@@ -348,6 +350,9 @@ func (u *AppUpdates) releaseAssets(release *updateRelease) (updateAsset, updateA
 		}
 		seen[a.Name] = true
 		ids[a.ID] = true
+		if a.Name == legacyName {
+			legacy = a
+		}
 		for i, name := range wanted {
 			if a.Name == name {
 				found[i] = a
@@ -356,6 +361,9 @@ func (u *AppUpdates) releaseAssets(release *updateRelease) (updateAsset, updateA
 				}
 			}
 		}
+	}
+	if found[0].ID == 0 {
+		found[0] = legacy
 	}
 	for _, a := range found {
 		if a.ID == 0 {
@@ -414,7 +422,7 @@ func (u *AppUpdates) Download() UpdateState {
 	if json.Unmarshal(data, &manifest) != nil || manifest.Version != version || manifest.Target != u.config.target || manifest.Signed == nil || manifest.SourceDirty == nil || *manifest.SourceDirty || !updateCommit.MatchString(manifest.SourceCommit) || len(manifest.Artifacts) != 2 {
 		return u.fail(errUpdateInvalid)
 	}
-	expectedZip := "Forkrail-" + version + "-" + u.config.target + ".zip"
+	expectedZip := strings.TrimSuffix(strings.TrimSuffix(installer.Name, ".dmg"), "-Setup.exe") + ".zip"
 	if !((manifest.Artifacts[0] == installer.Name && manifest.Artifacts[1] == expectedZip) || (manifest.Artifacts[1] == installer.Name && manifest.Artifacts[0] == expectedZip)) {
 		return u.fail(errUpdateInvalid)
 	}
@@ -426,7 +434,7 @@ func (u *AppUpdates) Download() UpdateState {
 		return u.fail(errUpdateInvalid)
 	}
 	u.change(func(s *UpdateState) { s.Signed = *manifest.Signed; s.TotalBytes = installer.Size })
-	directory, err := os.MkdirTemp(u.config.tempRoot, "Forkrail-update-")
+	directory, err := os.MkdirTemp(u.config.tempRoot, "Huginn-update-")
 	if err != nil {
 		return u.fail(err)
 	}
@@ -690,7 +698,7 @@ func (u *AppUpdates) requestOnce(ctx context.Context, address, token string, ass
 		req.Header.Set("Accept", "application/octet-stream")
 	}
 	req.Header.Set("X-GitHub-Api-Version", "2022-11-28")
-	req.Header.Set("User-Agent", "Forkrail-Updater")
+	req.Header.Set("User-Agent", "Huginn-Updater")
 	if token != "" {
 		req.Header.Set("Authorization", "Bearer "+token)
 	}

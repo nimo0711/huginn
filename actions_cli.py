@@ -8,7 +8,7 @@ from runtime_paths import DATA_DIR
 
 
 def main(argv=None,store=None):
-    parser=argparse.ArgumentParser(prog='wb actions',description='작업 보드 연결 설정과 스킬 바로가기 등록. 스킬을 실행하지 않습니다.')
+    parser=argparse.ArgumentParser(prog='wb actions',description='Huginn 연결 설정과 스킬 바로가기 등록. 스킬을 실행하지 않습니다.')
     sub=parser.add_subparsers(dest='action',required=True)
     cp=sub.add_parser('connections');cs=cp.add_subparsers(dest='connection_action',required=True)
     cs.add_parser('list')

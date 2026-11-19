@@ -638,9 +638,9 @@ test('saving Windows environment preserves unsupported settings by omitting hidd
  assert.deepEqual(JSON.parse(b.run('JSON.stringify(ui.environmentDraft)')),{auto_servers:false});
 });
 test('browser update settings link to official releases and distinguish installation requirements',()=>{
- const b=board();b.run('data={sessions:[]};ui.settingsTab="updates";ui.actionData={"":{app:{version:"1.2.0-rc.1",release_url:"https://github.com/nimo0711/forkrail/releases"},environment:{os:"windows"}}}');
- const view=b.run('settingsView()');assert.ok(view.includes('Windows'));assert.ok(view.includes('1.2.0-rc.1'));assert.ok(view.includes('설치본'));assert.ok(view.includes('href="https://github.com/nimo0711/forkrail/releases"'));assert.ok(!view.includes('data-update-action="Check"'));
- b.run('ui.actionData={}');assert.ok(b.run('settingsView()').includes('href="https://github.com/nimo0711/forkrail/releases"'));
+ const b=board();b.run('data={sessions:[]};ui.settingsTab="updates";ui.actionData={"":{app:{version:"1.2.0-rc.1",release_url:"https://github.com/nimo0711/huginn/releases"},environment:{os:"windows"}}}');
+ const view=b.run('settingsView()');assert.ok(view.includes('Windows'));assert.ok(view.includes('1.2.0-rc.1'));assert.ok(view.includes('설치본'));assert.ok(view.includes('href="https://github.com/nimo0711/huginn/releases"'));assert.ok(!view.includes('data-update-action="Check"'));
+ b.run('ui.actionData={}');assert.ok(b.run('settingsView()').includes('href="https://github.com/nimo0711/huginn/releases"'));
 });
 test('update settings show bounded progress, recoverable states and safe links without raw errors',()=>{
  const b=board();b.run('data={sessions:[]};ui.settingsTab="updates"');
@@ -711,7 +711,7 @@ test('release metadata controls the GitHub destination while malformed or foreig
  b.run('ui.updates={status:"available",available:true,release_url:"https://github.com/example-owner/Forkrail-next/releases/tag/v2.0.0-rc.1",target:"macos-arm64",os:"macos"}');
  const view=b.run('settingsView()');assert.ok(view.includes('href="https://github.com/example-owner/Forkrail-next/releases/tag/v2.0.0-rc.1"'));assert.ok(view.includes('macOS · Apple Silicon'));assert.ok(!view.includes('macos-arm64'));
  for(const url of ['javascript:alert(1)','https://github.com.evil.test/a/b/releases','https://github.com/a/b/releases?token=secret','https://github.com/a/../releases']) {
-  b.set(url);b.run('ui.updates.release_url=input');assert.ok(b.run('settingsView()').includes('href="https://github.com/nimo0711/forkrail/releases"'));
+  b.set(url);b.run('ui.updates.release_url=input');assert.ok(b.run('settingsView()').includes('href="https://github.com/nimo0711/huginn/releases"'));
  }
 });
 

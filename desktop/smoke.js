@@ -18,7 +18,7 @@
     const health = await healthResponse.json();
     if (!healthResponse.ok || health.ok !== true || health.app !== "Forkrail" ||
         health.api !== 1 || health.version !== version || !health.instance) {
-      throw new Error("WebView did not reach the bundled Forkrail service");
+      throw new Error("WebView did not reach the bundled Huginn service");
     }
 
     const updateInfo = window.go?.main?.AppUpdates?.Info;

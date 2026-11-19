@@ -1,4 +1,4 @@
-"""Build an installable Forkrail candidate on its target OS. Never publishes."""
+"""Build an installable Huginn candidate on its target OS. Never publishes."""
 from __future__ import annotations
 import argparse
 import json
@@ -10,7 +10,7 @@ import shutil
 import subprocess
 import sys
 
-from release_tools import TARGETS, MACHO_MAGIC, config, stage_sources, validate_signing, verify_macos_bundle, write_checksums, zip_tree
+from release_tools import TARGETS, MACHO_MAGIC, artifact_stem, config, stage_sources, validate_signing, verify_macos_bundle, write_checksums, zip_tree
 
 ROOT=Path(__file__).resolve().parents[1]
 
@@ -100,7 +100,7 @@ def package_mac(release,target,work,service,built,signed,output):
                 NSHighResolutionCapable=True,NSHumanReadableCopyright='Huginn contributors')
     info.write_bytes(plistlib.dumps(data));verify_macos_bundle(app,target);sign_mac(app,signed)
     run([app/'Contents/Resources/service/forkrail-service','self-test'],timeout=60)
-    stem=release['name']+'-'+release['version']+'-'+target
+    stem=artifact_stem(release,target)
     if signed:
         notary=['--keychain-profile',os.environ['FORKRAIL_NOTARY_PROFILE']]
         if os.environ.get('FORKRAIL_NOTARY_KEYCHAIN'):notary+=['--keychain',os.environ['FORKRAIL_NOTARY_KEYCHAIN']]
@@ -139,7 +139,7 @@ def package_windows(release,target,work,service,built,signed,output):
     if signed:
         sign_windows(folder/'Forkrail.exe');sign_windows(folder/'service/forkrail-service.exe')
     run([folder/'service/forkrail-service.exe','self-test'],timeout=60)
-    stem=release['name']+'-'+release['version']+'-'+target
+    stem=artifact_stem(release,target)
     installer=output/(stem+'-Setup.exe')
     nsis=shutil.which('makensis') or str(Path(os.environ.get('ProgramFiles(x86)','C:/Program Files (x86)'))/'NSIS/makensis.exe')
     run([nsis,'/V2','/DSOURCE='+str(folder),'/DOUTPUT='+str(installer),

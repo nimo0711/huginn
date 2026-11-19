@@ -71,7 +71,7 @@ func TestMacUpdatePreservesQuarantineOnDownloadedInstaller(t *testing.T) {
 	}
 	data := make([]byte, 1024)
 	n, err := unix.Getxattr(path, "com.apple.quarantine", data)
-	if err != nil || !strings.HasPrefix(string(data[:n]), "0081;") || !strings.Contains(string(data[:n]), ";Forkrail;") {
+	if err != nil || !strings.HasPrefix(string(data[:n]), "0081;") || !strings.Contains(string(data[:n]), ";Huginn;") {
 		t.Fatalf("missing OS quarantine: %q %v", data[:n], err)
 	}
 }

@@ -29,7 +29,8 @@ def main():
     if '-' not in release['version'] and not signed:raise ValueError('Stable drafts require signed installers')
     if not tag:raise ValueError('An existing version tag is required')
     commit=verify_tag_commit(tag)
-    body=('Forkrail '+release['version']+'\n\n'
+    display_name=release.get('display_name',release['name'])
+    body=(display_name+' '+release['version']+'\n\n'
           +'Windows x64 / macOS Apple Silicon / macOS Intel\n\n'
           +('Signed installers; macOS notarization completed.\n' if signed else
             'Unsigned test candidate. macOS Gatekeeper and Windows SmartScreen may block installation. This is not a signed production release.\n')
@@ -39,11 +40,11 @@ def main():
         notes=destination/'notes.md';notes.write_text(body,encoding='utf-8')
         artifacts=[]
         for target in release['platforms']:
-            folder=Path(sys.argv[1])/('Forkrail-'+target)
+            folder=Path(sys.argv[1])/(display_name+'-'+target)
             artifacts.extend(str(path) for path in prepare_assets(folder,target,destination,signed,commit))
         # Check again after all downloads are validated, immediately before creation.
         verify_tag_commit(tag)
-        subprocess.run(['gh','release','create',tag,'--verify-tag','--draft','--title','Forkrail '+release['version'],
+        subprocess.run(['gh','release','create',tag,'--verify-tag','--draft','--title',display_name+' '+release['version'],
                         '--notes-file',str(notes),*(['--prerelease'] if '-' in release['version'] else []),*artifacts],check=True)
 
 

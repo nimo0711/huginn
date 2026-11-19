@@ -2244,7 +2244,7 @@ function connectionsView() {
     ${ui.connectionRemove===x.kind?`<div class="connection-confirm"><span>보드에서 ${esc(x.label)} 연결을 제거할까요?</span><button class="soft-button" data-connection-confirm="${esc(x.kind)}"${pending}>연결 제거</button><button class="text-button" data-connection-keep${pending}>취소</button></div>`:''}</div>`;
   }).join('') || '<div class="settings-empty"><strong>등록한 연결이 없습니다</strong><p>연결 추가에서 사용할 서비스나 로컬 기록을 선택하세요.</p></div>'}</div></section>`;
 }
-const OFFICIAL_RELEASES='https://github.com/nimo0711/forkrail/releases';
+const OFFICIAL_RELEASES='https://github.com/nimo0711/huginn/releases';
 function updateNative() {
   const bridge=window.go?.main?.AppUpdates;
   return bridge && ['Info','Check','Download','Install'].every(name=>typeof bridge[name]==='function')?bridge:null;

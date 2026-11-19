@@ -13,7 +13,7 @@ import (
 )
 
 func markInstallerOrigin(path, _ string) error {
-	value := []byte(fmt.Sprintf("0081;%x;Forkrail;", time.Now().Unix()))
+	value := []byte(fmt.Sprintf("0081;%x;Huginn;", time.Now().Unix()))
 	if err := unix.Setxattr(path, "com.apple.quarantine", value, 0); err != nil {
 		return err
 	}

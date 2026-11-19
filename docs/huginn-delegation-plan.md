@@ -46,7 +46,7 @@
 
 ## Windows 실제 설치 검증 · 2026-11-19
 
-[GitHub Actions 44463453813](https://github.com/nimo0711/forkrail/actions/runs/44463453813)에서 소스 커밋 `9daab448730090da8ee469f1d899e2d32564c96f`의 1.2.0-rc.4를 검증했습니다. 이 실행에는 Windows x64, Apple Silicon Mac, Intel Mac이 모두 포함되며 세 대상 모두 통과했습니다.
+[GitHub Actions 44463453813](https://github.com/nimo0711/huginn/actions/runs/44463453813)에서 소스 커밋 `9daab448730090da8ee469f1d899e2d32564c96f`의 1.2.0-rc.4를 검증했습니다. 이 실행에는 Windows x64, Apple Silicon Mac, Intel Mac이 모두 포함되며 세 대상 모두 통과했습니다.
 
 Windows Server 2022의 일회용 환경에서 NSIS 설치 프로그램을 자동 실행했습니다. 다음 항목을 실제 파일·레지스트리·서비스·WebView로 확인했습니다.
 
@@ -58,3 +58,13 @@ Windows Server 2022의 일회용 환경에서 NSIS 설치 프로그램을 자동
 - 설치 파일과 증거를 내려받아 SHA-256·대상 플랫폼·버전·미커밋 변경 없는 정확한 소스 커밋 재검증
 
 Windows 설치 마법사를 사람이 클릭하는 수동 검사와 서명·SmartScreen 평판 확인은 이 자동 검증 범위에 포함하지 않습니다. 결과물은 서명되지 않은 테스트 후보입니다. 이 기록 이후의 문서 변경은 위에서 검증한 실행 코드 커밋과 구분합니다.
+
+## 표시 이름·설치 파일·저장소 정리 · rc.5
+
+사용자 요청: AI 도움말의 작업 보드 이름, 다운로드한 Forkrail 파일명, GitHub 저장소 이름까지 Huginn으로 맞춘다. 제품명은 Huginn, 새 저장소는 nimo0711/huginn이다. 저장 데이터·앱 식별자는 기존 사용자 설정을 보존한다. 이미 게시한 rc.4 바이너리를 덮어쓰지 않고 rc.5를 제공한다. rc.4의 업데이트 검색은 예전 주소와 파일명에 고정되어 있으므로 rc.5는 설치 파일로 한 번 교체해야 한다.
+
+- [x] 도움말·로그인 안내·CLI 표시와 배포 제목을 Huginn으로 정리한다.
+- [x] 배포 파일명은 release.json의 display_name을 사용해 한곳에서 만든다. 빌드·검증·설치 시험·게시가 같은 규칙을 사용한다.
+- [x] 새 업데이터는 Huginn 파일명을 우선 찾고 이전 Forkrail 파일도 검증 가능한 범위에서 읽는다. 잘못된 이름·다른 플랫폼·체크섬 불일치는 거부한다.
+- [x] GitHub 저장소를 huginn으로 변경하고 원격·업데이트 주소·현재 안내 링크를 바꾼다.
+- [ ] 회귀 시험과 세 플랫폼 설치 검증 후 rc.5를 게시한다. 다운로드 폴더에 Huginn 이름의 Windows·Mac 설치 파일을 준비한다.

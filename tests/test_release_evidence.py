@@ -16,7 +16,7 @@ class ReleaseEvidenceTests(unittest.TestCase):
         self.temp=tempfile.TemporaryDirectory();self.addCleanup(self.temp.cleanup)
         self.root=Path(self.temp.name)
         self.version=config(Path(__file__).resolve().parents[1])['version']
-        names=[f'Forkrail-{self.version}-macos-arm64{suffix}' for suffix in ['.dmg','.zip']]
+        names=[f'Huginn-{self.version}-macos-arm64{suffix}' for suffix in ['.dmg','.zip']]
         for name in names:(self.root/name).write_bytes(b'fixture package')
         self.manifest={'name':'Forkrail','version':self.version,'target':'macos-arm64','signed':False,'artifacts':names}
         (self.root/'release-manifest.json').write_text(json.dumps(self.manifest))
