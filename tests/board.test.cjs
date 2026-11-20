@@ -815,12 +815,12 @@ test('appearance offers named themes like a gallery, applies sidebar and accent 
   let view=b.run('settingsView()');
   assert.ok(view.includes('data-theme-mode="dark" aria-pressed="true"'));
   assert.ok(view.includes('data-palette-choice="huginn" aria-pressed="true"'));
-  for(const label of ['조합 색상','단일 색상','시력 보조 색상','청황색약 대비','적록색약 대비','data-palette-share'])assert.ok(view.includes(label),label);
+  for(const label of ['음악에서 고른 색','새로운 조합','다시 만든 클래식','단일 색상','시력 보조 색상','청황색약 대비','적록색약 대비','data-palette-share'])assert.ok(view.includes(label),label);
   assert.equal((view.match(/data-palette-choice=/g)||[]).length,b.run('PALETTES.length'));
   b.run('localStorage.setItem("wb.palette","eggplant");applyTheme()');
   assert.equal(b.root.dataset.sideScheme,'dark');
   const css=b.style().textContent;
-  for(const part of ['--d-side:#3b1340','--l-side:#3b1340','--d-primary:#d6a6dd','--l-primary:#6d2c78','--l-on-primary:#fbf8f1'])assert.ok(css.includes(part),part);
+  for(const part of ['--d-side:#3f0e40','--l-side:#3f0e40','--d-primary:#cc67cf','--l-primary:#5a1d5c','--l-on-primary:#fbf8f1'])assert.ok(css.includes(part),part);
   assert.equal(b.run('localStorage.getItem("wb.paletteCss")'),css);assert.equal(b.run('localStorage.getItem("wb.sideScheme")'),'dark');
   b.run('localStorage.setItem("wb.palette","deutan");applyTheme()');
   for(const part of ['--d-run:#f0e442','--l-done:#0b5f98'])assert.ok(b.style().textContent.includes(part),part);

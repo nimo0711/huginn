@@ -3003,26 +3003,45 @@ async function refresh() {
 }
 
 const THEME_MODES=[['system','시스템 설정'],['dark','다크'],['light','라이트']];
-const PALETTE_GROUPS=[['combo','조합 색상'],['single','단일 색상'],['vision','시력 보조 색상']];
+const PALETTE_GROUPS=[['huginn','Huginn'],['combo','음악에서 고른 색'],['single','단일 색상'],['vision','시력 보조 색상'],['fresh','새로운 조합'],['classic','다시 만든 클래식']];
 const PALETTES=[
-  {id:'huginn',group:'combo',name:'Huginn 기본',accent:{dark:'#d3b066',light:'#765714'}},
-  {id:'dawn',group:'combo',name:'새벽',sidebar:'#263347',accent:{dark:'#8fb4d9',light:'#2f5a86'}},
-  {id:'forest',group:'combo',name:'숲길',sidebar:'#1f3328',accent:{dark:'#9cc98a',light:'#3e6934'}},
-  {id:'dusk',group:'combo',name:'노을',sidebar:'#3d2230',accent:{dark:'#f0a58a',light:'#9c4712'}},
-  {id:'sea',group:'combo',name:'밤바다',sidebar:'#10283a',accent:{dark:'#7fc4b8',light:'#22675d'}},
-  {id:'plum',group:'combo',name:'자두',sidebar:'#36213f',accent:{dark:'#d4a3dc',light:'#7a3f86'}},
-  {id:'eggplant',group:'single',name:'가지',sidebar:'#3b1340',accent:{dark:'#d6a6dd',light:'#6d2c78'}},
-  {id:'tangerine',group:'single',name:'귤',sidebar:'#5c2a10',accent:{dark:'#f2a477',light:'#9c4712'}},
-  {id:'banana',group:'single',name:'바나나',sidebar:'#463609',accent:{dark:'#e3c56a',light:'#765714'}},
-  {id:'jade',group:'single',name:'비취',sidebar:'#123a2c',accent:{dark:'#84d1ad',light:'#23684d'}},
-  {id:'lagoon',group:'single',name:'석호',sidebar:'#0f3350',accent:{dark:'#8fc0ec',light:'#23598a'}},
-  {id:'rose',group:'single',name:'장미',sidebar:'#561a26',accent:{dark:'#f19aa8',light:'#9e2c43'}},
-  {id:'ink',group:'single',name:'먹',sidebar:'#222222',accent:{dark:'#c8c8c8',light:'#4a4a4a'}},
-  {id:'indigo',group:'single',name:'남색',sidebar:'#1b2266',accent:{dark:'#a9b2f5',light:'#3a46a8'}},
+  {id:'huginn',group:'huginn',name:'Huginn 기본',accent:{dark:'#d3b066',light:'#765714'},swatch:['#1d1c18','#d3b066']},
+  {id:'blue-note',group:'combo',name:'푸른 선율',sidebar:'#263d52',accent:{dark:'#6993b7',light:'#466b8c'},swatch:['#4a77a0','#5a86ad']},
+  {id:'funky',group:'combo',name:'펑키 그루브',sidebar:'#3a365c',accent:{dark:'#4fa56f',light:'#427254'},swatch:['#7f78b0','#5a9a72']},
+  {id:'jazz-bar',group:'combo',name:'재즈 바',sidebar:'#721a1a',accent:{dark:'#cc6cb2',light:'#5a1f4a'},swatch:['#7a1c1c','#5a1f4a']},
+  {id:'electric',group:'combo',name:'전기 신호',sidebar:'#333f21',accent:{dark:'#60b260',light:'#487148'},swatch:['#8fae62','#6fa36f']},
+  {id:'brass',group:'combo',name:'금관 악기',sidebar:'#443a1c',accent:{dark:'#a28c3b',light:'#77662b'},swatch:['#9a8540','#a08a3a']},
+  {id:'shades',group:'combo',name:'밤의 선글라스',sidebar:'#3a1340',accent:{dark:'#ba75c3',light:'#5a2a60'},swatch:['#3a1340','#5a2a60']},
+  {id:'eggplant',group:'single',name:'가지',sidebar:'#3f0e40',accent:{dark:'#cc67cf',light:'#5a1d5c'},swatch:['#3f0e40','#5a1d5c']},
+  {id:'tangerine',group:'single',name:'귤',sidebar:'#66280d',accent:{dark:'#e7672e',light:'#9a3c12'},swatch:['#6b2a0e','#9a3c12']},
+  {id:'banana',group:'single',name:'바나나',sidebar:'#4f370d',accent:{dark:'#b88520',light:'#866117'},swatch:['#6b4b12','#8a6418']},
+  {id:'jade',group:'single',name:'비취',sidebar:'#12382a',accent:{dark:'#37a075',light:'#1f5a42'},swatch:['#12382a','#1f5a42']},
+  {id:'lagoon',group:'single',name:'석호',sidebar:'#0f3350',accent:{dark:'#3f94d5',light:'#1a4f78'},swatch:['#0f3350','#1a4f78']},
+  {id:'burgundy',group:'single',name:'버건디',sidebar:'#5a0f14',accent:{dark:'#df686f',light:'#7a1a20'},swatch:['#5a0f14','#7a1a20']},
+  {id:'ink',group:'single',name:'먹',sidebar:'#1f1f1f',accent:{dark:'#8e8e8e',light:'#3a3a3a'},swatch:['#1f1f1f','#3a3a3a']},
+  {id:'indigo',group:'single',name:'쪽빛',sidebar:'#121a6e',accent:{dark:'#7d86e5',light:'#1f2a9a'},swatch:['#121a6e','#1f2a9a']},
   {id:'tritan',group:'vision',name:'청황색약 대비',sidebar:'#121212',accent:{dark:'#f08a8a',light:'#b3261e'},
-    status:{dark:{run:'#4fc3c3',wait:'#f5a3a3',stall:'#ff6b5c',done:'#d0d0d0'},light:{run:'#1f6f6f',wait:'#a0495e',stall:'#b3261e',done:'#555555'}}},
+    status:{dark:{run:'#4fc3c3',wait:'#f5a3a3',stall:'#ff6b5c',done:'#d0d0d0'},light:{run:'#1f6f6f',wait:'#a0495e',stall:'#b3261e',done:'#555555'}},swatch:['#3a3a3a','#050505']},
   {id:'deutan',group:'vision',name:'적록색약 대비',sidebar:'#2b2140',accent:{dark:'#56b4e9',light:'#0b5f98'},
-    status:{dark:{run:'#f0e442',wait:'#e69f00',stall:'#e08fc0',done:'#56b4e9'},light:{run:'#6b6200',wait:'#8a5a00',stall:'#a8487f',done:'#0b5f98'}}},
+    status:{dark:{run:'#f0e442',wait:'#e69f00',stall:'#e08fc0',done:'#56b4e9'},light:{run:'#6b6200',wait:'#8a5a00',stall:'#a8487f',done:'#0b5f98'}},swatch:['#6a4a70','#2a0a2a']},
+  {id:'raspberry',group:'fresh',name:'산딸기 모자',sidebar:'#3a0f3a',accent:{dark:'#dd6a76',light:'#8a1f2a'},swatch:['#3a0f3a','#8a1f2a']},
+  {id:'suit',group:'fresh',name:'정장',sidebar:'#121a2e',accent:{dark:'#7a87e4',light:'#1c2a8a'},swatch:['#121a2e','#1c2a8a']},
+  {id:'pog',group:'fresh',name:'딱지',sidebar:'#6a1040',accent:{dark:'#cc7a21',light:'#955918'},swatch:['#6a1040','#a0601a']},
+  {id:'mint-chip',group:'fresh',name:'민트 칩',sidebar:'#1a3a1a',accent:{dark:'#7888e6',light:'#1a2a8a'},swatch:['#1a3a1a','#1a2a8a']},
+  {id:'jam',group:'fresh',name:'잼 샌드',sidebar:'#3a2018',accent:{dark:'#d46a9f',light:'#5a1a3a'},swatch:['#3a2018','#5a1a3a']},
+  {id:'chill',group:'fresh',name:'느긋함',sidebar:'#123a2c',accent:{dark:'#4696be',light:'#1a3a4a'},swatch:['#123a2c','#1a3a4a']},
+  {id:'forest-floor',group:'fresh',name:'숲 바닥',sidebar:'#1a3014',accent:{dark:'#cb7940',light:'#4a2a14'},swatch:['#1a3014','#4a2a14']},
+  {id:'red-blue',group:'fresh',name:'레드 앤 블루',sidebar:'#6a0a0a',accent:{dark:'#4c93d9',light:'#1a4a7a'},swatch:['#6a0a0a','#1a4a7a']},
+  {id:'sea-glass',group:'fresh',name:'바다 유리',sidebar:'#12304a',accent:{dark:'#bc70d6',light:'#4a1a5a'},swatch:['#12304a','#4a1a5a']},
+  {id:'lemon-lime',group:'fresh',name:'레몬 라임',sidebar:'#4a3010',accent:{dark:'#5a9e2b',light:'#2a4a14'},swatch:['#4a3010','#2a4a14']},
+  {id:'leaves',group:'fresh',name:'낙엽',sidebar:'#51340e',accent:{dark:'#c4801c',light:'#8a5a14'},swatch:['#5a3a10','#8a5a14']},
+  {id:'sunrise',group:'fresh',name:'해돋이',sidebar:'#6a1a0f',accent:{dark:'#df687c',light:'#7a1a2a'},swatch:['#6a1a0f','#7a1a2a']},
+  {id:'choco-mint',group:'classic',name:'초코 민트',sidebar:'#4a2414',accent:{dark:'#37a067',light:'#1f5a3a'},swatch:['#4a2414','#1f5a3a']},
+  {id:'cmyk',group:'classic',name:'인쇄 잉크',sidebar:'#1a2a5a',accent:{dark:'#df687c',light:'#7a1a2a'},swatch:['#1a2a5a','#7a1a2a']},
+  {id:'tailor',group:'classic',name:'양복점',sidebar:'#12305a',accent:{dark:'#b2891a',light:'#816313'},swatch:['#12305a','#8a6a14']},
+  {id:'glacier',group:'classic',name:'빙하',sidebar:'#121a20',accent:{dark:'#3e95d0',light:'#1a4a6a'},swatch:['#121a20','#1a4a6a']},
+  {id:'deep-sea',group:'classic',name:'심해',sidebar:'#12306a',accent:{dark:'#698ce3',light:'#1a3a8a'},swatch:['#12306a','#1a3a8a']},
+  {id:'caramel',group:'classic',name:'캐러멜',sidebar:'#5a1a0f',accent:{dark:'#e56837',light:'#9a3a14'},swatch:['#5a1a0f','#9a3a14']},
 ];
 const PALETTE_BASE={dark:{bg:'#171714',panel:'#24221d',dim:'#aea694',ink:'#ece5d5'},light:{bg:'#f3eee3',panel:'#fbf8f1',dim:'#625a4b',ink:'#24221d'}};
 const PALETTE_MODES=[['dark','다크'],['light','라이트']];
@@ -3111,8 +3130,8 @@ function applyTheme() {
 }
 systemLight?.addEventListener?.('change',()=>{if(themeChoice()==='system')applyTheme();});
 function paletteDot(palette) {
-  const side=palette.sidebar || '#1d1c18',accent=palette.accent?.dark || '#d3b066';
-  return `<span class="palette-dot" style="background:linear-gradient(135deg,${side} 35%,${accent})" aria-hidden="true"></span>`;
+  const [from,to]=palette.swatch || [palette.sidebar || '#1d1c18',palette.accent?.dark || '#d3b066'];
+  return `<span class="palette-dot" style="background:linear-gradient(135deg,${from} 20%,${to})" aria-hidden="true"></span>`;
 }
 function appearanceView() {
   const mode=themeChoice(),active=paletteChoice(),tab=ui.appearanceTab || 'presets',custom=customPalette();
