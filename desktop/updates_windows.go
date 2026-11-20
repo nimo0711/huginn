@@ -45,8 +45,11 @@ func verifyInstallerSignature(ctx context.Context, path string, required bool) (
 	}
 	return false, errUpdateInvalid
 }
+
+var windowsUpdateInstallerArgs = []string{"/UPDATE", "/RELAUNCH"}
+
 func launchUpdateInstaller(path, _ string) error {
-	command := exec.Command(path, "/S", "/RELAUNCH")
+	command := exec.Command(path, windowsUpdateInstallerArgs...)
 	command.SysProcAttr = &syscall.SysProcAttr{CreationFlags: windows.DETACHED_PROCESS | windows.CREATE_NEW_PROCESS_GROUP}
 	if err := command.Start(); err != nil {
 		return err
