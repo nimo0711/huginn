@@ -65,6 +65,10 @@
   --off: var(--d-off);
   --track: var(--d-track);
   --overlay: var(--d-overlay);
+  --selected: var(--d-selected, var(--panel2));
+  --on-selected: var(--d-on-selected, var(--ink));
+  --presence: var(--d-presence, var(--run));
+  --notify: var(--d-notify, var(--wait));
   --run-soft: color-mix(in srgb, var(--run) 15%, transparent);
   --run-line: color-mix(in srgb, var(--run) 45%, transparent);
   --info-soft: color-mix(in srgb, var(--info) 16%, transparent);
@@ -106,6 +110,10 @@
   --off: var(--l-off);
   --track: var(--l-track);
   --overlay: var(--l-overlay);
+  --selected: var(--l-selected, var(--panel2));
+  --on-selected: var(--l-on-selected, var(--ink));
+  --presence: var(--l-presence, var(--run));
+  --notify: var(--l-notify, var(--wait));
   --run-soft: color-mix(in srgb, var(--run) 12%, transparent);
   --run-line: color-mix(in srgb, var(--run) 40%, transparent);
   --info-soft: color-mix(in srgb, var(--info) 12%, transparent);

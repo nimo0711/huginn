@@ -839,6 +839,10 @@ test('every built-in theme stays readable and the validation base matches the st
   for(const id of b.run('PALETTES.map(p=>p.id)'))assert.doesNotThrow(()=>b.run(`readPalette(paletteJson(PALETTES.find(p=>p.id==="${id}")))`),id);
   const worst=b.run(`PALETTES.filter(p=>p.sidebar).map(p=>{const t=paletteTokens(p);return [p.id,Math.min(...['dark','light'].flatMap(m=>['ink','sub','dim','primary','run','wait','stall','done','info','off'].flatMap(k=>surfacesOf(t[m]).map(x=>contrast(t[m][k],x))))),contrast(t[sidebarScheme(p.sidebar)].dim,p.sidebar)];})`);
   for(const [id,text,side] of worst){assert.ok(text>=4.5,id+' text '+text);assert.ok(side>=4.5,id+' sidebar '+side);}
+  const roles=b.run(`PALETTES.filter(p=>p.sidebar).map(p=>{const t=paletteTokens(p).dark;return [p.id,contrast(t.selected,t['on-selected']),contrast(t.presence,p.sidebar),contrast(t.notify,p.sidebar)];})`);
+  assert.equal(roles.length,b.run('PALETTES.filter(p=>p.sidebar).length'));
+  for(const [id,selected,presence,notify] of roles){assert.ok(selected>=4.5,id+' selected '+selected);assert.ok(presence>=3,id+' presence');assert.ok(notify>=3,id+' notify');}
+  const tritan=b.run('paletteTokens(PALETTES.find(p=>p.id==="tritan")).light');assert.deepEqual([tritan.selected,tritan['on-selected']],['#ffffff','#000000']);
   const css=fs.readFileSync(path.join(__dirname,'..','desktop/theme.css'),'utf8');
   for(const [mode,prefix] of [['dark','--d-'],['light','--l-']])for(const key of ['bg','panel','dim','ink'])
     assert.equal(css.match(new RegExp(prefix+key+':\\s*(#[0-9a-f]{6})'))[1],b.run(`PALETTE_BASE.${mode}.${key}`),mode+key);
@@ -849,7 +853,7 @@ test('custom theme JSON is validated with readable messages before it is applied
   assert.deepEqual(JSON.parse(JSON.stringify(b.run(`readPalette('{"name":" 내 테마 ","sidebar":"#123","accent":{"dark":"#8FB4D9","light":"#2f5a86"}}')`))),{name:'내 테마',sidebar:'#112233',accent:{dark:'#8fb4d9',light:'#2f5a86'}});
   for(const [input,message] of [['{"name":',"JSON 형식"],['[]','JSON 객체'],['{"font":"x"}','font'],['{"sidebar":"red"}','#RRGGBB'],
     ['{"sidebar":"#808080"}','사이드바 글자'],['{"accent":{"dark":"#333333","light":"#765714"}}','다크 화면'],['{"accent":{"dark":"#d3b066"}}','accent.light'],['{"accent":"#8fb4d9"}','라이트 화면'],
-    ['{"status":{"light":{"run":"#f0e442"}}}','진행 상태색'],['{"name":"'+'가'.repeat(41)+'"}','name'],['{"sidebar":"#123;}body{x"}','#RRGGBB']])
+    ['{"status":{"light":{"run":"#f0e442"}}}','진행 상태색'],['{"sidebar":"#3f0e40","presence":"#3f0e41"}','접속 표시'],['{"notification":"zz"}','notification'],['{"name":"'+'가'.repeat(41)+'"}','name'],['{"sidebar":"#123;}body{x"}','#RRGGBB']])
     assert.throws(()=>b.run(`readPalette(${JSON.stringify(input)})`),e=>e.message.includes(message),input);
 });
 
@@ -867,7 +871,7 @@ test('custom themes apply, survive as a card, and can be shared or received as J
   fail=true;await b.run('sharePalette()');
   assert.equal(b.run('ui.appearanceTab'),'custom');assert.ok(b.run('ui.customDraft').includes('우리 팀'));
   const view=b.run('settingsView()');
-  for(const part of ['data-custom-json','data-custom-file','data-custom-color="sidebar" value="#0f3350"','data-custom-apply'])assert.ok(view.includes(part),part);
+  for(const part of ['data-custom-json','data-custom-file','data-custom-color="sidebar" value="#0f3350"','data-custom-color="selected"','data-custom-color="presence"','data-custom-color="notification"','data-custom-apply'])assert.ok(view.includes(part),part);
   b.run('localStorage.setItem("wb.customTheme","{broken");applyTheme()');assert.equal(b.run('paletteChoice()'),'huginn');
 });
 
