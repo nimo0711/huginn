@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>작업 기록 · Huginn</title>
 <link rel="icon" type="image/png" href="/assets/brand.png">
-<script data-theme-boot>try{if(localStorage.getItem("wb.theme")==="light")document.documentElement.dataset.theme="light";}catch(e){}</script>
+<script data-theme-boot>try{var r=document.documentElement,t=localStorage.getItem("wb.theme"),a=localStorage.getItem("wb.accent")||"";if(t==="light"||t==="system"&&matchMedia("(prefers-color-scheme: light)").matches)r.dataset.theme="light";if(/^(blue|teal|violet)$/.test(a))r.dataset.accent=a;}catch(e){}</script>
 <link rel="stylesheet" href="/assets/theme.css">
 <style>
 *{box-sizing:border-box}

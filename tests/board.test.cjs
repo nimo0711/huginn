@@ -798,3 +798,54 @@ test('identical queued delegation requests keep FIFO result order',()=>{
  assert.equal(b.run('delegationRows(W).find(r=>r.id==="first").result'),'첫 결과');
  assert.equal(b.run('delegationRows(W).find(r=>r.id==="second").result'),'둘째 결과');
 });
+
+test('appearance settings store brightness and accent, follow the system and keep the sidebar toggle explicit',()=>{
+  const el={addEventListener() {},setAttribute() {},classList:{toggle() {}},querySelectorAll() { return []; }};
+  const root={dataset:{}},media={matches:true,listener:null,addEventListener(_,fn){this.listener=fn;}};
+  const b=board({document:{getElementById:()=>el,querySelector:()=>el,querySelectorAll:()=>[],addEventListener() {},documentElement:root},
+    window:{addEventListener() {},getSelection:()=>'',matchMedia:()=>media}});
+  b.run('data={sessions:[]};ui.settingsTab="appearance"');
+  let view=b.run('settingsView()');
+  assert.ok(view.includes('data-theme-mode="dark" aria-pressed="true"'));assert.ok(view.includes('data-accent-choice="gold" aria-pressed="true"'));
+  for(const id of ['gold','blue','teal','violet'])assert.ok(view.includes(`var(--swatch-${id})`));
+  b.run('localStorage.setItem("wb.theme","system");localStorage.setItem("wb.accent","teal");applyTheme()');
+  assert.equal(root.dataset.theme,'light');assert.equal(root.dataset.accent,'teal');
+  media.matches=false;media.listener();assert.equal(root.dataset.theme,undefined);
+  b.run('localStorage.setItem("wb.theme","light");localStorage.setItem("wb.accent","gold");applyTheme()');
+  assert.equal(root.dataset.theme,'light');assert.equal(root.dataset.accent,undefined);
+  media.matches=true;media.listener();assert.equal(root.dataset.theme,'light');
+  b.run('localStorage.setItem("wb.theme","bogus");localStorage.setItem("wb.accent","<x>");applyTheme()');
+  assert.equal(root.dataset.theme,undefined);assert.equal(root.dataset.accent,undefined);
+  view=b.run('settingsView()');assert.ok(view.includes('data-theme-mode="dark" aria-pressed="true"'));
+});
+
+test('theme boot script applies stored choices before the stylesheet without trusting unknown values',()=>{
+  for(const page of ['index.html','stories.html']) {
+    const source=fs.readFileSync(path.join(__dirname,'..',page),'utf8').match(/<script data-theme-boot>([\s\S]*?)<\/script>/)[1];
+    for(const [theme,accent,light,expectedTheme,expectedAccent] of [['system','violet',true,'light','violet'],['system','blue',false,undefined,'blue'],['dark','teal',true,undefined,'teal'],['light','"><x',false,'light',undefined],[null,null,true,undefined,undefined]]) {
+      const root={dataset:{}},values={'wb.theme':theme,'wb.accent':accent};
+      vm.runInNewContext(source,{document:{documentElement:root},localStorage:{getItem:k=>values[k]},matchMedia:()=>({matches:light})});
+      assert.equal(root.dataset.theme,expectedTheme,page+theme);assert.equal(root.dataset.accent,expectedAccent,page+accent);
+    }
+  }
+});
+
+test('feedback dialog validates input, posts a feedback action and links only to GitHub',async()=>{
+  const requests=[];let reply=null;
+  const b=board({setTimeout,clearTimeout,AbortController,fetch:async(url,options)=>{if(options?.method==='POST'){requests.push(JSON.parse(options.body));return {ok:true,json:async()=>reply};}return {ok:true,json:async()=>({token:'t'})};}});
+  b.run('data={sessions:[]};ui.actionData={"":{token:"t",at:Date.now()}}');
+  const markup=b.run('feedbackMarkup()');
+  assert.ok(markup.includes('name="kind" value="bug" checked'));assert.ok(markup.includes('name="title"'));assert.ok(markup.includes('name="body"'));
+  b.run(`globalThis.makeForm=(title,body)=>{const status={textContent:'',innerHTML:''},button={disabled:false},fields={title:{value:title,disabled:false,focus(){}},body:{value:body,disabled:false,focus(){}}};
+    return {status,button,fields,elements:fields,querySelector:s=>s==='[data-feedback-status]'?status:s==='[data-feedback-submit]'?button:s==='[name=kind]:checked'?{value:'idea'}:null};}`);
+  b.run('globalThis.f=makeForm("  ","내용")');await b.run('sendFeedback(f)');
+  assert.equal(requests.length,0);assert.equal(b.run('f.status.textContent'),'제목과 내용을 입력해 주세요.');
+  reply={ok:true,status:'created',url:'https://github.com/owner/huginn/issues/7',message:'의견을 등록했습니다.'};b.run('globalThis.f=makeForm(" 제안 ","내용")');
+  await b.run('sendFeedback(f)');
+  assert.deepEqual(requests[0],{action:'feedback',kind:'idea',title:'제안',body:'내용'});
+  assert.ok(b.run('f.status.innerHTML').includes('href="https://github.com/owner/huginn/issues/7"'));
+  assert.equal(b.run('f.fields.title.disabled'),true);
+  reply={ok:true,status:'browser',url:'javascript:alert(1)',message:'작성 페이지로 보냅니다.'};b.run('globalThis.f=makeForm("제안","내용")');
+  await b.run('sendFeedback(f)');
+  assert.ok(!b.run('f.status.innerHTML').includes('href'));assert.equal(b.run('f.button.disabled'),false);
+});

@@ -28,6 +28,10 @@
   --wait-soft: rgba(238,154,91,.16);
   --stall-soft: rgba(240,128,108,.16);
   --overlay: rgba(23,23,20,.7);
+  --swatch-gold: #d3b066;
+  --swatch-blue: #8fb4d9;
+  --swatch-teal: #7fc4b8;
+  --swatch-violet: #b9a3dc;
   --ease: cubic-bezier(.22,1,.36,1);
   /* Names used by the work-history page. */
   --text: var(--ink);
@@ -70,4 +74,12 @@
   --wait-soft: rgba(156,71,18,.12);
   --stall-soft: rgba(173,54,38,.12);
   --overlay: rgba(36,34,29,.35);
+  --swatch-gold: #765714;
+  --swatch-blue: #2f5a86;
+  --swatch-teal: #22675d;
+  --swatch-violet: #5e4a8c;
 }
+
+:root[data-accent="blue"] { --primary: var(--swatch-blue); }
+:root[data-accent="teal"] { --primary: var(--swatch-teal); }
+:root[data-accent="violet"] { --primary: var(--swatch-violet); }

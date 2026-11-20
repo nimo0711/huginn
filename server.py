@@ -22,6 +22,7 @@ import usage
 import local_runtime
 import board_actions
 import branding
+import feedback
 from runtime_paths import DATA_DIR, DB_PATH, RESOURCE_ROOT, SPOOL_DIR, release_info
 from platform_support import IS_WINDOWS
 
@@ -480,6 +481,9 @@ class Handler(BaseHTTPRequestHandler):
                 result=ACTIONS.login(body.get('kind'),body.get('request_id'),body.get('switch',False))
             elif action == 'configure':
                 result={'ok':True,'settings':ACTIONS.configure(body.get('settings')),'message':'연결 설정을 저장했습니다.'}
+            elif action == 'feedback':
+                result = feedback.submit(RELEASE.get('repository'), body.get('kind'), body.get('title'), body.get('body'),
+                                         RELEASE['version'], action_environment()['os'])
             elif action == "favorite":
                 ACTIONS.favorite(body.get("skill"), body.get("enabled") is True, cwd)
                 result = {"ok": True}

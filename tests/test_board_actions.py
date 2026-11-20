@@ -20,6 +20,17 @@ class ActionTests(unittest.TestCase):
   self.skill();self.skill('internal','hidden\nuser-invocable: false')
   result=self.store.catalog(self.cwd)
   self.assertEqual([s['name'] for s in result],['review'])
+ def test_account_synced_skills_are_discovered_without_hidden_markers(self):
+  self.skill()
+  bucket=self.home/'.claude/skills/synced/account_org'
+  for name,body in [('docx','Word files'),('internal','hidden\nuser-invocable: false')]:
+   p=bucket/name/'SKILL.md';p.parent.mkdir(parents=True);p.write_text('---\nname: '+name+'\ndescription: '+body+'\n---\nInstructions')
+  hidden=self.home/'.claude/skills/synced/.trash/old/SKILL.md';hidden.parent.mkdir(parents=True);hidden.write_text('---\nname: old\n---')
+  (bucket/'manifest.json').write_text('{}')
+  result={s['name']:s for s in self.store.catalog(self.cwd)}
+  self.assertEqual(sorted(result),['docx','review'])
+  self.assertEqual((result['docx']['agent'],result['docx']['id'].split(':')[2]),('claude','anthropic-skills'))
+  self.assertEqual(result['docx']['path'],str((bucket/'docx/SKILL.md').resolve()))
  def test_disabled_plugin_is_not_launchable(self):
   p=self.home/'.claude/plugins/test';(p/'commands').mkdir(parents=True);(p/'commands/do.md').write_text('---\nname: do\n---')
   (p.parent/'installed_plugins.json').write_text(json.dumps({'plugins':{'test@market':[{'scope':'user','installPath':str(p)}]}}))
