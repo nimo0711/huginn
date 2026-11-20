@@ -6,7 +6,6 @@
   "repository": "nimo0711/huginn",
   "platforms": [
     "macos-arm64",
-    "macos-x86_64",
     "windows-x64"
   ],
   "display_name": "Huginn"

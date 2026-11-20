@@ -2378,7 +2378,7 @@ function updatesView() {
   const status=state.status,available=state.available,pending=updatePending(),disabled=pending?' disabled':'';
   const os={macos:'macOS',windows:'Windows',other:'기타 운영체제'}[state.os || catalog?.environment?.os] || '운영체제 확인 필요';
   const macos=(state.os || catalog?.environment?.os)==='macos';
-  const cpu={'macos-arm64':'Apple Silicon','macos-x86_64':'Intel','windows-x64':'x64'}[state.target];
+  const cpu={'macos-arm64':'Apple Silicon','windows-x64':'x64'}[state.target];
   const version=state.current_version || catalog?.app?.version || '버전 확인 필요';
   const messages={
     idle:['업데이트를 확인해 주세요','게시된 새 버전이 있는지 확인합니다. 다운로드와 설치는 직접 선택할 수 있습니다.'],

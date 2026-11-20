@@ -4,14 +4,13 @@ Claude·Codex의 병렬 작업에서 세션의 관계, 현재 작업, 진척과 
 
 ## 설치
 
-배포 대상은 Windows 10/11 x64, macOS 13 이상 Apple Silicon·Intel입니다. 설치 파일에는 Python 서비스가 포함됩니다. Python이나 Go를 사용자가 따로 설치할 필요가 없습니다.
+배포 대상은 Windows 10/11 x64, macOS 13 이상 Apple Silicon입니다. Intel Mac은 지원하지 않습니다. 설치 파일에는 Python 서비스가 포함됩니다. Python이나 Go를 사용자가 따로 설치할 필요가 없습니다.
 
 [GitHub Releases](https://github.com/nimo0711/huginn/releases)에서 운영체제에 맞는 파일을 받습니다. 저장소가 비공개이면 접근 권한이 있는 GitHub 계정으로 로그인해야 합니다. 아직 게시된 릴리즈가 없다면 [Actions의 설치 후보](https://github.com/nimo0711/huginn/actions)에서 시험 결과와 파일을 확인합니다.
 
 | 환경 | 설치 파일 | 실행 |
 | --- | --- | --- |
 | Mac Apple Silicon | `Huginn-<버전>-macos-arm64.dmg` | 응용 프로그램의 Huginn |
-| Mac Intel | `Huginn-<버전>-macos-x86_64.dmg` | 응용 프로그램의 Huginn |
 | Windows x64 | `Huginn-<버전>-windows-x64-Setup.exe` | 시작 메뉴의 Huginn |
 
 Mac에서는 DMG를 열고 **Huginn 아이콘을 Applications 폴더로 드래그**합니다. 복사가 끝나면 응용 프로그램에서 Huginn을 실행하고 설치 디스크를 추출합니다. 이후 업데이트는 설정의 앱 업데이트에서 버튼 한 번으로 진행되며, 앱이 스스로 새 버전으로 바꾼 뒤 다시 시작합니다.

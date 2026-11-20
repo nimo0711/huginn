@@ -21,8 +21,7 @@ SOURCE_FILES = (
     'desktop/theme.css',
     'app/brand.json', 'app/assets/huginn-icon.png', 'app/assets/huginn-icon-web.png',
 )
-TARGETS = {'macos-arm64': ('darwin','arm64'), 'macos-x86_64': ('darwin','amd64'),
-           'windows-x64': ('windows','amd64')}
+TARGETS = {'macos-arm64': ('darwin','arm64'), 'windows-x64': ('windows','amd64')}
 MACHO_MAGIC={b'\xcf\xfa\xed\xfe',b'\xfe\xed\xfa\xcf',b'\xca\xfe\xba\xbe',
              b'\xbe\xba\xfe\xca',b'\xca\xfe\xba\xbf',b'\xbf\xba\xfe\xca'}
 
@@ -38,7 +37,7 @@ def check_macos_minimum(load_commands, name, maximum):
 
 
 def verify_macos_bundle(app, target, minimum=(13,0)):
-    arch='arm64' if target=='macos-arm64' else 'x86_64';count=0
+    arch='arm64';count=0
     for path in Path(app).rglob('*'):
         if path.is_symlink() or not path.is_file():continue
         with path.open('rb') as stream:magic=stream.read(4)
