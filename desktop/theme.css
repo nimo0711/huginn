@@ -1,38 +1,77 @@
 /* Huginn Twins palette. Shared by the web UI and native fallback. */
 :root {
-  color-scheme: dark;
-  --bg: #171714;
-  --side: #1d1c18;
-  --panel: #24221d;
-  --panel2: #302d26;
-  --hover: #3a362c;
-  --line: #4c463b;
-  --line2: #7a6f5a;
-  --ink: #ece5d5;
-  --sub: #c9c1b2;
-  --dim: #aea694;
-  --primary: #d3b066;
-  --on-primary: #211f19;
-  --run: #dcb85c;
-  --wait: #ee9a5b;
-  --stall: #f0806c;
-  --done: #a3c88f;
-  --info: #a3b8c2;
-  --off: #8f8a7e;
-  --track: rgba(236,229,213,.08);
-  --run-soft: rgba(220,184,92,.15);
-  --run-line: rgba(220,184,92,.45);
-  --info-soft: rgba(163,184,194,.16);
-  --done-soft: rgba(163,200,143,.15);
-  --done-line: rgba(163,200,143,.4);
-  --wait-soft: rgba(238,154,91,.16);
-  --stall-soft: rgba(240,128,108,.16);
-  --overlay: rgba(23,23,20,.7);
-  --swatch-gold: #d3b066;
-  --swatch-blue: #8fb4d9;
-  --swatch-teal: #7fc4b8;
-  --swatch-violet: #b9a3dc;
+  --d-bg: #171714;
+  --d-side: #1d1c18;
+  --d-panel: #24221d;
+  --d-panel2: #302d26;
+  --d-hover: #3a362c;
+  --d-line: #4c463b;
+  --d-line2: #7a6f5a;
+  --d-ink: #ece5d5;
+  --d-sub: #c9c1b2;
+  --d-dim: #aea694;
+  --d-primary: #d3b066;
+  --d-on-primary: #211f19;
+  --d-run: #dcb85c;
+  --d-wait: #ee9a5b;
+  --d-stall: #f0806c;
+  --d-done: #a3c88f;
+  --d-info: #a3b8c2;
+  --d-off: #8f8a7e;
+  --d-track: rgba(236,229,213,.08);
+  --d-overlay: rgba(23,23,20,.7);
+  --l-bg: #f3eee3;
+  --l-side: #ebe4d5;
+  --l-panel: #fbf8f1;
+  --l-panel2: #f0eadd;
+  --l-hover: #e7dfcd;
+  --l-line: #d8cdb7;
+  --l-line2: #a2947a;
+  --l-ink: #24221d;
+  --l-sub: #4d473c;
+  --l-dim: #625a4b;
+  --l-primary: #765714;
+  --l-on-primary: #fbf8f1;
+  --l-run: #7a5a10;
+  --l-wait: #9c4712;
+  --l-stall: #ad3626;
+  --l-done: #3e6934;
+  --l-info: #395d6e;
+  --l-off: #686255;
+  --l-track: rgba(36,34,29,.08);
+  --l-overlay: rgba(36,34,29,.35);
   --ease: cubic-bezier(.22,1,.36,1);
+}
+
+:root, :root[data-side-scheme="dark"] aside {
+  color-scheme: dark;
+  --bg: var(--d-bg);
+  --side: var(--d-side);
+  --panel: var(--d-panel);
+  --panel2: var(--d-panel2);
+  --hover: var(--d-hover);
+  --line: var(--d-line);
+  --line2: var(--d-line2);
+  --ink: var(--d-ink);
+  --sub: var(--d-sub);
+  --dim: var(--d-dim);
+  --primary: var(--d-primary);
+  --on-primary: var(--d-on-primary);
+  --run: var(--d-run);
+  --wait: var(--d-wait);
+  --stall: var(--d-stall);
+  --done: var(--d-done);
+  --info: var(--d-info);
+  --off: var(--d-off);
+  --track: var(--d-track);
+  --overlay: var(--d-overlay);
+  --run-soft: color-mix(in srgb, var(--run) 15%, transparent);
+  --run-line: color-mix(in srgb, var(--run) 45%, transparent);
+  --info-soft: color-mix(in srgb, var(--info) 16%, transparent);
+  --done-soft: color-mix(in srgb, var(--done) 15%, transparent);
+  --done-line: color-mix(in srgb, var(--done) 40%, transparent);
+  --wait-soft: color-mix(in srgb, var(--wait) 16%, transparent);
+  --stall-soft: color-mix(in srgb, var(--stall) 16%, transparent);
   /* Names used by the work-history page. */
   --text: var(--ink);
   --faint: var(--dim);
@@ -45,41 +84,41 @@
   --holdbg: var(--panel2);
 }
 
-:root[data-theme="light"] {
+:root[data-theme="light"], :root[data-side-scheme="light"] aside {
   color-scheme: light;
-  --bg: #f3eee3;
-  --side: #ebe4d5;
-  --panel: #fbf8f1;
-  --panel2: #f0eadd;
-  --hover: #e7dfcd;
-  --line: #d8cdb7;
-  --line2: #a2947a;
-  --ink: #24221d;
-  --sub: #4d473c;
-  --dim: #625a4b;
-  --primary: #765714;
-  --on-primary: #fbf8f1;
-  --run: #7a5a10;
-  --wait: #9c4712;
-  --stall: #ad3626;
-  --done: #3e6934;
-  --info: #395d6e;
-  --off: #686255;
-  --track: rgba(36,34,29,.08);
-  --run-soft: rgba(122,90,16,.12);
-  --run-line: rgba(122,90,16,.4);
-  --info-soft: rgba(57,93,110,.12);
-  --done-soft: rgba(62,105,52,.12);
-  --done-line: rgba(62,105,52,.38);
-  --wait-soft: rgba(156,71,18,.12);
-  --stall-soft: rgba(173,54,38,.12);
-  --overlay: rgba(36,34,29,.35);
-  --swatch-gold: #765714;
-  --swatch-blue: #2f5a86;
-  --swatch-teal: #22675d;
-  --swatch-violet: #5e4a8c;
+  --bg: var(--l-bg);
+  --side: var(--l-side);
+  --panel: var(--l-panel);
+  --panel2: var(--l-panel2);
+  --hover: var(--l-hover);
+  --line: var(--l-line);
+  --line2: var(--l-line2);
+  --ink: var(--l-ink);
+  --sub: var(--l-sub);
+  --dim: var(--l-dim);
+  --primary: var(--l-primary);
+  --on-primary: var(--l-on-primary);
+  --run: var(--l-run);
+  --wait: var(--l-wait);
+  --stall: var(--l-stall);
+  --done: var(--l-done);
+  --info: var(--l-info);
+  --off: var(--l-off);
+  --track: var(--l-track);
+  --overlay: var(--l-overlay);
+  --run-soft: color-mix(in srgb, var(--run) 12%, transparent);
+  --run-line: color-mix(in srgb, var(--run) 40%, transparent);
+  --info-soft: color-mix(in srgb, var(--info) 12%, transparent);
+  --done-soft: color-mix(in srgb, var(--done) 12%, transparent);
+  --done-line: color-mix(in srgb, var(--done) 38%, transparent);
+  --wait-soft: color-mix(in srgb, var(--wait) 12%, transparent);
+  --stall-soft: color-mix(in srgb, var(--stall) 12%, transparent);
 }
 
-:root[data-accent="blue"] { --primary: var(--swatch-blue); }
-:root[data-accent="teal"] { --primary: var(--swatch-teal); }
-:root[data-accent="violet"] { --primary: var(--swatch-violet); }
+:root[data-side-scheme] aside {
+  --panel: color-mix(in srgb, var(--side) 88%, var(--ink));
+  --panel2: color-mix(in srgb, var(--side) 82%, var(--ink));
+  --hover: color-mix(in srgb, var(--side) 78%, var(--ink));
+  --line: color-mix(in srgb, var(--side) 72%, var(--ink));
+  --line2: color-mix(in srgb, var(--side) 52%, var(--ink));
+}

@@ -799,33 +799,86 @@ test('identical queued delegation requests keep FIFO result order',()=>{
  assert.equal(b.run('delegationRows(W).find(r=>r.id==="second").result'),'둘째 결과');
 });
 
-test('appearance settings store brightness and accent, follow the system and keep the sidebar toggle explicit',()=>{
+function themeBoard(extra={}) {
+  const root={dataset:{}},media={matches:true,listener:null,addEventListener(_,fn){this.listener=fn;}},head={children:[],appendChild(x){this.children.push(x);}};
   const el={addEventListener() {},setAttribute() {},classList:{toggle() {}},querySelectorAll() { return []; }};
-  const root={dataset:{}},media={matches:true,listener:null,addEventListener(_,fn){this.listener=fn;}};
-  const b=board({document:{getElementById:()=>el,querySelector:()=>el,querySelectorAll:()=>[],addEventListener() {},documentElement:root},
-    window:{addEventListener() {},getSelection:()=>'',matchMedia:()=>media}});
-  b.run('data={sessions:[]};ui.settingsTab="appearance"');
+  const document={head,documentElement:root,getElementById:()=>el,querySelectorAll:()=>[],addEventListener() {},
+    createElement:()=>({dataset:{},textContent:'',remove(){head.children=head.children.filter(x=>x!==this);}}),
+    querySelector:s=>s==='style[data-palette]'?head.children.find(x=>'palette' in x.dataset)||null:el};
+  const b=board({document,window:{addEventListener() {},getSelection:()=>'',matchMedia:()=>media},...extra});
+  b.run('data={sessions:[]};ui.settingsTab="appearance";render=()=>{}');
+  return {...b,root,media,head,style:()=>head.children.find(x=>'palette' in x.dataset)};
+}
+
+test('appearance offers named themes like a gallery, applies sidebar and accent colours, and follows the system brightness',()=>{
+  const b=themeBoard();
   let view=b.run('settingsView()');
-  assert.ok(view.includes('data-theme-mode="dark" aria-pressed="true"'));assert.ok(view.includes('data-accent-choice="gold" aria-pressed="true"'));
-  for(const id of ['gold','blue','teal','violet'])assert.ok(view.includes(`var(--swatch-${id})`));
-  b.run('localStorage.setItem("wb.theme","system");localStorage.setItem("wb.accent","teal");applyTheme()');
-  assert.equal(root.dataset.theme,'light');assert.equal(root.dataset.accent,'teal');
-  media.matches=false;media.listener();assert.equal(root.dataset.theme,undefined);
-  b.run('localStorage.setItem("wb.theme","light");localStorage.setItem("wb.accent","gold");applyTheme()');
-  assert.equal(root.dataset.theme,'light');assert.equal(root.dataset.accent,undefined);
-  media.matches=true;media.listener();assert.equal(root.dataset.theme,'light');
-  b.run('localStorage.setItem("wb.theme","bogus");localStorage.setItem("wb.accent","<x>");applyTheme()');
-  assert.equal(root.dataset.theme,undefined);assert.equal(root.dataset.accent,undefined);
-  view=b.run('settingsView()');assert.ok(view.includes('data-theme-mode="dark" aria-pressed="true"'));
+  assert.ok(view.includes('data-theme-mode="dark" aria-pressed="true"'));
+  assert.ok(view.includes('data-palette-choice="huginn" aria-pressed="true"'));
+  for(const label of ['조합 색상','단일 색상','시력 보조 색상','청황색약 대비','적록색약 대비','data-palette-share'])assert.ok(view.includes(label),label);
+  assert.equal((view.match(/data-palette-choice=/g)||[]).length,b.run('PALETTES.length'));
+  b.run('localStorage.setItem("wb.palette","eggplant");applyTheme()');
+  assert.equal(b.root.dataset.sideScheme,'dark');
+  const css=b.style().textContent;
+  for(const part of ['--d-side:#3b1340','--l-side:#3b1340','--d-primary:#d6a6dd','--l-primary:#6d2c78','--l-on-primary:#fbf8f1'])assert.ok(css.includes(part),part);
+  assert.equal(b.run('localStorage.getItem("wb.paletteCss")'),css);assert.equal(b.run('localStorage.getItem("wb.sideScheme")'),'dark');
+  b.run('localStorage.setItem("wb.palette","deutan");applyTheme()');
+  for(const part of ['--d-run:#f0e442','--l-done:#0b5f98'])assert.ok(b.style().textContent.includes(part),part);
+  b.run('localStorage.setItem("wb.palette","<x>");applyTheme()');
+  assert.equal(b.root.dataset.sideScheme,undefined);assert.ok(!b.style().textContent.includes('--d-side'));
+  b.run('localStorage.setItem("wb.theme","system");applyTheme()');assert.equal(b.root.dataset.theme,'light');
+  b.media.matches=false;b.media.listener();assert.equal(b.root.dataset.theme,undefined);
+  b.run('localStorage.setItem("wb.theme","light");applyTheme()');b.media.matches=true;b.media.listener();assert.equal(b.root.dataset.theme,'light');
+  b.run('localStorage.setItem("wb.theme","bogus");applyTheme()');assert.equal(b.root.dataset.theme,undefined);
+});
+
+test('every built-in theme stays readable and the validation base matches the stylesheet',()=>{
+  const b=themeBoard();
+  for(const id of b.run('PALETTES.map(p=>p.id)'))assert.doesNotThrow(()=>b.run(`readPalette(paletteJson(PALETTES.find(p=>p.id==="${id}")))`),id);
+  const css=fs.readFileSync(path.join(__dirname,'..','desktop/theme.css'),'utf8');
+  for(const [mode,prefix] of [['dark','--d-'],['light','--l-']])for(const key of ['bg','panel','dim','ink'])
+    assert.equal(css.match(new RegExp(prefix+key+':\\s*(#[0-9a-f]{6})'))[1],b.run(`PALETTE_BASE.${mode}.${key}`),mode+key);
+});
+
+test('custom theme JSON is validated with readable messages before it is applied',()=>{
+  const b=themeBoard();
+  assert.deepEqual(JSON.parse(JSON.stringify(b.run(`readPalette('{"name":" 내 테마 ","sidebar":"#123","accent":{"dark":"#8FB4D9","light":"#2f5a86"}}')`))),{name:'내 테마',sidebar:'#112233',accent:{dark:'#8fb4d9',light:'#2f5a86'}});
+  for(const [input,message] of [['{"name":',"JSON 형식"],['[]','JSON 객체'],['{"font":"x"}','font'],['{"sidebar":"red"}','#RRGGBB'],
+    ['{"sidebar":"#808080"}','사이드바 글자'],['{"accent":{"dark":"#333333","light":"#765714"}}','다크 화면'],['{"accent":{"dark":"#d3b066"}}','accent.light'],['{"accent":"#8fb4d9"}','라이트 화면'],
+    ['{"status":{"light":{"run":"#f0e442"}}}','진행 상태색'],['{"name":"'+'가'.repeat(41)+'"}','name'],['{"sidebar":"#123;}body{x"}','#RRGGBB']])
+    assert.throws(()=>b.run(`readPalette(${JSON.stringify(input)})`),e=>e.message.includes(message),input);
+});
+
+test('custom themes apply, survive as a card, and can be shared or received as JSON',async()=>{
+  const copied=[];let fail=false;
+  const b=themeBoard({navigator:{clipboard:{writeText:async text=>{if(fail)throw new Error('denied');copied.push(text);}}}});
+  b.run(`applyCustomPalette('{"name":"우리 팀","sidebar":"#0f3350","accent":{"dark":"#8fc0ec","light":"#23598a"}}')`);
+  assert.equal(b.run('paletteChoice()'),'custom');assert.ok(b.style().textContent.includes('--d-side:#0f3350'));
+  assert.ok(b.run('ui.appearanceStatus.text').includes('우리 팀'));
+  assert.ok(b.run('settingsView()').includes('data-palette-choice="custom" aria-pressed="true"'));
+  await b.run('sharePalette()');
+  assert.deepEqual(JSON.parse(copied[0]),{name:'우리 팀',sidebar:'#0f3350',accent:{dark:'#8fc0ec',light:'#23598a'}});
+  b.run(`applyCustomPalette('{"accent":"#111111"}')`);
+  assert.equal(b.run('ui.appearanceStatus.error'),true);assert.equal(b.run('paletteChoice()'),'custom');assert.ok(b.style().textContent.includes('#0f3350'));
+  fail=true;await b.run('sharePalette()');
+  assert.equal(b.run('ui.appearanceTab'),'custom');assert.ok(b.run('ui.customDraft').includes('우리 팀'));
+  const view=b.run('settingsView()');
+  for(const part of ['data-custom-json','data-custom-file','data-custom-color="sidebar" value="#0f3350"','data-custom-apply'])assert.ok(view.includes(part),part);
+  b.run('localStorage.setItem("wb.customTheme","{broken");applyTheme()');assert.equal(b.run('paletteChoice()'),'huginn');
 });
 
 test('theme boot script applies stored choices before the stylesheet without trusting unknown values',()=>{
   for(const page of ['index.html','stories.html']) {
     const source=fs.readFileSync(path.join(__dirname,'..',page),'utf8').match(/<script data-theme-boot>([\s\S]*?)<\/script>/)[1];
-    for(const [theme,accent,light,expectedTheme,expectedAccent] of [['system','violet',true,'light','violet'],['system','blue',false,undefined,'blue'],['dark','teal',true,undefined,'teal'],['light','"><x',false,'light',undefined],[null,null,true,undefined,undefined]]) {
-      const root={dataset:{}},values={'wb.theme':theme,'wb.accent':accent};
-      vm.runInNewContext(source,{document:{documentElement:root},localStorage:{getItem:k=>values[k]},matchMedia:()=>({matches:light})});
-      assert.equal(root.dataset.theme,expectedTheme,page+theme);assert.equal(root.dataset.accent,expectedAccent,page+accent);
+    const good='html:root{--d-side:#3b1340;--l-primary:#6d2c78}';
+    for(const [theme,light,css,scheme,expectedTheme,styled,expectedScheme] of [
+      ['system',true,good,'dark','light',true,'dark'],['system',false,null,null,undefined,false,undefined],['dark',true,good,'light',undefined,true,'light'],
+      ['light',false,'html:root{--d-side:#000}</style><x>',"\"><x",'light',false,undefined],[null,true,'html:root{--x:url(//evil)}','dark',undefined,false,'dark'],
+      [null,true,'body{color:red}',null,undefined,false,undefined]]) {
+      const root={dataset:{}},head=[],values={'wb.theme':theme,'wb.paletteCss':css,'wb.sideScheme':scheme};
+      vm.runInNewContext(source,{document:{documentElement:root,head:{appendChild:x=>head.push(x)},createElement:()=>({dataset:{}})},localStorage:{getItem:k=>values[k]??null},matchMedia:()=>({matches:light})});
+      assert.equal(root.dataset.theme,expectedTheme,page+theme);assert.equal(head.length===1,styled,page+css);
+      if(styled)assert.equal(head[0].textContent,css);assert.equal(root.dataset.sideScheme,expectedScheme,page+scheme);
     }
   }
 });

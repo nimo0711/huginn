@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Huginn</title>
 <link rel="icon" type="image/png" href="/assets/brand.png">
-<script data-theme-boot>try{var r=document.documentElement,t=localStorage.getItem("wb.theme"),a=localStorage.getItem("wb.accent")||"";if(t==="light"||t==="system"&&matchMedia("(prefers-color-scheme: light)").matches)r.dataset.theme="light";if(/^(blue|teal|violet)$/.test(a))r.dataset.accent=a;}catch(e){}</script>
+<script data-theme-boot>try{var r=document.documentElement,s=localStorage,t=s.getItem("wb.theme"),c=s.getItem("wb.paletteCss")||"",k=s.getItem("wb.sideScheme");if(t==="light"||t==="system"&&matchMedia("(prefers-color-scheme: light)").matches)r.dataset.theme="light";if(/^html:root\{[-\w:#;]*\}$/.test(c)){var e=document.createElement("style");e.dataset.palette="";e.textContent=c;document.head.appendChild(e)}if(k==="dark"||k==="light")r.dataset.sideScheme=k;}catch(e){}</script>
 <link rel="stylesheet" href="/assets/theme.css">
 <style>
 * { box-sizing: border-box; }
@@ -16,7 +16,7 @@ button:focus-visible, select:focus-visible, .tab:focus-visible { outline: 2px so
 .app { display: grid; grid-template-columns: 280px minmax(0, 1fr); height: 100vh; }
 .num { font-variant-numeric: tabular-nums; }
 
-aside { background: var(--side); border-right: 1px solid var(--line); display: flex; flex-direction: column; min-height: 0; user-select: none; -webkit-user-select: none; }
+aside { background: var(--side); color: var(--ink); border-right: 1px solid var(--line); display: flex; flex-direction: column; min-height: 0; user-select: none; -webkit-user-select: none; }
 .sum { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; padding: 16px 16px 8px; }
 .sum div { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 8px 12px; }
 .sum b { display: block; font-size: 20px; line-height: 28px; font-weight: 500; font-variant-numeric: tabular-nums; color: var(--ink); }
@@ -896,7 +896,26 @@ h1,h2,h3,p { margin-top:0; }
 .choice-row { display:flex; flex-wrap:wrap; gap:8px; align-content:flex-start; }
 .choice-row .choice { display:inline-flex; align-items:center; gap:8px; min-height:36px; }
 .choice-row .choice[aria-pressed=true] { border-color:var(--primary); color:var(--ink); box-shadow:inset 0 0 0 1px var(--primary); }
-.accent-swatch { width:14px; height:14px; border-radius:50%; flex:none; box-shadow:0 0 0 1px var(--line2); }
+.appearance-tabs { display:flex; gap:24px; margin:24px 0 16px; border-bottom:1px solid var(--line); }
+.appearance-tabs button { padding:8px 0; border:0; border-bottom:2px solid transparent; margin-bottom:-1px; background:none; color:var(--sub); font:inherit; font-size:14px; font-weight:600; cursor:pointer; }
+.appearance-tabs button:hover { color:var(--ink); }
+.appearance-tabs button[aria-selected=true] { color:var(--ink); border-bottom-color:var(--ink); }
+.palette-head { display:flex; align-items:center; justify-content:space-between; gap:12px; margin:24px 0 12px; min-height:36px; }
+.palette-head:first-of-type { margin-top:8px; }
+.palette-group { margin:0; font-size:14px; font-weight:600; color:var(--sub); }
+.palette-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(200px,1fr)); gap:12px; }
+.palette-card { display:flex; align-items:center; gap:16px; min-height:72px; padding:12px 16px; border:1px solid var(--line); border-radius:8px; background:var(--panel); color:var(--ink); font:inherit; font-size:15px; font-weight:600; text-align:left; cursor:pointer; }
+.palette-card:hover { border-color:var(--line2); background:var(--hover); }
+.palette-card[aria-pressed=true] { border-color:var(--primary); box-shadow:inset 0 0 0 1px var(--primary); }
+.palette-dot { width:44px; height:44px; border-radius:50%; flex:none; box-shadow:0 0 0 1px var(--line); }
+.appearance-status { margin:12px 0 0; color:var(--sub); font-size:13px; }
+.appearance-status.is-error { color:var(--stall); }
+.custom-colors { display:flex; flex-wrap:wrap; gap:16px; margin:16px 0; }
+.custom-color { display:inline-flex; align-items:center; gap:8px; color:var(--sub); font-size:14px; cursor:pointer; }
+.custom-color input { width:36px; height:36px; padding:0; border:1px solid var(--line2); border-radius:6px; background:none; cursor:pointer; }
+.custom-json textarea { font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; font-size:13px; line-height:1.5; }
+.custom-file { cursor:pointer; }
+.appearance-panel .action-buttons { margin-top:16px; }
 .theme-toggle:hover { color:var(--ink); border-color:var(--line2); }
 .theme-toggle svg { width:14px; height:14px; flex:none; }
 .theme-toggle .theme-sun, :root[data-theme="light"] .theme-toggle .theme-moon { display:none; }
@@ -2984,22 +3003,149 @@ async function refresh() {
 }
 
 const THEME_MODES=[['system','시스템 설정'],['dark','다크'],['light','라이트']];
-const ACCENTS=[['gold','금색'],['blue','청색'],['teal','청록'],['violet','보라']];
+const PALETTE_GROUPS=[['combo','조합 색상'],['single','단일 색상'],['vision','시력 보조 색상']];
+const PALETTES=[
+  {id:'huginn',group:'combo',name:'Huginn 기본',accent:{dark:'#d3b066',light:'#765714'}},
+  {id:'dawn',group:'combo',name:'새벽',sidebar:'#263347',accent:{dark:'#8fb4d9',light:'#2f5a86'}},
+  {id:'forest',group:'combo',name:'숲길',sidebar:'#1f3328',accent:{dark:'#9cc98a',light:'#3e6934'}},
+  {id:'dusk',group:'combo',name:'노을',sidebar:'#3d2230',accent:{dark:'#f0a58a',light:'#9c4712'}},
+  {id:'sea',group:'combo',name:'밤바다',sidebar:'#10283a',accent:{dark:'#7fc4b8',light:'#22675d'}},
+  {id:'plum',group:'combo',name:'자두',sidebar:'#36213f',accent:{dark:'#d4a3dc',light:'#7a3f86'}},
+  {id:'eggplant',group:'single',name:'가지',sidebar:'#3b1340',accent:{dark:'#d6a6dd',light:'#6d2c78'}},
+  {id:'tangerine',group:'single',name:'귤',sidebar:'#5c2a10',accent:{dark:'#f2a477',light:'#9c4712'}},
+  {id:'banana',group:'single',name:'바나나',sidebar:'#463609',accent:{dark:'#e3c56a',light:'#765714'}},
+  {id:'jade',group:'single',name:'비취',sidebar:'#123a2c',accent:{dark:'#84d1ad',light:'#23684d'}},
+  {id:'lagoon',group:'single',name:'석호',sidebar:'#0f3350',accent:{dark:'#8fc0ec',light:'#23598a'}},
+  {id:'rose',group:'single',name:'장미',sidebar:'#561a26',accent:{dark:'#f19aa8',light:'#9e2c43'}},
+  {id:'ink',group:'single',name:'먹',sidebar:'#222222',accent:{dark:'#c8c8c8',light:'#4a4a4a'}},
+  {id:'indigo',group:'single',name:'남색',sidebar:'#1b2266',accent:{dark:'#a9b2f5',light:'#3a46a8'}},
+  {id:'tritan',group:'vision',name:'청황색약 대비',sidebar:'#121212',accent:{dark:'#f08a8a',light:'#b3261e'},
+    status:{dark:{run:'#4fc3c3',wait:'#f5a3a3',stall:'#ff6b5c',done:'#d0d0d0'},light:{run:'#1f6f6f',wait:'#a0495e',stall:'#b3261e',done:'#555555'}}},
+  {id:'deutan',group:'vision',name:'적록색약 대비',sidebar:'#2b2140',accent:{dark:'#56b4e9',light:'#0b5f98'},
+    status:{dark:{run:'#f0e442',wait:'#e69f00',stall:'#e08fc0',done:'#56b4e9'},light:{run:'#6b6200',wait:'#8a5a00',stall:'#a8487f',done:'#0b5f98'}}},
+];
+const PALETTE_BASE={dark:{bg:'#171714',panel:'#24221d',dim:'#aea694',ink:'#ece5d5'},light:{bg:'#f3eee3',panel:'#fbf8f1',dim:'#625a4b',ink:'#24221d'}};
+const PALETTE_MODES=[['dark','다크'],['light','라이트']];
+const STATUS_KEYS=[['run','진행'],['wait','대기'],['stall','막힘'],['done','완료']];
 const systemLight=window.matchMedia?.('(prefers-color-scheme: light)');
 function themeChoice() { const value=store.get('wb.theme');return THEME_MODES.some(([id])=>id===value)?value:'dark'; }
-function accentChoice() { const value=store.get('wb.accent');return ACCENTS.some(([id])=>id===value)?value:'gold'; }
+function hexColor(value) {
+  if(typeof value!=='string')return null;
+  const v=value.trim().toLowerCase();
+  if(/^#[0-9a-f]{3}$/.test(v))return '#'+[...v.slice(1)].map(c=>c+c).join('');
+  return /^#[0-9a-f]{6}$/.test(v)?v:null;
+}
+function luminance(hex) {
+  const [r,g,b]=[1,3,5].map(i=>{const c=parseInt(hex.slice(i,i+2),16)/255;return c<=.03928?c/12.92:((c+.055)/1.055)**2.4;});
+  return .2126*r+.7152*g+.0722*b;
+}
+function contrast(a,b) { const x=luminance(a),y=luminance(b);return (Math.max(x,y)+.05)/(Math.min(x,y)+.05); }
+function sidebarScheme(hex) { return luminance(hex)<.18?'dark':'light'; }
+function readPalette(input) {
+  let value=input;
+  if(typeof input==='string'){try{value=JSON.parse(input);}catch(e){throw new Error('JSON 형식이 올바르지 않습니다. 따옴표와 쉼표를 확인해 주세요.');}}
+  if(!value || typeof value!=='object' || Array.isArray(value))throw new Error('테마는 { } 로 감싼 JSON 객체여야 합니다.');
+  const unknown=Object.keys(value).filter(k=>!['name','sidebar','accent','status'].includes(k));
+  if(unknown.length)throw new Error('지원하지 않는 항목입니다: '+unknown.join(', ')+'. name·sidebar·accent·status만 쓸 수 있습니다.');
+  const name=value.name===undefined?'사용자 지정':value.name;
+  if(typeof name!=='string' || !name.trim() || name.trim().length>40)throw new Error('name은 1~40자 문자열로 입력해 주세요.');
+  const palette={name:name.trim()};
+  const color=(raw,label)=>{const hex=hexColor(raw);if(!hex)throw new Error(label+' 색은 #RRGGBB 형식으로 입력해 주세요.');return hex;};
+  const readable=(hex,mode,label,surface=[PALETTE_BASE[mode].bg,PALETTE_BASE[mode].panel])=>{
+    const ratio=Math.min(...surface.map(x=>contrast(hex,x)));
+    if(ratio<4.5)throw new Error(label+'이 '+(mode==='dark'?'다크':'라이트')+' 화면에서 잘 보이지 않습니다. 대비 '+ratio.toFixed(1)+':1, 4.5:1 이상이 필요합니다.');
+  };
+  if(value.sidebar!==undefined && value.sidebar!==null){
+    palette.sidebar=color(value.sidebar,'sidebar');
+    const scheme=sidebarScheme(palette.sidebar),ratio=contrast(PALETTE_BASE[scheme].dim,palette.sidebar);
+    if(ratio<4.5)throw new Error('sidebar 색에서 사이드바 글자가 잘 보이지 않습니다. 대비 '+ratio.toFixed(1)+':1, 4.5:1 이상이 필요합니다.');
+  }
+  if(value.accent!==undefined && value.accent!==null){
+    const accent=typeof value.accent==='string'?{dark:value.accent,light:value.accent}:value.accent;
+    if(!accent || typeof accent!=='object')throw new Error('accent는 색 하나 또는 {"dark":…, "light":…}로 입력해 주세요.');
+    palette.accent={};
+    for(const [mode] of PALETTE_MODES){palette.accent[mode]=color(accent[mode],'accent.'+mode);readable(palette.accent[mode],mode,'강조색');}
+  }
+  if(value.status!==undefined && value.status!==null){
+    if(!value.status || typeof value.status!=='object')throw new Error('status는 {"dark":{…}, "light":{…}}로 입력해 주세요.');
+    palette.status={};
+    for(const [mode] of PALETTE_MODES){
+      const set=value.status[mode];if(set===undefined)continue;
+      if(!set || typeof set!=='object')throw new Error('status.'+mode+'는 run·wait·stall·done 색을 담은 객체여야 합니다.');
+      palette.status[mode]={};
+      for(const [key,label] of STATUS_KEYS)if(set[key]!==undefined){palette.status[mode][key]=color(set[key],'status.'+mode+'.'+key);readable(palette.status[mode][key],mode,label+' 상태색');}
+    }
+  }
+  return palette;
+}
+function onPrimary(hex) { return contrast(hex,'#211f19')>=contrast(hex,'#fbf8f1')?'#211f19':'#fbf8f1'; }
+function paletteStyle(palette) {
+  const rules=[];
+  if(palette.sidebar)rules.push('--d-side:'+palette.sidebar,'--l-side:'+palette.sidebar);
+  for(const [mode] of PALETTE_MODES){
+    const prefix=mode==='dark'?'--d-':'--l-',accent=palette.accent?.[mode];
+    if(accent)rules.push(prefix+'primary:'+accent,prefix+'on-primary:'+onPrimary(accent));
+    for(const [key,hex] of Object.entries(palette.status?.[mode] || {}))rules.push(prefix+key+':'+hex);
+  }
+  return {css:rules.length?'html:root{'+rules.join(';')+'}':'',scheme:palette.sidebar?sidebarScheme(palette.sidebar):''};
+}
+function customPalette() { try { return readPalette(store.get('wb.customTheme') || ''); } catch(e) { return null; } }
+function paletteChoice() {
+  const id=store.get('wb.palette');
+  if(id==='custom' && customPalette())return 'custom';
+  return PALETTES.some(p=>p.id===id)?id:'huginn';
+}
+function currentPalette() { const id=paletteChoice();return id==='custom'?customPalette():PALETTES.find(p=>p.id===id); }
+function paletteJson(palette) {
+  const {name,sidebar,accent,status}=palette;
+  return JSON.stringify({name,...(sidebar?{sidebar}:{}),...(accent?{accent}:{}),...(status && Object.keys(status).length?{status}:{})},null,2);
+}
 function applyTheme() {
-  const root=document.documentElement,mode=themeChoice(),accent=accentChoice();
+  const root=document.documentElement,mode=themeChoice(),{css,scheme}=paletteStyle(currentPalette());
   if(mode==='light' || (mode==='system' && systemLight?.matches))root.dataset.theme='light';else delete root.dataset.theme;
-  if(accent==='gold')delete root.dataset.accent;else root.dataset.accent=accent;
+  let style=document.querySelector('style[data-palette]');
+  if(css){if(!style){style=document.createElement('style');style.dataset.palette='';document.head.appendChild(style);}style.textContent=css;}else style?.remove();
+  if(scheme)root.dataset.sideScheme=scheme;else delete root.dataset.sideScheme;
+  store.set('wb.paletteCss',css);store.set('wb.sideScheme',scheme);
   syncThemeToggle();
 }
 systemLight?.addEventListener?.('change',()=>{if(themeChoice()==='system')applyTheme();});
+function paletteDot(palette) {
+  const side=palette.sidebar || '#1d1c18',accent=palette.accent?.dark || '#d3b066';
+  return `<span class="palette-dot" style="background:linear-gradient(135deg,${side} 35%,${accent})" aria-hidden="true"></span>`;
+}
 function appearanceView() {
-  const mode=themeChoice(),accent=accentChoice();
-  return `<section class="result-panel" data-key="appearance"><div class="section-heading"><div><h2>화면</h2><p class="quiet">밝기와 강조색을 정합니다. 이 컴퓨터에 저장되며 작업 기록 화면에도 적용됩니다.</p></div></div>
+  const mode=themeChoice(),active=paletteChoice(),tab=ui.appearanceTab || 'presets',custom=customPalette();
+  if(ui.customDraft===undefined)ui.customDraft=paletteJson(custom || currentPalette());
+  const status=ui.appearanceStatus?`<p class="action-feedback appearance-status${ui.appearanceStatus.error?' is-error':''}" role="status">${esc(ui.appearanceStatus.text)}</p>`:'';
+  const share=`<button type="button" class="soft-button" data-palette-share>${SVG('<path d="M10 3h3v3M13 3 8 8M12 9v4H3V4h4"/>')} 공유</button>`;
+  const presets=`${status}${PALETTE_GROUPS.map(([group,label],i)=>`<div class="palette-head"><h4 class="palette-group">${label}</h4>${i?'':share}</div><div class="palette-grid">${PALETTES.filter(p=>p.group===group).map(p=>`<button type="button" class="palette-card" data-palette-choice="${p.id}" aria-pressed="${p.id===active}">${paletteDot(p)}<span>${esc(p.name)}</span></button>`).join('')}</div>`).join('')}
+    ${custom?`<div class="palette-head"><h4 class="palette-group">사용자 지정</h4></div><div class="palette-grid"><button type="button" class="palette-card" data-palette-choice="custom" aria-pressed="${active==='custom'}">${paletteDot(custom)}<span>${esc(custom.name)}</span></button></div>`:''}`;
+  let draft={};try{draft=JSON.parse(ui.customDraft);}catch(e){}
+  const pick=(path,label)=>{const [key,mode]=path.split('.'),raw=mode?draft?.[key]?.[mode]??(typeof draft?.[key]==='string'?draft[key]:''):draft?.[key];return `<label class="custom-color"><input type="color" data-custom-color="${path}" value="${hexColor(raw) || '#000000'}">${label}</label>`;};
+  const customView=`<p class="quiet">색을 고르거나 JSON을 붙여 넣은 뒤 적용합니다. 다른 사람이 공유한 테마 JSON이나 .json 파일도 받을 수 있습니다.</p>
+    <div class="custom-colors">${pick('sidebar','사이드바')}${pick('accent.dark','강조색 (다크)')}${pick('accent.light','강조색 (라이트)')}</div>
+    <label class="settings-field custom-json">테마 JSON<textarea data-custom-json rows="12" spellcheck="false" autocomplete="off">${esc(ui.customDraft)}</textarea></label>
+    <details class="connection-details"><summary>JSON 형식</summary><div class="connection-details-body"><p>name은 테마 이름, sidebar는 사이드바 색입니다. accent는 색 하나 또는 다크·라이트별 색을 씁니다. status에는 화면별 run(진행)·wait(대기)·stall(막힘)·done(완료) 색을 넣을 수 있습니다. 모든 색은 #RRGGBB 형식이며, 글자가 배경과 4.5:1 이상 대비되어야 적용됩니다.</p></div></details>
+    ${status}<div class="action-buttons"><label class="soft-button custom-file">파일에서 불러오기<input type="file" accept=".json,application/json" data-custom-file hidden></label><button type="button" class="soft-button" data-palette-share>현재 테마 복사</button><button type="button" class="soft-button settings-primary" data-custom-apply>적용</button></div>`;
+  return `<section class="result-panel" data-key="appearance"><div class="section-heading"><div><h2>화면</h2><p class="quiet">밝기와 테마를 정합니다. 이 컴퓨터에 저장되며 작업 기록 화면에도 적용됩니다.</p></div></div>
   <div class="settings-form-section"><div><h3>밝기</h3><p class="quiet">시스템 설정을 고르면 운영체제의 다크·라이트 모드를 따라갑니다.</p></div><div class="choice-row" role="group" aria-label="밝기">${THEME_MODES.map(([id,label])=>`<button type="button" class="soft-button choice" data-theme-mode="${id}" aria-pressed="${id===mode}">${label}</button>`).join('')}</div></div>
-  <div class="settings-form-section"><div><h3>강조색</h3><p class="quiet">버튼·선택 표시·링크에 쓰입니다. 진행·완료 같은 상태색은 바뀌지 않습니다.</p></div><div class="choice-row" role="group" aria-label="강조색">${ACCENTS.map(([id,label])=>`<button type="button" class="soft-button choice" data-accent-choice="${id}" aria-pressed="${id===accent}"><span class="accent-swatch" style="background:var(--swatch-${id})"></span>${label}</button>`).join('')}</div></div></section>`;
+  <div class="appearance-tabs" role="tablist" aria-label="테마">${[['presets','Huginn 테마'],['custom','사용자 지정 테마']].map(([id,label])=>`<button type="button" role="tab" data-appearance-tab="${id}" aria-selected="${id===tab}">${label}</button>`).join('')}</div>
+  <div class="appearance-panel" role="tabpanel">${tab==='custom'?customView:presets}</div></section>`;
+}
+function setAppearanceStatus(text,error=false) { ui.appearanceStatus={text,error};render(true); }
+function applyCustomPalette(source) {
+  try {
+    const palette=readPalette(source);
+    store.set('wb.customTheme',JSON.stringify(palette));store.set('wb.palette','custom');
+    ui.customDraft=paletteJson(palette);applyTheme();
+    setAppearanceStatus('"'+palette.name+'" 테마를 적용했습니다.');
+  } catch(error) { setAppearanceStatus(error.message,true); }
+}
+async function sharePalette() {
+  const text=paletteJson(currentPalette());
+  try { await navigator.clipboard.writeText(text);setAppearanceStatus('현재 테마를 JSON으로 복사했습니다. 받는 사람은 사용자 지정 테마에 붙여 넣으면 됩니다.'); }
+  catch(e) { ui.customDraft=text;ui.appearanceTab='custom';setAppearanceStatus('클립보드에 복사하지 못했습니다. 아래 JSON을 직접 복사해 주세요.',true); }
 }
 const FEEDBACK_KINDS=[['bug','버그 신고'],['idea','의견·제안']];
 function feedbackMarkup() {
@@ -3047,7 +3193,10 @@ document.addEventListener('click',async e=>{
   if(e.target.closest('[data-feedback-close]')){document.getElementById('feedback-dialog').close();return;}
   if(e.target.closest('[data-theme-toggle]')){store.set('wb.theme',document.documentElement.dataset.theme==='light'?'dark':'light');applyTheme();render(true);return;}
   const mode=e.target.closest('[data-theme-mode]');if(mode){store.set('wb.theme',mode.dataset.themeMode);applyTheme();render(true);return;}
-  const accent=e.target.closest('[data-accent-choice]');if(accent){store.set('wb.accent',accent.dataset.accentChoice);applyTheme();render(true);return;}
+  const palette=e.target.closest('[data-palette-choice]');if(palette){store.set('wb.palette',palette.dataset.paletteChoice);ui.appearanceStatus=null;applyTheme();render(true);return;}
+  const appearanceTab=e.target.closest('[data-appearance-tab]');if(appearanceTab){ui.appearanceTab=appearanceTab.dataset.appearanceTab;ui.appearanceStatus=null;render(true);return;}
+  if(e.target.closest('[data-palette-share]')){await sharePalette();return;}
+  if(e.target.closest('[data-custom-apply]')){applyCustomPalette(ui.customDraft);return;}
   if(e.target.closest('[data-open-settings]')){ui.sid=SETTINGS;ui.stage=null;ui.req=null;ui.menu=false;store.set('wb.sid',ui.sid);rememberNavigation();render();document.getElementById('main').scrollTop=0;return;}
   const update=e.target.closest('[data-update-action]');if(update){await runUpdateAction(update.dataset.updateAction);return;}
   const tab=e.target.closest('[data-settings-tab]');if(tab){ui.settingsTab=tab.dataset.settingsTab;render(true);return;}
@@ -3072,11 +3221,28 @@ document.addEventListener('click',async e=>{
   const confirm=e.target.closest('[data-connection-confirm]');if(confirm){await boardAction('connection_remove',{kind:confirm.dataset.connectionConfirm},'');return;}
 });
 document.getElementById('main').addEventListener('input',e=>{
+  if(e.target.dataset?.customJson!==undefined){ui.customDraft=e.target.value;return;}
+  const color=e.target.dataset.customColor;
+  if(color){
+    let draft;try{draft=JSON.parse(ui.customDraft);}catch(error){draft=null;}
+    if(!draft || typeof draft!=='object' || Array.isArray(draft))draft={name:'사용자 지정'};
+    const [key,mode]=color.split('.');
+    if(mode){const accent=typeof draft.accent==='string'?{dark:draft.accent,light:draft.accent}:{...(draft.accent || {})};accent[mode]=e.target.value;draft.accent=accent;}else draft[key]=e.target.value;
+    ui.customDraft=JSON.stringify(draft,null,2);
+    const box=document.querySelector('[data-custom-json]');if(box)box.value=ui.customDraft;
+    return;
+  }
   const key=e.target.dataset.connectionField;
   if(key && ui.connectionDraft){const field=connectionRows().find(x=>x.kind===ui.connectionEdit)?.fields.find(x=>x.key===key);ui.connectionDraft[key]=key==='enabled'?e.target.checked:field?.type==='paths'?e.target.value.split('\n').filter(x=>x.trim()):e.target.value;}
   if(e.target.closest('[data-action-settings]')){const form=e.target.closest('form');ui.environmentDraft=environmentValues(form);}
 });
-document.getElementById('main').addEventListener('change',e=>{
+document.getElementById('main').addEventListener('change',async e=>{
+  if(e.target.dataset?.customFile!==undefined){
+    const file=e.target.files?.[0];e.target.value='';
+    if(!file)return;
+    if(file.size>65536){setAppearanceStatus('테마 파일은 64KB 이하여야 합니다.',true);return;}
+    ui.customDraft=await file.text();applyCustomPalette(ui.customDraft);return;
+  }
   if(e.target.matches('[data-connection-kind]')){openConnection(e.target.value,true);render(true);}
 });
 document.getElementById('main').addEventListener('submit',e=>{
