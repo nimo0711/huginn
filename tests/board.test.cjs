@@ -821,6 +821,8 @@ test('appearance offers named themes like a gallery, applies sidebar and accent 
   assert.equal(b.root.dataset.sideScheme,'dark');
   const css=b.style().textContent;
   for(const part of ['--d-side:#3f0e40','--l-side:#3f0e40','--d-primary:#cc67cf','--l-primary:#5a1d5c','--l-on-primary:#fbf8f1'])assert.ok(css.includes(part),part);
+  for(const key of ['bg','panel','panel2','hover','line','line2','ink','sub','dim'])for(const prefix of ['--d-','--l-'])assert.match(css,new RegExp(prefix+key+':#[0-9a-f]{6}'),prefix+key);
+  const [hue]=b.run('toHsl(paletteTokens(PALETTES.find(p=>p.id==="eggplant")).dark.bg)');assert.ok(Math.abs(hue-b.run('toHsl("#3f0e40")[0]'))<.02);
   assert.equal(b.run('localStorage.getItem("wb.paletteCss")'),css);assert.equal(b.run('localStorage.getItem("wb.sideScheme")'),'dark');
   b.run('localStorage.setItem("wb.palette","deutan");applyTheme()');
   for(const part of ['--d-run:#f0e442','--l-done:#0b5f98'])assert.ok(b.style().textContent.includes(part),part);
@@ -835,6 +837,8 @@ test('appearance offers named themes like a gallery, applies sidebar and accent 
 test('every built-in theme stays readable and the validation base matches the stylesheet',()=>{
   const b=themeBoard();
   for(const id of b.run('PALETTES.map(p=>p.id)'))assert.doesNotThrow(()=>b.run(`readPalette(paletteJson(PALETTES.find(p=>p.id==="${id}")))`),id);
+  const worst=b.run(`PALETTES.filter(p=>p.sidebar).map(p=>{const t=paletteTokens(p);return [p.id,Math.min(...['dark','light'].flatMap(m=>['ink','sub','dim','primary','run','wait','stall','done','info','off'].flatMap(k=>surfacesOf(t[m]).map(x=>contrast(t[m][k],x))))),contrast(t[sidebarScheme(p.sidebar)].dim,p.sidebar)];})`);
+  for(const [id,text,side] of worst){assert.ok(text>=4.5,id+' text '+text);assert.ok(side>=4.5,id+' sidebar '+side);}
   const css=fs.readFileSync(path.join(__dirname,'..','desktop/theme.css'),'utf8');
   for(const [mode,prefix] of [['dark','--d-'],['light','--l-']])for(const key of ['bg','panel','dim','ink'])
     assert.equal(css.match(new RegExp(prefix+key+':\\s*(#[0-9a-f]{6})'))[1],b.run(`PALETTE_BASE.${mode}.${key}`),mode+key);
