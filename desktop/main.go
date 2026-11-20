@@ -271,16 +271,24 @@ func (app *desktopApp) confirmUpdateInstall(state UpdateState) (bool, error) {
 	if state.Signed {
 		signature = "운영체제에서 설치 파일의 서명을 확인했습니다."
 	}
-	button := "업데이트 후 다시 시작"
 	message := "Huginn " + state.LatestVersion + "(으)로 업데이트할까요?\n\n" + signature +
 		"\n\n앱을 종료하고 새 버전으로 바꾼 뒤 다시 시작합니다. 설정과 기록은 유지됩니다. 별도로 실행한 서비스는 종료하지 않습니다."
-	answer, err := wailsruntime.MessageDialog(ctx, wailsruntime.MessageDialogOptions{
-		Type:    wailsruntime.QuestionDialog,
-		Title:   "Huginn 업데이트 설치",
-		Message: message,
-		Buttons: []string{button, "취소"}, DefaultButton: "취소", CancelButton: "취소",
-	})
-	return answer == button, err
+	options, accept := updateInstallDialog(goruntime.GOOS, message)
+	answer, err := wailsruntime.MessageDialog(ctx, options)
+	return err == nil && answer == accept, err
+}
+
+func updateInstallDialog(goos, message string) (wailsruntime.MessageDialogOptions, string) {
+	options := wailsruntime.MessageDialogOptions{Type: wailsruntime.QuestionDialog, Title: "Huginn 업데이트 설치", Message: message}
+	if goos == "windows" {
+		options.DefaultButton = "No"
+		return options, "Yes"
+	}
+	accept := "업데이트 후 다시 시작"
+	options.Buttons = []string{accept, "취소"}
+	options.DefaultButton = "취소"
+	options.CancelButton = "취소"
+	return options, accept
 }
 
 func (app *desktopApp) setRuntimeContext(ctx context.Context) {

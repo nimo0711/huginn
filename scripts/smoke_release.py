@@ -93,16 +93,16 @@ def smoke_mac_disk_image(image, bundle_id, env, folder):
     return results,{'layout_verified':True,'copied':True,'layout':layout}
 
 
-def nsis_command(executable, path_option=None, directory=None, flags=()):
+def nsis_command(executable, path_option=None, directory=None, flags=(), silent=True):
     """NSIS treats the final path option as raw text, including any spaces."""
-    command = subprocess.list2cmdline([str(executable), '/S', *flags])
+    command = subprocess.list2cmdline([str(executable), *(['/S'] if silent else []), *flags])
     if path_option is not None:
         command += f' {path_option}={directory}'
     return command
 
 
-def run_nsis(executable, env, path_option=None, directory=None, expected=0, flags=()):
-    command = nsis_command(executable, path_option, directory, flags)
+def run_nsis(executable, env, path_option=None, directory=None, expected=0, flags=(), silent=True):
+    command = nsis_command(executable, path_option, directory, flags, silent)
     result = subprocess.run(command, executable=str(executable), env=env, timeout=120)
     if result.returncode != expected:
         raise ValueError(f'{executable.name} returned {result.returncode}; expected {expected}')
@@ -264,7 +264,7 @@ def smoke_windows_installer(installer, installed, env, folder, marker, version):
         require_preserved_markers(marker, default_marker)
         result = smoke(installed / 'Huginn.exe', env, folder)
 
-        run_nsis(installer, env, flags=('/RELAUNCH',))
+        run_nsis(installer, env, flags=('/UPDATE', '/RELAUNCH'), silent=False)
         relaunched = wait_for_windows_process(installed / 'Huginn.exe', 30)
         if relaunched is None:
             raise ValueError('In-app update did not restart Huginn after installing')
@@ -329,7 +329,7 @@ def main():
                     installer, installed, env, folder, marker, release['version'],
                 )
                 result['installer'] = (
-                    'legacy Forkrail install replaced after close, locked upgrade refused, closing app upgrade retried, silent update restarted app, '
+                    'legacy Forkrail install replaced after close, locked upgrade refused, closing app upgrade retried, in-app update showed install progress and restarted app, '
                     'upgraded, locked uninstall refused, '
                     'and uninstalled on disposable runner'
                 )

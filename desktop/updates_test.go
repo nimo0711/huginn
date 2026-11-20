@@ -501,3 +501,14 @@ func TestUpdateQuitsOnlyAfterOSOpensImageAndKeepsImageAvailable(t *testing.T) {
 		t.Fatalf("image removed while OS may still be opening it: %v", err)
 	}
 }
+
+func TestUpdateInstallDialogAcceptsTheAnswerEachPlatformReturns(t *testing.T) {
+	windows, accept := updateInstallDialog("windows", "본문")
+	if accept != "Yes" || len(windows.Buttons) != 0 || windows.DefaultButton != "No" {
+		t.Fatalf("Windows message boxes only return Yes or No: %+v %q", windows, accept)
+	}
+	mac, accept := updateInstallDialog("darwin", "본문")
+	if accept != "업데이트 후 다시 시작" || len(mac.Buttons) != 2 || mac.Buttons[0] != accept || mac.DefaultButton != "취소" || mac.CancelButton != "취소" {
+		t.Fatalf("macOS must accept its own install button: %+v %q", mac, accept)
+	}
+}

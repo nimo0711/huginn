@@ -17,8 +17,10 @@ VIAddVersionKey "FileVersion" "${RELEASE_VERSION}"
 VIAddVersionKey "LegalCopyright" "Huginn contributors"
 !define MUI_ICON "${SOURCE}\Huginn.ico"
 !define MUI_UNICON "${SOURCE}\Huginn.ico"
+!define MUI_PAGE_CUSTOMFUNCTION_PRE SkipPageForUpdate
 !insertmacro MUI_PAGE_WELCOME
 !insertmacro MUI_PAGE_INSTFILES
+!define MUI_PAGE_CUSTOMFUNCTION_PRE SkipPageForUpdate
 !insertmacro MUI_PAGE_FINISH
 !insertmacro MUI_UNPAGE_CONFIRM
 !insertmacro MUI_UNPAGE_INSTFILES
@@ -94,6 +96,14 @@ Function RelaunchIfRequested
   IfFileExists "$INSTDIR\Huginn.exe" 0 relaunch_done
   Exec '"$INSTDIR\Huginn.exe"'
   relaunch_done:
+FunctionEnd
+
+Function SkipPageForUpdate
+  ${GetParameters} $R0
+  ClearErrors
+  ${GetOptions} $R0 "/UPDATE" $R1
+  IfErrors +2
+  Abort
 FunctionEnd
 
 Function .onInit
