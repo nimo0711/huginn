@@ -31,7 +31,7 @@ def main():
     commit=verify_tag_commit(tag)
     display_name=release.get('display_name',release['name'])
     body=(display_name+' '+release['version']+'\n\n'
-          +'Windows x64 / macOS Apple Silicon / macOS Intel\n\n'
+          +'Windows x64 / macOS Apple Silicon\n\n'
           +('Signed installers; macOS notarization completed.\n' if signed else
             'Unsigned test candidate. macOS Gatekeeper and Windows SmartScreen may block installation. This is not a signed production release.\n')
           +'\nChecksums and platform smoke evidence are attached. Local data and credentials are not included.\n')

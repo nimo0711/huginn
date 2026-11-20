@@ -22,9 +22,9 @@ def run(args, **kwargs):
 
 def native_target():
     system=platform.system();arch=platform.machine().lower()
-    if system=='Darwin':return 'macos-arm64' if arch=='arm64' else 'macos-x86_64'
+    if system=='Darwin' and arch=='arm64':return 'macos-arm64'
     if system=='Windows' and arch in ('amd64','x86_64'):return 'windows-x64'
-    raise ValueError('Build on a supported Windows x64 or macOS runner')
+    raise ValueError('Build on a supported Windows x64 or Apple Silicon macOS runner')
 
 
 def make_icons():

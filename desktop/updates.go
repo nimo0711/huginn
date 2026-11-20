@@ -126,8 +126,6 @@ func nativeUpdateConfig(executable, version string) (updateConfig, error) {
 	switch runtime.GOOS + "/" + runtime.GOARCH {
 	case "darwin/arm64":
 		cfg.target = "macos-arm64"
-	case "darwin/amd64":
-		cfg.target = "macos-x86_64"
 	case "windows/amd64":
 		cfg.target = "windows-x64"
 	default:
@@ -180,7 +178,7 @@ func newAppUpdates(ctx context.Context, cfg updateConfig, client *http.Client) *
 		osName = "windows"
 	}
 	_, err := parseUpdateVersion(cfg.version)
-	valid := err == nil && updateRepositoryPattern.MatchString(cfg.repository) && (cfg.target == "macos-arm64" || cfg.target == "macos-x86_64" || cfg.target == "windows-x64")
+	valid := err == nil && updateRepositoryPattern.MatchString(cfg.repository) && (cfg.target == "macos-arm64" || cfg.target == "windows-x64")
 	u.state = UpdateState{Status: "idle", CurrentVersion: cfg.version, Target: cfg.target, OS: osName, Available: valid}
 	if updateRepositoryPattern.MatchString(cfg.repository) {
 		u.state.ReleaseURL = "https://github.com/" + cfg.repository + "/releases"

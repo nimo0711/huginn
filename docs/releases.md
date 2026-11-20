@@ -17,7 +17,6 @@
 | 대상 | 빌드 환경 | 결과 |
 | --- | --- | --- |
 | `macos-arm64` | Apple Silicon Mac / Actions `macos-15` | dmg, zip |
-| `macos-x86_64` | Intel Mac / Actions `macos-15-intel` | dmg, zip |
 | `windows-x64` | Windows x64 / Actions `windows-2022` | Setup.exe, zip |
 
 Go 1.27.4, Python 3.12, Node.js 22가 필요합니다. Mac에는 Xcode Command Line Tools, Windows에는 NSIS와 WebView2 Runtime도 필요합니다. Wails v2.16.0과 Python 빌드 의존성은 고정 버전을 사용합니다.

@@ -18,7 +18,7 @@ class ReleasePackagingTests(unittest.TestCase):
         self.config = {'name':'Huginn', 'display_name':'Huginn', 'version':'1.2.0-rc.1',
                        'package_version':'1.2.0', 'bundle_id':'app.huginn.desktop',
                        'repository':'nimo0711/huginn',
-                       'platforms':['macos-arm64','macos-x86_64','windows-x64']}
+                       'platforms':['macos-arm64','windows-x64']}
 
     def test_tag_must_match_the_version_being_built(self):
         release_tools.validate_config(self.config, tag='v1.2.0-rc.1')
