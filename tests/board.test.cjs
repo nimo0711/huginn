@@ -839,6 +839,8 @@ test('every built-in theme stays readable and the validation base matches the st
   for(const id of b.run('PALETTES.map(p=>p.id)'))assert.doesNotThrow(()=>b.run(`readPalette(paletteJson(PALETTES.find(p=>p.id==="${id}")))`),id);
   const worst=b.run(`PALETTES.filter(p=>p.sidebar).map(p=>{const t=paletteTokens(p);return [p.id,Math.min(...['dark','light'].flatMap(m=>['ink','sub','dim','primary','run','wait','stall','done','info','off'].flatMap(k=>surfacesOf(t[m]).map(x=>contrast(t[m][k],x))))),contrast(t[sidebarScheme(p.sidebar)].dim,p.sidebar)];})`);
   for(const [id,text,side] of worst){assert.ok(text>=4.5,id+' text '+text);assert.ok(side>=4.5,id+' sidebar '+side);}
+  const tinted=b.run(`PALETTES.filter(p=>p.sidebar && toHsl(p.sidebar)[1]>.3).flatMap(p=>{const t=paletteTokens(p),hue=toHsl(p.sidebar)[0];return ['dark','light'].flatMap(m=>['bg','panel2'].map(k=>{const [h,s]=toHsl(t[m][k]);return [p.id+' '+m+' '+k,Math.min(Math.abs(h-hue),1-Math.abs(h-hue)),s,Math.min(toHsl(p.sidebar)[1]*.7,.5)];}));})`);
+  for(const [name,drift,sat,floor] of tinted){assert.ok(drift<.03,name+' hue');assert.ok(sat>=floor,name+' saturation '+sat);}
   const roles=b.run(`PALETTES.filter(p=>p.sidebar).map(p=>{const t=paletteTokens(p).dark;return [p.id,contrast(t.selected,t['on-selected']),contrast(t.presence,p.sidebar),contrast(t.notify,p.sidebar)];})`);
   assert.equal(roles.length,b.run('PALETTES.filter(p=>p.sidebar).length'));
   for(const [id,selected,presence,notify] of roles){assert.ok(selected>=4.5,id+' selected '+selected);assert.ok(presence>=3,id+' presence');assert.ok(notify>=3,id+' notify');}
