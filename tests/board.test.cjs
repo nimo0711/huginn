@@ -656,6 +656,26 @@ function updateBoard() {
  b.run('render=()=>{};data={sessions:[]};ui.sid=SETTINGS;ui.settingsTab="updates"');
  return {...b,timers,tick:async()=>{const entry=[...timers.entries()].find(([,t])=>t.ms<1000);if(entry){timers.delete(entry[0]);await entry[1].fn();await Promise.resolve();}}};
 }
+test('updates are checked once a day in the background and a new version shows a sidebar notice',async()=>{
+ const notice={hidden:true,text:{textContent:''},querySelector(){return this.text;}};
+ const b=updateBoard();b.run('ui.sid=null;ui.updates=null;globalThis.checks=0');
+ b.set(notice);b.run('document.querySelectorAll=s=>s==="[data-open-updates]"?[input]:[]');
+ const day=24*60*60*1000,hour=60*60*1000,start=Date.UTC(2026,10,23,9);
+ b.run('window.go={main:{AppUpdates:{Info:async()=>ui.updates,Check:async()=>{checks++;return globalThis.next;},Download(){},Install(){}}}}');
+ b.run('globalThis.next={status:"current",available:true,current_version:"1.2.0-rc.13",latest_version:"1.2.0-rc.13"}');
+ await b.run(`autoCheckUpdates(${start})`);assert.equal(b.run('checks'),1);assert.equal(notice.hidden,true);
+ await b.run(`autoCheckUpdates(${start+day-1})`);assert.equal(b.run('checks'),1);
+ b.run('globalThis.next={status:"error",available:true}');
+ await b.run(`autoCheckUpdates(${start+day})`);assert.equal(b.run('checks'),2);
+ await b.run(`autoCheckUpdates(${start+day+hour-1})`);assert.equal(b.run('checks'),2);
+ b.run('globalThis.next={status:"available",available:true,current_version:"1.2.0-rc.13",latest_version:"1.2.0-rc.14"}');
+ await b.run(`autoCheckUpdates(${start+day+hour})`);assert.equal(b.run('checks'),3);
+ assert.equal(notice.hidden,false);assert.equal(notice.text.textContent,'업데이트가 있습니다 · 1.2.0-rc.14');
+ await b.run(`autoCheckUpdates(${start+3*day})`);assert.equal(b.run('checks'),3);
+ const nav=navigationBoard();nav.run('ui.settingsTab="connections"');
+ nav.click('document',{'[data-open-updates]':{dataset:{}}});
+ assert.equal(nav.run('ui.sid===SETTINGS && ui.settingsTab'),'updates');
+});
 test('native binding appearing after startup initializes updates and leaving settings stops polling',async()=>{
  const b=updateBoard();b.run('syncUpdates()');assert.ok(b.timers.size>0);
  b.run('window.go={main:{AppUpdates:{Info:async()=>({status:"idle",available:true,current_version:"2.0.0",os:"windows"}),Check(){},Download(){},Install(){}}}}');
