@@ -850,6 +850,11 @@ test('every built-in theme stays readable and the validation base matches the st
     assert.equal(css.match(new RegExp(prefix+key+':\\s*(#[0-9a-f]{6})'))[1],b.run(`PALETTE_BASE.${mode}.${key}`),mode+key);
 });
 
+test('a selected sidebar row repaints its inner buttons and avatar from the selected colour',()=>{
+  const rule=html.match(/\.tab\.sel \{([^}]*)\}/)[1];
+  for(const token of ['--panel','--panel2','--hover','--line','--line2'])assert.match(rule,new RegExp(token+': color-mix\\(in srgb, var\\(--selected\\) \\d+%, var\\(--on-selected\\)\\)'),token);
+});
+
 test('custom theme JSON is validated with readable messages before it is applied',()=>{
   const b=themeBoard();
   assert.deepEqual(JSON.parse(JSON.stringify(b.run(`readPalette('{"name":" 내 테마 ","sidebar":"#123","accent":{"dark":"#8FB4D9","light":"#2f5a86"}}')`))),{name:'내 테마',sidebar:'#112233',accent:{dark:'#8fb4d9',light:'#2f5a86'}});

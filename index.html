@@ -32,7 +32,7 @@ aside { background: var(--side); color: var(--ink); border-right: 1px solid var(
 .sc-tab.drop-before { box-shadow: inset 0 2px 0 var(--sub); }
 .sc-tab.drop-after { box-shadow: inset 0 -2px 0 var(--sub); }
 .tab:hover { background: var(--panel); }
-.tab.sel { background: var(--selected); border-color: var(--line); color: var(--on-selected); --ink: var(--on-selected); --sub: var(--on-selected); --dim: var(--on-selected); }
+.tab.sel { background: var(--selected); border-color: var(--line); color: var(--on-selected); --ink: var(--on-selected); --sub: var(--on-selected); --dim: var(--on-selected); --panel: color-mix(in srgb, var(--selected) 88%, var(--on-selected)); --panel2: color-mix(in srgb, var(--selected) 82%, var(--on-selected)); --hover: color-mix(in srgb, var(--selected) 78%, var(--on-selected)); --line: color-mix(in srgb, var(--selected) 72%, var(--on-selected)); --line2: color-mix(in srgb, var(--selected) 52%, var(--on-selected)); }
 .tab.sel .stt, .tab.sel .ask-rq { color: var(--on-selected) !important; }
 .av { width: 32px; height: 32px; border-radius: 8px; display: grid; place-items: center; font-weight: 500; font-size: 14px; color: var(--sub); background: var(--panel2); border: 1px solid var(--line); position: relative; font-variant-numeric: tabular-nums; }
 .av::after { content: ""; position: absolute; right: -3px; bottom: -3px; width: 10px; height: 10px; border-radius: 50%; border: 2px solid var(--side); background: var(--off); }
