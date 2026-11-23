@@ -23,6 +23,7 @@ import local_runtime
 import board_actions
 import branding
 import feedback
+import failure_log
 from runtime_paths import DATA_DIR, DB_PATH, RESOURCE_ROOT, SPOOL_DIR, release_info
 from platform_support import IS_WINDOWS
 
@@ -525,11 +526,11 @@ def drain_spool() -> None:
                         if line.strip():
                             try:
                                 add_event(json.loads(line))
-                            except ValueError:
-                                pass
+                            except ValueError as error:
+                                failure_log.report(f'전송 대기 기록 {name}의 줄을 버림', error)
                 os.remove(path)
-            except OSError:
-                pass
+            except OSError as error:
+                failure_log.report(f'전송 대기 기록 {name} 처리', error)
         time.sleep(3)
 
 
@@ -545,6 +546,10 @@ class LoopbackServer(ThreadingHTTPServer):
         # stall startup on offline machines and hosted runners.
         TCPServer.server_bind(self)
         self.server_name, self.server_port = self.server_address[:2]
+
+    def handle_error(self, request, client_address):
+        print(f'{time.strftime("%Y-%m-%d %H:%M:%S")} 요청 처리 오류', file=sys.stderr)
+        super().handle_error(request, client_address)
 
 
 def create_server():
