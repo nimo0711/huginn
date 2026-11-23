@@ -23,6 +23,7 @@ import enrich
 import delegation
 import progress
 import title_summary
+import failure_log
 
 HOME = os.path.expanduser("~")
 CLAUDE_SESSIONS = os.path.join(HOME, ".claude", "sessions")
@@ -669,8 +670,8 @@ def _fetch_jira(key: str) -> None:
             os.makedirs(os.path.dirname(JIRA_CACHE), exist_ok=True)
             with open(JIRA_CACHE, "w", encoding="utf-8") as f:
                 json.dump(_jira, f, ensure_ascii=False)
-        except OSError:
-            pass
+        except OSError as error:
+            failure_log.report('Jira 제목 캐시 저장', error)
 
 
 def _jira_title(key: str) -> str:
@@ -686,8 +687,8 @@ def _story_titles() -> dict:
         with closing(sqlite3.connect(BOARD_DB, timeout=1)) as con:
             rows = con.execute("SELECT story, title FROM events WHERE kind = 'story' AND title != '' ORDER BY ts").fetchall()
         titles = {k: re.sub(r"^(\s*\[[^\]]*\])+\s*", "", t) for k, t in rows}
-    except sqlite3.Error:
-        pass
+    except sqlite3.Error as error:
+        failure_log.report('스토리 제목 읽기', error)
     return titles
 
 
@@ -1017,7 +1018,8 @@ def codex_sessions(now: float) -> list[dict]:
                                 cache.pop(identity, None)
                     continue
                 tasks = _codex_tasks(hist, tid, turns, branch or '', database_identity)
-            except sqlite3.Error:
+            except sqlite3.Error as error:
+                failure_log.report('Codex 작업 기록 읽기', error)
                 continue
             tasks = [t for t in tasks if t.get('history') or t["prompt"] or t["notes"] or t["n_steps"] or t["n_checks"]]
             if not tasks:

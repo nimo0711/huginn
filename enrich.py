@@ -10,6 +10,7 @@ import time
 from pathlib import Path
 from urllib.parse import quote
 import connections
+import failure_log
 from runtime_paths import DATA_DIR
 from platform_support import replace_file, run_hidden
 
@@ -37,8 +38,8 @@ def _save() -> None:
         with open(CACHE + ".tmp", "w", encoding="utf-8") as f:
             json.dump(_data, f, ensure_ascii=False)
         replace_file(CACHE + ".tmp", CACHE)
-    except OSError:
-        pass
+    except OSError as error:
+        failure_log.report('작업 정보 캐시 저장', error)
 
 
 def _run(args: list, cwd: str | None = None) -> str:

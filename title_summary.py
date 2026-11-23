@@ -12,6 +12,7 @@ import subprocess
 import threading
 import time
 import connections
+import failure_log
 from platform_support import IS_WINDOWS, replace_file, windows_agent_command, run_hidden
 from runtime_paths import DATA_DIR, RESOURCE_ROOT
 
@@ -113,8 +114,8 @@ class TitleCache:
                 value = self.runner(context,model=config['model']) if self.runner is generate else self.runner(context)
                 if _valid(value):
                     title = value.strip()
-            except (OSError, ValueError, TypeError, subprocess.SubprocessError):
-                pass
+            except (OSError, ValueError, TypeError, subprocess.SubprocessError) as error:
+                failure_log.report('AI 제목 요약', error)
             with self.lock:
                 if config!=connections.STORE.get('summary'):
                     self.pending.discard(key);self.jobs.task_done();continue
@@ -134,8 +135,8 @@ class TitleCache:
             self.path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
             temporary.write_text(json.dumps(saved, ensure_ascii=False), encoding="utf-8")
             replace_file(temporary, self.path)
-        except OSError:
-            pass
+        except OSError as error:
+            failure_log.report('제목 요약 캐시 저장', error)
 
 
 _cache = TitleCache(DATA_DIR / "work_titles.json")
