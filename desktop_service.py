@@ -13,6 +13,7 @@ import sqlite3
 import sys
 import tempfile
 import threading
+import time
 
 
 DURABLE_SETTINGS = ('settings.json', 'favorites.json', 'connections.json')
@@ -117,6 +118,21 @@ def configure_service(port, data_dir, instance):
     os.environ['HUGINN_INSTANCE'] = instance
 
 
+SERVICE_LOG = 'service.log'
+SERVICE_LOG_LIMIT = 5 * 1024 * 1024
+
+
+def attach_service_log(data_dir, limit=SERVICE_LOG_LIMIT):
+    data_dir.mkdir(parents=True, exist_ok=True)
+    path = data_dir / SERVICE_LOG
+    if path.is_file() and path.stat().st_size > limit:
+        os.replace(path, path.with_name(SERVICE_LOG + '.1'))
+    stream = open(path, 'a', encoding='utf-8', buffering=1)
+    sys.stdout = sys.stderr = stream
+    print(f'{time.strftime("%Y-%m-%d %H:%M:%S")} 서비스 시작 pid={os.getpid()}', flush=True)
+    return path
+
+
 def serve(args):
     from platform_support import parent_monitor
 
@@ -128,6 +144,7 @@ def serve(args):
     import server
 
     with server.create_server() as httpd:
+        attach_service_log(DATA_DIR)
         stop = threading.Event()
 
         def monitor():
