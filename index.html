@@ -3047,7 +3047,7 @@ const PALETTES=[
 const PALETTE_BASE={dark:{bg:'#171714',panel:'#24221d',panel2:'#302d26',dim:'#aea694',ink:'#ece5d5',run:'#dcb85c',wait:'#ee9a5b',stall:'#f0806c',done:'#a3c88f',info:'#a3b8c2',off:'#8f8a7e'},
   light:{bg:'#f3eee3',panel:'#fbf8f1',panel2:'#f0eadd',dim:'#625a4b',ink:'#24221d',run:'#7a5a10',wait:'#9c4712',stall:'#ad3626',done:'#3e6934',info:'#395d6e',off:'#686255'}};
 const SURFACE_LIGHTNESS={dark:{bg:.085,panel:.12,panel2:.16,hover:.2,line:.27,line2:.45,ink:.91,sub:.8,dim:.7},
-  light:{bg:.945,panel:.985,panel2:.915,hover:.875,line:.8,line2:.6,ink:.13,sub:.3,dim:.4}};
+  light:{bg:.925,panel:.98,panel2:.9,hover:.86,line:.78,line2:.58,ink:.13,sub:.3,dim:.4}};
 const TEXT_TOKENS=['ink','sub','dim'],SIGNAL_TOKENS=['run','wait','stall','done','info','off'];
 const PALETTE_MODES=[['dark','다크'],['light','라이트']];
 const PALETTE_SIDE={dark:'#1d1c18',light:'#ebe4d5'};
@@ -3095,11 +3095,12 @@ function paletteTokens(palette) {
   for(const [mode] of PALETTE_MODES){
     const set=tokens[mode]={...PALETTE_BASE[mode]};
     if(palette.sidebar){
-      const [h,s]=toHsl(palette.sidebar),tint=Math.min(s*.45,.22);
-      for(const [key,lightness] of Object.entries(SURFACE_LIGHTNESS[mode]))set[key]=fromHsl(h,TEXT_TOKENS.includes(key)?Math.min(tint,.12):tint,lightness);
+      const [h,s,l]=toHsl(palette.sidebar),tint=Math.min(s*.8,.6),lift=mode==='dark'?Math.max(0,l*.55-SURFACE_LIGHTNESS.dark.bg):0;
+      for(const [key,lightness] of Object.entries(SURFACE_LIGHTNESS[mode]))set[key]=TEXT_TOKENS.includes(key)?fromHsl(h,Math.min(tint,.2),lightness):fromHsl(h,tint,lightness+lift);
       set.side=palette.sidebar;
       for(const key of TEXT_TOKENS)set[key]=readableOn(set[key],surfacesOf(set),mode);
-      for(const key of SIGNAL_TOKENS)set[key]=readableOn(PALETTE_BASE[mode][key],surfacesOf(set),mode);
+      for(const key of SIGNAL_TOKENS)set[key]=readableOn(palette.status?.[mode]?.[key] || PALETTE_BASE[mode][key],surfacesOf(set),mode);
+      if(palette.accent)set.primary=readableOn(palette.accent[mode],surfacesOf(set),mode);
       set.selected=palette.selected || mixHex(palette.sidebar,'#ffffff',.85);
       set['on-selected']=inkOn(set.selected);
       set.presence=palette.presence || visibleOn('#2bac76',palette.sidebar);
@@ -3108,9 +3109,10 @@ function paletteTokens(palette) {
       if(palette.selected){set.selected=palette.selected;set['on-selected']=inkOn(palette.selected);}
       if(palette.presence)set.presence=palette.presence;
       if(palette.notification)set.notify=palette.notification;
+      if(palette.accent)set.primary=palette.accent[mode];
+      Object.assign(set,palette.status?.[mode] || {});
     }
-    if(palette.accent){set.primary=palette.accent[mode];set['on-primary']=onPrimary(set.primary);}
-    Object.assign(set,palette.status?.[mode] || {});
+    if(palette.accent)set['on-primary']=onPrimary(set.primary);
   }
   return tokens;
 }
